@@ -1,128 +1,185 @@
 import { useMemo, useState } from 'react';
-import { tableRows, departments, subStatuses } from '../data/mockData.js';
+import { useStore, DEPARTMENTS } from '../store/StoreContext.jsx';
 import { useSearch } from '../components/Layout.jsx';
+import { useToast } from '../store/ToastContext.jsx';
+import { useTranslation } from '../store/useTranslation.js';
 import Avatar from '../components/Avatar.jsx';
 import Badge from '../components/Badge.jsx';
 import Button from '../components/Button.jsx';
 import Icon from '../components/Icon.jsx';
-import { Link } from 'react-router-dom';
+import EmptyState from '../components/EmptyState.jsx';
+import Modal from '../components/Modal.jsx';
+import ConfirmDialog from '../components/ConfirmDialog.jsx';
+import Breadcrumb from '../components/Breadcrumb.jsx';
+import PageHeader from '../components/PageHeader.jsx';
 
-const PER_PAGE = 8;
+const STATUS_OPTIONS = [
+  { value: 'approved', labelKey: 'doc.status.approved' },
+  { value: 'pending', labelKey: 'doc.status.pending' },
+  { value: 'rejected', labelKey: 'doc.status.rejected' },
+];
 
 export default function DataTables() {
   const { query } = useSearch();
-  const [dept, setDept] = useState('All Departments');
-  const [status, setStatus] = useState('All Status');
-  const [page, setPage] = useState(1);
+  const { submissions, updateDocument, deleteDocument } = useStore();
+  const { notify } = useToast();
+  const { t } = useTranslation();
+
+  const [dept, setDept] = useState('all');
+  const [status, setStatus] = useState('all');
+  const [viewing, setViewing] = useState(null);
+  const [confirmId, setConfirmId] = useState(null);
+
   const q = query.trim().toLowerCase();
 
   const filtered = useMemo(() => {
-    let rows = tableRows;
-    if (dept !== 'All Departments') rows = rows.filter((r) => r.dept === dept);
-    if (status !== 'All Status') rows = rows.filter((r) => r.status === status);
+    let rows = submissions;
+    if (dept !== 'all') rows = rows.filter((r) => r.dept === dept);
+    if (status !== 'all') rows = rows.filter((r) => r.status === status);
     if (q) rows = rows.filter((r) => `${r.id} ${r.name} ${r.dept} ${r.doc}`.toLowerCase().includes(q));
     return rows;
-  }, [dept, status, q]);
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
-  const safePage = Math.min(page, totalPages);
-  const current = filtered.slice((safePage - 1) * PER_PAGE, safePage * PER_PAGE);
+  }, [submissions, dept, status, q]);
 
   const initials = (name) => name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
 
-  const goTo = (p) => setPage(Math.max(1, Math.min(totalPages, p)));
+  const exportCSV = () => {
+    if (filtered.length === 0) return;
+    const header = ['ID', 'Employee Name', 'Department', 'Document Title', 'Date Submitted', 'Status'];
+    const rows = filtered.map((r) => [r.id, r.name, r.dept, r.doc, r.date, r.status]);
+    const csv = [header, ...rows]
+      .map((row) => row.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'noffice-submissions.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+    notify(t('table.export.msg'));
+  };
+
+  const doDelete = () => {
+    if (!confirmId) return;
+    deleteDocument(confirmId);
+    setConfirmId(null);
+    if (viewing && viewing.subId === confirmId) setViewing(null);
+    notify(t('action.delete'));
+  };
 
   return (
     <>
-      <nav className="breadcrumb" aria-label="Breadcrumb">
-        <Link to="/dashboard">Home</Link>
-        <span className="sep">/</span>
-        <span className="current">Data Tables</span>
-      </nav>
-
-      <div className="page-head">
-        <div>
-          <h1>Data Tables</h1>
-          <div className="section-sub">Document submission records</div>
-        </div>
-      </div>
+      <Breadcrumb crumbs={[{ label: t('breadcrumb.home'), to: '/dashboard' }, { label: t('table.title') }]} />
+      <PageHeader
+        title={t('table.title')}
+        subtitle={t('table.subtitle')}
+        actions={<Button variant="secondary" icon="download" onClick={exportCSV} disabled={filtered.length === 0}>{t('action.export')}</Button>}
+      />
 
       <div className="table-controls">
-        <select className="filter-select" value={dept} onChange={(e) => { setDept(e.target.value); setPage(1); }} aria-label="Filter by department">
-          {departments.map((d) => <option key={d}>{d}</option>)}
+        <select className="filter-select" value={dept} onChange={(e) => setDept(e.target.value)} aria-label={t('status.allDepts')}>
+          <option value="all">{t('status.allDepts')}</option>
+          {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
         </select>
-        <select className="filter-select" value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} aria-label="Filter by status">
-          {subStatuses.map((s) => <option key={s}>{s}</option>)}
+        <select className="filter-select" value={status} onChange={(e) => setStatus(e.target.value)} aria-label={t('status.all')}>
+          <option value="all">{t('status.all')}</option>
+          {STATUS_OPTIONS.map((s) => <option key={s.value} value={s.value}>{t(s.labelKey)}</option>)}
         </select>
-        <input className="filter-select" type="date" aria-label="Date submitted" style={{ width: 160 }} />
-        <div style={{ flex: 1 }} />
-        <Button variant="secondary" icon="download">Export CSV</Button>
+        <input className="filter-select" type="date" aria-label={t('table.date')} />
       </div>
 
       <div className="card table-card">
-        <div className="table-scroll">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Employee Name</th>
-                <th>Department</th>
-                <th>Document Title</th>
-                <th>Date Submitted</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {current.map((r) => (
-                <tr key={r.id}>
-                  <td style={{ fontWeight: 600, color: 'var(--primary)' }}>{r.id}</td>
-                  <td>
-                    <div className="employee-cell">
-                      <Avatar name={r.name} />
-                      <div>
-                        <div style={{ fontWeight: 600 }}>{r.name}</div>
-                        <div className="cell-sub">{r.id.toLowerCase()}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td>{r.dept}</td>
-                  <td>
-                    <div style={{ fontWeight: 500 }}>{r.doc}</div>
-                  </td>
-                  <td style={{ color: 'var(--text-2)' }}>{r.date}</td>
-                  <td><Badge status={r.status} /></td>
-                  <td>
-                    <span style={{ display: 'inline-flex', gap: 4 }}>
-                      <button className="action-btn" aria-label={`View ${r.id}`}><Icon name="eye" size={16} /></button>
-                      <button className="action-btn" aria-label={`Edit ${r.id}`}><Icon name="edit" size={16} /></button>
-                      <button className="action-btn" aria-label={`Delete ${r.id}`}><Icon name="trash" size={16} /></button>
-                    </span>
-                  </td>
-                </tr>
-              ))}
-              {current.length === 0 && (
-                <tr><td colSpan="7" style={{ textAlign: 'center', color: 'var(--text-3)', padding: 30 }}>No submissions match your filters.</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="card-body pagination">
-          <div className="pagination-info">
-            Showing {(safePage - 1) * PER_PAGE + 1}–{Math.min(safePage * PER_PAGE, filtered.length)} of {filtered.length} submissions
-          </div>
-          <div className="page-btns">
-            <button className="page-btn" disabled={safePage <= 1} onClick={() => goTo(safePage - 1)} aria-label="Previous page">&lt;</button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-              <button key={p} className={`page-btn ${p === safePage ? 'active' : ''}`} onClick={() => goTo(p)} aria-current={p === safePage ? 'page' : undefined}>
-                {p}
-              </button>
-            ))}
-            <button className="page-btn" disabled={safePage >= totalPages} onClick={() => goTo(safePage + 1)} aria-label="Next page">&gt;</button>
-          </div>
-        </div>
+        {filtered.length === 0 ? (
+          <EmptyState
+            icon="table"
+            title={t('table.empty.title')}
+            description={t('table.empty.desc')}
+          />
+        ) : (
+          <>
+            <div className="table-scroll">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>{t('table.col.id')}</th>
+                    <th>{t('table.col.employee')}</th>
+                    <th>{t('table.col.dept')}</th>
+                    <th>{t('table.col.doc')}</th>
+                    <th>{t('table.col.date')}</th>
+                    <th>{t('table.col.status')}</th>
+                    <th>{t('table.col.actions')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((r) => (
+                    <tr key={r.subId}>
+                      <td className="cell-id">{r.id}</td>
+                      <td>
+                        <div className="employee-cell">
+                          <Avatar name={r.name} size="sm" />
+                          <div className="emp-name">{r.name}</div>
+                        </div>
+                      </td>
+                      <td>{r.dept}</td>
+                      <td className="cell-doc">{r.doc}</td>
+                      <td className="cell-date">{r.date}</td>
+                      <td><Badge status={r.status} /></td>
+                      <td>
+                        <span className="row-actions">
+                          <button className="action-btn" onClick={() => setViewing(r)} aria-label={`${t('action.view')} ${r.id}`}><Icon name="eye" size={16} /></button>
+                          <button className="action-btn" onClick={() => setConfirmId(r.subId)} aria-label={`${t('action.delete')} ${r.id}`}><Icon name="trash" size={16} /></button>
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="card-footer pagination-info">
+              {t('table.showing')} {filtered.length} {t('table.col.id').toLowerCase()}
+            </div>
+          </>
+        )}
       </div>
+
+      {viewing && (
+        <Modal open onClose={() => setViewing(null)} title={viewing.doc}>
+          <dl className="doc-detail-list">
+            <div><dt>{t('table.col.id')}</dt><dd>{viewing.id}</dd></div>
+            <div><dt>{t('table.col.employee')}</dt><dd>{viewing.name}</dd></div>
+            <div><dt>{t('table.col.dept')}</dt><dd>{viewing.dept}</dd></div>
+            <div><dt>{t('table.col.date')}</dt><dd>{viewing.date}</dd></div>
+            <div className="with-badge"><dt>{t('table.col.status')}</dt><dd><Badge status={viewing.status} /></dd></div>
+          </dl>
+          <div className="form-group">
+            <label className="form-label" htmlFor="sub-status">{t('doc.updateStatus')}</label>
+            <select
+              className="form-select"
+              id="sub-status"
+              value={viewing.status}
+              onChange={(e) => {
+                updateDocument(viewing.subId, { status: e.target.value });
+                notify(t('doc.updateStatus'));
+                setViewing((v) => ({ ...v, status: e.target.value }));
+              }}
+            >
+              {STATUS_OPTIONS.map((s) => <option key={s.value} value={s.value}>{t(s.labelKey)}</option>)}
+            </select>
+          </div>
+          <div className="modal-actions">
+            <Button variant="ghost" icon="trash" onClick={() => { setConfirmId(viewing.subId); }}>{t('action.delete')}</Button>
+          </div>
+        </Modal>
+      )}
+
+      <ConfirmDialog
+        open={!!confirmId}
+        title={t('doc.delete.title')}
+        message={t('doc.delete.msg')}
+        confirmLabel={t('action.delete')}
+        onCancel={() => setConfirmId(null)}
+        onConfirm={doDelete}
+      />
     </>
   );
 }

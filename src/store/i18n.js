@@ -107,6 +107,7 @@ export const translations = {
     'doc.upload.reqFile': 'Please select a file.',
     'doc.upload.reqName': 'File name is required.',
     'doc.upload.tooLarge': 'File size exceeds the allowed limit.',
+    'doc.upload.category': 'Category',
 
     // Inbox
     'inbox.title': 'Inbox',
@@ -332,6 +333,7 @@ export const translations = {
     'doc.upload.reqFile': 'Silakan pilih file.',
     'doc.upload.reqName': 'Nama file wajib diisi.',
     'doc.upload.tooLarge': 'Ukuran file melebihi batas yang diizinkan.',
+    'doc.upload.category': 'Kategori',
 
     'inbox.title': 'Kotak Masuk',
     'inbox.subtitle': 'Pesan dan notifikasi',

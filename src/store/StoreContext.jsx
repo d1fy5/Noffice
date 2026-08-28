@@ -10,6 +10,15 @@ export const DEPARTMENTS = [
 export const RECIPIENT_STATUSES = ['Approved', 'Pending', 'Rejected'];
 export const EMPLOYEE_STATUSES = ['Active', 'Inactive'];
 
+const UPLOAD_CATEGORIES = [
+  'Reports',
+  'Finance',
+  'HR & Talent',
+  'Legal & Compliance',
+  'Engineering',
+  'Operations',
+];
+
 const KEYS = {
   documents: 'noffice.documents',
   employees: 'noffice.employees',
@@ -79,24 +88,30 @@ export function StoreProvider({ children }) {
   useEffect(() => localStorage.setItem(KEYS.language, JSON.stringify(language)), [language]);
 
   // Documents
-  const addDocuments = useCallback((files) => {
+  const addDocuments = useCallback((items) => {
     const now = Date.now();
-    const created = files.map((f, idx) => ({
-      id: uid() + idx,
-      title: f.name,
-      author: account.firstName ? `${account.firstName} ${account.lastName}`.trim() : 'You',
-      size: formatBytes(f.size),
-      sizeBytes: f.size,
-      date: new Date(now - idx * 1000).toLocaleDateString(undefined, {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-      }),
-      dateTs: now - idx * 1000,
-      status: 'pending',
-      type: extOf(f.name),
-      dept: account.department || 'General',
-    }));
+    const created = items.map((item, idx) => {
+      const f = item.file;
+      const name = (item.name && item.name.trim()) || f.name;
+      return {
+        id: uid() + idx,
+        title: name,
+        description: item.description || '',
+        category: item.category || '',
+        author: account.firstName ? `${account.firstName} ${account.lastName}`.trim() : 'You',
+        size: formatBytes(f.size),
+        sizeBytes: f.size,
+        date: new Date(now - idx * 1000).toLocaleDateString(undefined, {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+        }),
+        dateTs: now - idx * 1000,
+        status: 'pending',
+        type: extOf(f.name),
+        dept: item.category || account.department || 'General',
+      };
+    });
     setDocuments((d) => [...created, ...d]);
     return created;
   }, [account]);
@@ -226,3 +241,5 @@ export function extOf(name) {
   if (ext === 'docx' || ext === 'doc') return 'docx';
   return 'docx';
 }
+
+export { UPLOAD_CATEGORIES };

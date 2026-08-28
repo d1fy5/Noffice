@@ -1,22 +1,25 @@
-import { useRef } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore, formatBytes } from '../store/StoreContext.jsx';
 import { useSearch } from '../components/Layout.jsx';
+import { useTranslation } from '../store/useTranslation.js';
 import StatCard from '../components/StatCard.jsx';
 import Badge from '../components/Badge.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import Button from '../components/Button.jsx';
 import Icon from '../components/Icon.jsx';
+import UploadModal from '../components/UploadModal.jsx';
+import PageHeader from '../components/PageHeader.jsx';
 
 export default function Dashboard() {
   const { query } = useSearch();
-  const { totals, documents, addDocuments } = useStore();
+  const { totals, documents } = useStore();
+  const { t } = useTranslation();
   const navigate = useNavigate();
-  const fileInput = useRef(null);
+  const [uploadOpen, setUploadOpen] = useState(false);
 
   const q = query.trim().toLowerCase();
-
-  const triggerUpload = () => fileInput.current && fileInput.current.click();
+  const openUpload = () => setUploadOpen(true);
 
   const recent = documents
     .filter((d) => !q || d.title.toLowerCase().includes(q) || d.author.toLowerCase().includes(q))
@@ -24,49 +27,29 @@ export default function Dashboard() {
 
   return (
     <>
-      <div className="page-head">
-        <div>
-          <h1>Dashboard</h1>
-          <div className="section-sub">Overview of your document workspace</div>
-        </div>
-        <Button variant="primary" icon="upload" onClick={triggerUpload}>Upload Document</Button>
-        <input
-          ref={fileInput}
-          type="file"
-          multiple
-          hidden
-          onChange={(e) => {
-            if (e.target.files.length) {
-              addDocuments(Array.from(e.target.files));
-            }
-            e.target.value = '';
-          }}
-          aria-label="Upload documents"
-        />
-      </div>
+      <PageHeader
+        title={t('dash.title')}
+        subtitle={t('dash.subtitle')}
+        actions={<Button variant="primary" icon="upload" onClick={openUpload}>{t('action.upload')}</Button>}
+      />
 
       <div className="stat-grid">
-        <StatCard label="Total Documents" value={totals.totalDocuments.toLocaleString()} icon="documents" sub={totals.totalDocuments ? 'documents in workspace' : 'no documents yet'} />
-        <StatCard label="Pending Approvals" value={totals.pendingApprovals.toLocaleString()} icon="clock" sub={totals.pendingApprovals ? 'awaiting review' : 'all caught up'} />
-        <StatCard label="Active Employees" value={totals.activeEmployees.toLocaleString()} icon="employees" sub={totals.activeEmployees ? 'team members' : 'no employees yet'} />
-        <StatCard label="Storage Used" value={formatBytes(totals.storageBytes)} icon="chart" sub={formatBytes(totals.storageBytes) === '0 B' ? 'no files stored' : 'total upload size'} />
+        <StatCard label={t('stat.totalDocuments')} value={totals.totalDocuments.toLocaleString()} icon="documents" sub={totals.totalDocuments ? t('stat.sub.totalTruth') : t('stat.sub.totalEmpty')} />
+        <StatCard label={t('stat.pendingApprovals')} value={totals.pendingApprovals.toLocaleString()} icon="clock" sub={totals.pendingApprovals ? t('stat.sub.pendingTruth') : t('stat.sub.pendingEmpty')} />
+        <StatCard label={t('stat.activeEmployees')} value={totals.activeEmployees.toLocaleString()} icon="employees" sub={totals.activeEmployees ? t('stat.sub.employeesTruth') : t('stat.sub.employeesEmpty')} />
+        <StatCard label={t('stat.storageUsed')} value={formatBytes(totals.storageBytes)} icon="chart" sub={formatBytes(totals.storageBytes) === '0 B' ? t('stat.sub.storageEmpty') : t('stat.sub.storageTruth')} />
       </div>
 
       <div className="dash-two dash-grid-wide">
         <div>
-          <div className="section-header">
-            <div>
-              <h2>Recent Submissions</h2>
-              <div className="section-sub">Latest documents in the workspace</div>
-            </div>
-          </div>
+          <SectionHead title={t('dash.recentSubmissions')} subtitle={t('dash.recentSub')} />
           <div className="card">
             {recent.length === 0 ? (
               <EmptyState
                 icon="documents"
-                title="No documents yet"
-                description="Upload a document to see it here, or add one from the Documents page."
-                action={<Button variant="secondary" icon="upload" onClick={triggerUpload}>Upload Document</Button>}
+                title={t('dash.empty.documents.title')}
+                description={t('dash.empty.documents.desc')}
+                action={<Button variant="secondary" icon="upload" onClick={openUpload}>{t('action.upload')}</Button>}
               />
             ) : (
               <>
@@ -75,71 +58,80 @@ export default function Dashboard() {
                     <div className={`doc-icon ${d.type || 'docx'}`}>
                       <Icon name={d.type === 'docx' ? 'fileText' : 'file'} size={20} />
                     </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div className="sub-docname" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.title}</div>
+                    <div className="sub-main">
+                      <div className="sub-docname">{d.title}</div>
                       <div className="sub-meta">{d.author} • {d.dept} • {d.size}</div>
                     </div>
                     <Badge status={d.status} />
                   </div>
                 ))}
-                <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border)' }}>
-                  <Button variant="ghost" size="sm" onClick={() => navigate('/documents')}>View all documents</Button>
+                <div className="card-footer-link">
+                  <Button variant="ghost" size="sm" onClick={() => navigate('/documents')}>{t('dash.viewAll')}</Button>
                 </div>
               </>
             )}
           </div>
 
-          <div className="section-header">
-            <h2>Quick Operations</h2>
-          </div>
+          <SectionHead title={t('dash.quickOps')} />
           <div className="quick-op-grid">
-            <button className="quick-op" onClick={triggerUpload}>
+            <button className="quick-op" onClick={openUpload}>
               <span className="qo-icon"><Icon name="upload" size={18} /></span>
-              Upload Document
+              {t('action.upload')}
             </button>
             <button className="quick-op" onClick={() => navigate('/employees')}>
               <span className="qo-icon"><Icon name="userPlus" size={18} /></span>
-              Add Employee
+              {t('action.addEmployee')}
             </button>
             <button className="quick-op" onClick={() => navigate('/inbox')}>
               <span className="qo-icon"><Icon name="message" size={18} /></span>
-              New Message
+              {t('action.newMessage')}
             </button>
           </div>
         </div>
 
         <div>
-          <div className="section-header">
-            <h2>Category Distribution</h2>
-          </div>
+          <SectionHead title={t('dash.category')} />
           <div className="card">
             {documents.length === 0 ? (
-              <EmptyState icon="chart" title="No data to chart" description="Upload documents to see category distribution." />
+              <EmptyState icon="chart" title={t('dash.empty.category.title')} description={t('dash.empty.category.desc')} />
             ) : (
               <div className="card-body category-list">{categoryRows(documents)}</div>
             )}
           </div>
 
-          <div className="section-header">
-            <h2>System Activity</h2>
-          </div>
+          <SectionHead title={t('dash.activity')} />
           <div className="card">
             {documents.length === 0 ? (
-              <EmptyState icon="activity" title="No activity yet" description="Uploads and reviews will be tracked here." />
+              <EmptyState icon="activity" title={t('dash.empty.activity.title')} description={t('dash.empty.activity.desc')} />
             ) : (
-              <div className="chart-bars" role="img" aria-label="Document activity">
-                {activitySegments(documents).map((b, i) => (
-                  <div key={i} className={`chart-bar ${b.active ? 'highlight' : ''}`} style={{ height: `${b.h}%` }} />
-                ))}
-                <div className="legend" style={{ width: '100%' }}>
-                  <div className="legend-item"><span className="legend-swatch" style={{ background: 'var(--primary)' }} /> Uploads</div>
+              <div className="card-body">
+                <div className="chart-bars" role="img" aria-label={t('dash.activity')}>
+                  {activitySegments(documents).map((b, i) => (
+                    <div key={i} className={`chart-bar ${b.active ? 'highlight' : ''}`} style={{ height: `${b.h}%` }} />
+                  ))}
+                </div>
+                <div className="legend">
+                  <div className="legend-item"><span className="legend-swatch" style={{ background: 'var(--primary)' }} /> {t('legend.uploads')}</div>
                 </div>
               </div>
             )}
           </div>
         </div>
       </div>
+
+      <UploadModal open={uploadOpen} onClose={() => setUploadOpen(false)} />
     </>
+  );
+}
+
+function SectionHead({ title, subtitle }) {
+  return (
+    <div className="section-header">
+      <div>
+        <h2>{title}</h2>
+        {subtitle && <div className="section-sub">{subtitle}</div>}
+      </div>
+    </div>
   );
 }
 
