@@ -7,7 +7,7 @@ const iconColor = {
   chart: '#7c3aed',
 };
 
-export default function StatCard({ label, value, trend, dir, color, icon }) {
+export default function StatCard({ label, value, icon, sub, color }) {
   return (
     <div className="stat-card">
       <div className="stat-icon" style={{ background: color || iconColor[icon] }}>
@@ -16,11 +16,7 @@ export default function StatCard({ label, value, trend, dir, color, icon }) {
       <div>
         <div className="stat-label">{label}</div>
         <div className="stat-value">{value}</div>
-        <div className={`stat-trend ${dir === 'down' ? 'down' : 'up'}`}>
-          <Icon name={dir === 'down' ? 'chevronDown' : 'chart'} size={13} />
-          {trend}
-          <span style={{ color: 'var(--text-3)', fontWeight: 500, marginLeft: 2 }}>vs last month</span>
-        </div>
+        {sub && <div className="stat-sub">{sub}</div>}
       </div>
     </div>
   );

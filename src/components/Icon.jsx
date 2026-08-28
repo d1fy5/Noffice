@@ -34,6 +34,13 @@ const paths = {
   shield: <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" strokeLinejoin="round" />,
   monitor: <path d="M2 4h20v13H2zM8 21h8M12 17v4" strokeLinecap="round" strokeLinejoin="round" />,
   userPlus: <path d="M15 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0zM2 21v-1a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v1M19 8v6M22 11h-6" strokeLinecap="round" strokeLinejoin="round" />,
+  menu: <path d="M3 6h18M3 12h18M3 18h18" strokeLinecap="round" />,
+  sun: <path d="M12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10zM12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" strokeLinecap="round" />,
+  moon: <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" strokeLinecap="round" strokeLinejoin="round" />,
+  sort: <path d="M11 5h10M11 12h7M11 19h4M5 3v18M8 6l-3 3L2 6" strokeLinecap="round" strokeLinejoin="round" />,
+  dots: <path d="M12 5h.01M12 12h.01M12 19h.01" strokeLinecap="round" strokeLinejoin="round" />,
+  filter: <path d="M22 3H2l8 9.46V19l4 2v-8.54z" strokeLinecap="round" strokeLinejoin="round" />,
+  save: <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2zM17 21v-8H7v8M7 3v5h8" strokeLinecap="round" strokeLinejoin="round" />,
 };
 
 export default function Icon({ name, size = 20, strokeWidth = 1.8, className = '' }) {
