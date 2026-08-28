@@ -18,6 +18,7 @@ const KEYS = {
   notifications: 'noffice.notifications',
   security: 'noffice.security',
   appearance: 'noffice.appearance',
+  language: 'noffice.language',
 };
 
 function load(key, fallback) {
@@ -63,6 +64,7 @@ export function StoreProvider({ children }) {
   const [security, setSecurity] = useState(() =>
     load(KEYS.security, { twoFactor: true, keepSession: true, changedAt: null })
   );
+  const [language, setLanguage] = useState(() => load(KEYS.language, 'en'));
 
   useEffect(() => localStorage.setItem(KEYS.documents, JSON.stringify(documents)), [documents]);
   useEffect(() => localStorage.setItem(KEYS.employees, JSON.stringify(employees)), [employees]);
@@ -74,6 +76,7 @@ export function StoreProvider({ children }) {
   );
   useEffect(() => localStorage.setItem(KEYS.appearance, JSON.stringify(appearance)), [appearance]);
   useEffect(() => localStorage.setItem(KEYS.security, JSON.stringify(security)), [security]);
+  useEffect(() => localStorage.setItem(KEYS.language, JSON.stringify(language)), [language]);
 
   // Documents
   const addDocuments = useCallback((files) => {
@@ -181,6 +184,7 @@ export function StoreProvider({ children }) {
     appearance,
     security,
     totals,
+    language,
     addDocuments,
     deleteDocument,
     updateDocument,
@@ -193,6 +197,7 @@ export function StoreProvider({ children }) {
     setNotifications,
     setAppearance,
     setSecurity,
+    setLanguage,
   };
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
