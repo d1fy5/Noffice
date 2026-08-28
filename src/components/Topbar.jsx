@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Icon from './Icon.jsx';
 import Avatar from './Avatar.jsx';
+import { useTranslation } from '../store/useTranslation.js';
 
 export default function Topbar({ title, searchValue, onSearch, onMenu, notifications = [] }) {
   const [notifOpen, setNotifOpen] = useState(false);
@@ -9,6 +10,7 @@ export default function Topbar({ title, searchValue, onSearch, onMenu, notificat
   const notifRef = useRef(null);
   const profileRef = useRef(null);
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   useEffect(() => {
     const handler = (e) => {
@@ -21,7 +23,7 @@ export default function Topbar({ title, searchValue, onSearch, onMenu, notificat
 
   return (
     <header className="topbar">
-      <button className="icon-btn menu-toggle" onClick={onMenu} aria-label="Open navigation menu">
+      <button className="icon-btn menu-toggle" onClick={onMenu} aria-label={t('action.menu') || 'Menu'}>
         <Icon name="menu" size={20} />
       </button>
 
@@ -33,13 +35,13 @@ export default function Topbar({ title, searchValue, onSearch, onMenu, notificat
         </span>
         <input
           type="search"
-          placeholder="Search documents, employees, messages..."
+          placeholder={t('search')}
           value={searchValue}
           onChange={(e) => onSearch(e.target.value)}
-          aria-label="Search"
+          aria-label={t('search')}
         />
         {searchValue && (
-          <button className="search-clear" onClick={() => onSearch('')} aria-label="Clear search">
+          <button className="search-clear" onClick={() => onSearch('')} aria-label={t('search.clear')}>
             <Icon name="x" size={15} />
           </button>
         )}
@@ -49,7 +51,7 @@ export default function Topbar({ title, searchValue, onSearch, onMenu, notificat
         <div className="dropdown" ref={notifRef}>
           <button
             className="icon-btn"
-            aria-label={`Notifications (${notifications.length})`}
+            aria-label={`${t('topbar.notifications')} (${notifications.length})`}
             onClick={() => setNotifOpen((v) => !v)}
           >
             <Icon name="bell" size={20} />
@@ -59,9 +61,9 @@ export default function Topbar({ title, searchValue, onSearch, onMenu, notificat
           </button>
           {notifOpen && (
             <div className="dropdown-menu notif-menu" role="menu">
-              <div className="dropdown-head">Notifications</div>
+              <div className="dropdown-head">{t('topbar.notifications')}</div>
               {notifications.length === 0 ? (
-                <div className="dropdown-empty">You're all caught up.</div>
+                <div className="dropdown-empty">{t('topbar.notifEmpty')}</div>
               ) : (
                 notifications.slice(0, 6).map((n, i) => (
                   <button
@@ -82,21 +84,21 @@ export default function Topbar({ title, searchValue, onSearch, onMenu, notificat
         </div>
 
         <div className="dropdown" ref={profileRef}>
-          <button className="topbar-profile" aria-label="Profile menu" onClick={() => setProfileOpen((v) => !v)}>
-            <Avatar name="Noffice User" />
+          <button className="topbar-profile" aria-label={t('profile')} onClick={() => setProfileOpen((v) => !v)}>
+            <Avatar name={t('profile')} />
             <span className="p-namewrap">
-              <span className="p-name">Noffice User</span>
-              <div className="p-role">Admin</div>
+              <span className="p-name">{t('profile')}</span>
+              <div className="p-role">{t('profileRole')}</div>
             </span>
             <Icon name="chevronDown" size={16} />
           </button>
           {profileOpen && (
             <div className="dropdown-menu" role="menu">
               <button className="dropdown-item" onClick={() => { setProfileOpen(false); navigate('/settings'); }}>
-                Settings
+                {t('settings.title')}
               </button>
               <button className="dropdown-item" onClick={() => { setProfileOpen(false); navigate('/settings'); }}>
-                Account
+                {t('settings.account')}
               </button>
             </div>
           )}

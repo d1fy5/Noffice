@@ -152,7 +152,7 @@ export default function Settings() {
             <>
               <div className="settings-head">
                 <h2>{t('settings.appearance')}</h2>
-                <p>{t('settings.langSub')}</p>
+                <p>{t('settings.appearance.sub')}</p>
               </div>
               <FormField label={t('settings.theme')} htmlFor="theme-select">
                 <select className="form-select" id="theme-select" value={chosen} onChange={(e) => setTheme(e.target.value)}>

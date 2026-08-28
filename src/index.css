@@ -41,6 +41,35 @@
   --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
+/* ============================================================
+   DARK MODE
+   Overrides design tokens when `.dark` is applied to <html>.
+   ============================================================ */
+.dark {
+  --bg: #0d1220;
+  --surface: #161d2f;
+  --surface-2: #1d2540;
+
+  --border: #2a3552;
+  --border-strong: #38466b;
+
+  --text: #e6ebf8;
+  --text-2: #b3bdd8;
+  --text-3: #7c87a5;
+
+  --primary-soft: #1d2c55;
+
+  --green-soft: #14311f;
+  --amber-soft: #362a16;
+  --red-soft: #3a1c1f;
+  --violet-soft: #2a2140;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.45);
+
+  color-scheme: dark;
+}
+
 *,
 *::before,
 *::after {
@@ -277,6 +306,7 @@ h2 {
 
 .topbar-search {
   flex: 1;
+  min-width: 0;
   max-width: 460px;
   margin-left: auto;
   position: relative;
@@ -302,7 +332,7 @@ h2 {
 .topbar-search input:focus {
   border-color: var(--primary);
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
-  background: #fff;
+  background: var(--surface);
 }
 
 .search-icon {
@@ -327,7 +357,7 @@ h2 {
   height: 40px;
   border-radius: 50%;
   border: 1px solid var(--border);
-  background: #fff;
+  background: var(--surface);
   color: var(--text-2);
   display: flex;
   align-items: center;
@@ -457,7 +487,7 @@ h2 {
 }
 
 .btn-secondary {
-  background: #fff;
+  background: var(--surface);
   border-color: var(--border-strong);
   color: var(--text);
 }
@@ -676,7 +706,7 @@ h2 {
   padding: 13px 14px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: #fff;
+  background: var(--surface);
   text-align: left;
   font-size: 14px;
   font-weight: 500;
@@ -955,7 +985,7 @@ h2 {
 }
 
 .folder-item.active .folder-count {
-  background: #fff;
+  background: var(--surface);
   color: var(--primary);
 }
 
@@ -970,7 +1000,7 @@ h2 {
   height: 40px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
-  background: #fff;
+  background: var(--surface);
   color: var(--text);
   padding: 0 12px;
   font-size: 13px;
@@ -995,7 +1025,7 @@ h2 {
   width: 38px;
   height: 38px;
   border: none;
-  background: #fff;
+  background: var(--surface);
   color: var(--text-3);
   display: flex;
   align-items: center;
@@ -1014,7 +1044,7 @@ h2 {
 }
 
 .doc-card {
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   overflow: hidden;
@@ -1098,7 +1128,7 @@ h2 {
 }
 
 .modal {
-  background: #fff;
+  background: var(--surface);
   border-radius: var(--radius-lg);
   width: 100%;
   max-width: min(520px, 100%);
@@ -1186,7 +1216,7 @@ h2 {
 }
 
 .email-list {
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   overflow: hidden;
@@ -1264,7 +1294,7 @@ h2 {
 }
 
 .email-pane {
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   overflow: hidden;
@@ -1412,7 +1442,7 @@ table.data-table {
   min-width: 36px;
   height: 36px;
   border: 1px solid var(--border);
-  background: #fff;
+  background: var(--surface);
   border-radius: var(--radius-sm);
   color: var(--text-2);
   font-size: 13px;
@@ -1513,7 +1543,7 @@ table.data-table {
   font-size: 13.5px;
   font-family: inherit;
   color: var(--text);
-  background: #fff;
+  background: var(--surface);
   outline: none;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
@@ -1893,6 +1923,27 @@ table.data-table {
   .quick-op-grid {
     grid-template-columns: 1fr;
   }
+
+  .dropdown-menu {
+    min-width: 200px;
+  }
+
+  .notif-menu {
+    position: fixed;
+    top: calc(var(--topbar-height) + 8px);
+    right: 12px;
+    left: 12px;
+    width: auto;
+    min-width: 0;
+    max-width: none;
+  }
+
+  .toast-stack {
+    right: 12px;
+    left: 12px;
+    bottom: 12px;
+    max-width: none;
+  }
 }
 
 @media (max-width: 375px) {
@@ -2184,7 +2235,7 @@ table.data-table {
 .doc-thumb .thumb-file {
   display: flex;
   border-radius: var(--radius);
-  background: #fff;
+  background: var(--surface);
   padding: 10px;
   box-shadow: var(--shadow-sm);
 }
@@ -2545,4 +2596,222 @@ table.data-table tbody td {
 #root {
   overflow-x: clip;
 }
+
+/* ============================================================
+   TOASTS
+   ============================================================ */
+.toast-stack {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: min(380px, calc(100vw - 32px));
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-md);
+  font-size: 13.5px;
+  color: var(--text);
+  min-width: 0;
+}
+
+.toast-icon {
+  flex-shrink: 0;
+  display: flex;
+  margin-top: 1px;
+}
+
+.toast-success .toast-icon {
+  color: var(--green);
+}
+
+.toast-error .toast-icon {
+  color: var(--red);
+}
+
+.toast-info .toast-icon {
+  color: var(--primary);
+}
+
+.toast-msg {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.toast-close {
+  flex-shrink: 0;
+  border: none;
+  background: none;
+  color: var(--text-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border-radius: 6px;
+}
+
+.toast-close:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+/* ============================================================
+   TOPBAR DROPDOWNS
+   ============================================================ */
+.dropdown {
+  position: relative;
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  min-width: 240px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  padding: 6px;
+  z-index: 60;
+  animation: pop 0.14s ease;
+}
+
+.dropdown-head {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-3);
+  padding: 8px 10px 4px;
+}
+
+.dropdown-empty {
+  font-size: 13px;
+  color: var(--text-3);
+  padding: 12px 10px;
+}
+
+.dropdown-item {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: none;
+  padding: 9px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.dropdown-item:hover {
+  background: var(--surface-2);
+}
+
+.dropdown-item-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.dropdown-item-sub {
+  font-size: 12px;
+  color: var(--text-3);
+  margin-top: 2px;
+  overflow-wrap: anywhere;
+}
+
+.notif-menu {
+  min-width: 300px;
+  max-width: min(340px, calc(100vw - 32px));
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+/* Search clear inside topbar */
+.search-clear {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 26px;
+  height: 26px;
+  border: none;
+  background: var(--surface-2);
+  color: var(--text-3);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.search-clear:hover {
+  background: var(--border-strong);
+  color: var(--text);
+}
+
+/* Inbox message paragraphs + docs count label */
+.pane-para {
+  margin: 0 0 12px;
+}
+
+.pane-para:last-child {
+  margin-bottom: 0;
+}
+
+.doc-count-label {
+  font-size: 13px;
+  color: var(--text-3);
+  margin: 14px 0;
+}
+
+/* ============================================================
+   DARK MODE — element-level overrides that need more than tokens
+   ============================================================ */
+.dark .doc-thumb {
+  background: linear-gradient(180deg, #1b2438, #151c2e);
+}
+
+.dark .doc-thumb .thumb-file {
+  background: var(--surface-2);
+}
+
+.dark .topbar-search input:focus {
+  background: var(--surface);
+}
+
+.dark .view-btn.active {
+  background: var(--primary-soft);
+}
+
+.dark .icon-btn,
+.dark .page-btn,
+.dark .quick-op {
+  background: var(--surface);
+}
+
+.dark .btn-secondary {
+  border-color: var(--border-strong);
+}
+
+.dark .toast {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
 

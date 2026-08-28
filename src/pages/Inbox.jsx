@@ -20,6 +20,7 @@ export default function Inbox() {
   const { t } = useTranslation();
 
   const [activeId, setActiveId] = useState(null);
+  const [listOpen, setListOpen] = useState(false);
   const [composeOpen, setComposeOpen] = useState(false);
   const [confirmId, setConfirmId] = useState(null);
 
@@ -31,7 +32,7 @@ export default function Inbox() {
     !q || `${m.sender} ${m.subject} ${m.body}`.toLowerCase().includes(q)
   );
 
-  const active = messages.find((m) => m.id === activeId) || filtered[0] || null;
+  const active = listOpen ? null : messages.find((m) => m.id === activeId) || filtered[0] || null;
 
   const openCompose = () => {
     setForm({ recipient: '', subject: '', message: '' });
@@ -84,7 +85,10 @@ export default function Inbox() {
               <button
                 key={m.id}
                 className={`email-item ${active && m.id === active.id ? 'active' : ''}`}
-                onClick={() => setActiveId(m.id)}
+                onClick={() => {
+                  setActiveId(m.id);
+                  setListOpen(false);
+                }}
               >
                 <Avatar name={m.sender} />
                 <div className="email-main">
@@ -105,7 +109,7 @@ export default function Inbox() {
             <>
               <div className="email-pane-head">
                 <div className="email-pane-top">
-                  <button className="inbox-back-btn icon-btn" onClick={() => setActiveId(null)} aria-label={t('action.back')}><Icon name="back" size={17} /></button>
+                  <button className="inbox-back-btn icon-btn" onClick={() => { setActiveId(null); setListOpen(true); }} aria-label={t('action.back')}><Icon name="back" size={17} /></button>
                   <h2 className="email-pane-title">{active.subject}</h2>
                   <div className="email-pane-actions">
                     <button className="icon-btn" aria-label={t('action.edit')}><Icon name="edit" size={17} /></button>

@@ -20,7 +20,7 @@ export default function Sidebar({ open, onClose }) {
   return (
     <>
       <div className={`drawer-backdrop ${open ? 'show' : ''}`} onClick={onClose} aria-hidden="true" />
-      <aside className={`sidebar ${open ? 'open' : ''}`} aria-label="Sidebar navigation">
+      <aside className={`sidebar ${open ? 'open' : ''}`} aria-label={t('app.name')}>
         <div className="sidebar-logo">
           <div className="logo-mark">N</div>
           <div>

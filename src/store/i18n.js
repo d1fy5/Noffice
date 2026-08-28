@@ -33,6 +33,13 @@ export const translations = {
     'action.back': 'Back',
     'action.close': 'Close',
     'action.loadMore': 'View all',
+    'action.menu': 'Open navigation menu',
+
+    // Topbar
+    'topbar.notifications': 'Notifications',
+    'topbar.notifEmpty': "You're all caught up.",
+    'topbar.pendingApproval': 'pending approval',
+    'topbar.viewPending': 'View pending documents',
 
     // Search
     search: 'Search documents, employees, messages...',
@@ -179,6 +186,7 @@ export const translations = {
     'settings.account': 'Account',
     'settings.notifications': 'Notifications',
     'settings.appearance': 'Appearance',
+    'settings.appearance.sub': 'Customise how Noffice looks and feels.',
     'settings.language': 'Language',
     'settings.security': 'Security',
     'settings.saveAccount': 'Save changes',
@@ -263,6 +271,13 @@ export const translations = {
     'action.back': 'Kembali',
     'action.close': 'Tutup',
     'action.loadMore': 'Lihat semua',
+    'action.menu': 'Buka menu navigasi',
+
+    // Topbar
+    'topbar.notifications': 'Notifikasi',
+    'topbar.notifEmpty': 'Semua sudah beres.',
+    'topbar.pendingApproval': 'menunggu persetujuan',
+    'topbar.viewPending': 'Lihat dokumen tertunda',
 
     search: 'Cari dokumen, karyawan, pesan...',
     'search.clear': 'Bersihkan pencarian',
@@ -400,6 +415,7 @@ export const translations = {
     'settings.account': 'Akun',
     'settings.notifications': 'Notifikasi',
     'settings.appearance': 'Tampilan',
+    'settings.appearance.sub': 'Sesuaikan tampilan dan nuansa Noffice.',
     'settings.language': 'Bahasa',
     'settings.security': 'Keamanan',
     'settings.saveAccount': 'Simpan perubahan',

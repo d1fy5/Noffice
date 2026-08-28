@@ -1,6 +1,7 @@
 import { createContext, useContext, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useStore } from '../store/StoreContext.jsx';
+import { useTranslation } from '../store/useTranslation.js';
 import Sidebar from './Sidebar.jsx';
 import Topbar from './Topbar.jsx';
 
@@ -10,13 +11,13 @@ export function useSearch() {
   return useContext(SearchContext);
 }
 
-const titleMap = {
-  '/dashboard': 'Dashboard',
-  '/documents': 'Documents',
-  '/inbox': 'Inbox',
-  '/data-tables': 'Data Tables',
-  '/employees': 'Employees',
-  '/settings': 'Settings',
+const titleKeyMap = {
+  '/dashboard': 'dashboard',
+  '/documents': 'documents',
+  '/inbox': 'inbox',
+  '/data-tables': 'data-tables',
+  '/employees': 'employees',
+  '/settings': 'settings',
 };
 
 export default function Layout({ children }) {
@@ -24,13 +25,14 @@ export default function Layout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
   const { documents } = useStore();
+  const { t } = useTranslation();
 
-  const title = titleMap[location.pathname] || 'Noffice';
+  const title = titleKeyMap[location.pathname] ? t(titleKeyMap[location.pathname]) : 'Noffice';
 
   // Derive notifications from actual pending data (not dummy)
   const pendingDocs = documents.filter((d) => d.status === 'pending').length;
   const notifItems = pendingDocs > 0
-    ? [{ title: `${pendingDocs} document${pendingDocs > 1 ? 's' : ''} pending approval`, sub: 'View pending documents', route: '/documents' }]
+    ? [{ title: `${pendingDocs} ${t('topbar.pendingApproval')}`, sub: `${t('topbar.viewPending')} →`, route: '/documents' }]
     : [];
 
   return (
