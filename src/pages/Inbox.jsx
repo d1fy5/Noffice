@@ -69,7 +69,7 @@ export default function Inbox() {
       />
 
       <div className="inbox-layout">
-        <div className="email-list">
+        <div className={`email-list ${active ? 'hide' : ''}`}>
           {filtered.length === 0 ? (
             <div className="inbox-empty-mini">
               <EmptyState
@@ -100,11 +100,12 @@ export default function Inbox() {
           )}
         </div>
 
-        <div className="email-pane">
+        <div className={`email-pane email-pane-mobile ${active ? 'show' : ''}`}>
           {active ? (
             <>
               <div className="email-pane-head">
                 <div className="email-pane-top">
+                  <button className="inbox-back-btn icon-btn" onClick={() => setActiveId(null)} aria-label={t('action.back')}><Icon name="back" size={17} /></button>
                   <h2 className="email-pane-title">{active.subject}</h2>
                   <div className="email-pane-actions">
                     <button className="icon-btn" aria-label={t('action.edit')}><Icon name="edit" size={17} /></button>

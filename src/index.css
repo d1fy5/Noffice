@@ -849,6 +849,20 @@ h2 {
   gap: 18px;
 }
 
+.dash-two,
+.dash-grid-wide {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  align-items: start;
+  min-width: 0;
+}
+
+.dash-two > *,
+.dash-grid-wide > * {
+  min-width: 0;
+}
+
 /* ---------- Breadcrumb ---------- */
 .breadcrumb {
   display: flex;
@@ -1609,16 +1623,30 @@ table.data-table {
   display: none;
 }
 
+.inbox-back-btn {
+  display: none;
+}
+
 /* ---------- Responsive ---------- */
-@media (max-width: 1080px) {
-  .stat-grid {
-    grid-template-columns: repeat(2, 1fr);
+@media (max-width: 1280px) {
+  .main {
+    padding: 22px 24px 44px;
   }
 }
 
 @media (max-width: 1080px) {
-  .dash-two {
-    grid-template-columns: 1fr !important;
+  .main {
+    padding: 20px 20px 40px;
+  }
+
+  .stat-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .dash-two,
+  .dash-grid-wide,
+  .dash-grid {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -1679,7 +1707,12 @@ table.data-table {
   }
 
   .email-pane.show {
-    display: block;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .email-list.hide {
+    display: none;
   }
 
   .inbox-back-btn {
@@ -1687,16 +1720,45 @@ table.data-table {
   }
 }
 
+@media (max-width: 768px) {
+  .doc-layout,
+  .settings-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .stat-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .doc-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .quick-op-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
 @media (max-width: 640px) {
   .main {
-    padding: 16px 14px 40px;
+    padding: 14px 14px 40px;
   }
 
   .stat-grid {
     grid-template-columns: 1fr;
   }
 
-  .dash-grid {
+  .dash-grid,
+  .dash-two,
+  .dash-grid-wide {
+    grid-template-columns: 1fr;
+  }
+
+  .doc-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .quick-op-grid {
     grid-template-columns: 1fr;
   }
 
@@ -1706,13 +1768,23 @@ table.data-table {
 
   .topbar-search {
     margin-left: 0;
+    min-width: 0;
+  }
+
+  .topbar {
+    gap: 10px;
+    padding: 0 12px;
+  }
+
+  .topbar-actions {
+    gap: 6px;
+  }
+
+  .topbar-search input {
+    padding: 0 12px 0 36px;
   }
 
   .form-row {
-    grid-template-columns: 1fr;
-  }
-
-  .doc-grid {
     grid-template-columns: 1fr;
   }
 
@@ -1721,9 +1793,131 @@ table.data-table {
     align-items: stretch;
   }
 
-  .page-head .btn {
+  .page-head-actions {
+    width: 100%;
+  }
+
+  .page-head .btn,
+  .page-head-actions .btn,
+  .table-controls .btn {
     width: 100%;
     justify-content: center;
+  }
+
+  .table-controls {
+    flex-direction: column;
+  }
+
+  .table-controls .filter-select {
+    width: 100%;
+  }
+
+  .doc-view-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .doc-view-controls .filter-select,
+  .doc-view-controls .view-toggle {
+    width: 100%;
+  }
+
+  .doc-view-controls .view-toggle {
+    justify-content: flex-start;
+  }
+
+  .modal-overlay {
+    padding: 12px;
+  }
+
+  .modal,
+  .modal-wide,
+  .modal-sm {
+    max-width: 100%;
+  }
+
+  .modal-footer-btns {
+    flex-direction: column;
+  }
+
+  .modal-footer-btns .btn {
+    width: 100%;
+  }
+
+  .modal-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .modal-actions .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .account-avatar-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .settings-section {
+    padding: 18px 16px;
+  }
+
+  .email-pane-head,
+  .email-pane-body {
+    padding: 16px;
+  }
+
+  h1 {
+    font-size: 22px;
+  }
+
+  .stat-value {
+    font-size: 22px;
+  }
+}
+
+@media (max-width: 480px) {
+  .stat-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .topbar-profile {
+    padding: 0;
+  }
+
+  .email-item {
+    padding: 12px;
+  }
+
+  .quick-op-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 375px) {
+  .topbar-search input {
+    font-size: 12.5px;
+  }
+
+  .main {
+    padding: 12px 10px 36px;
+  }
+
+  .modal-body {
+    padding: 16px 14px;
+  }
+
+  .modal-titlebar {
+    padding: 14px 14px;
+  }
+
+  .empty-state {
+    padding: 30px 16px;
+  }
+
+  .breadcrumb {
+    font-size: 12px;
   }
 }
 
