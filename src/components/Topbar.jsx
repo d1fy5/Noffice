@@ -1,29 +1,23 @@
 import { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import Icon from './Icon.jsx';
 import Avatar from './Avatar.jsx';
 import { useStore } from '../store/hooks.js';
 import { useTranslation } from '../store/useTranslation.js';
-import { formatNotificationDate } from '../utils/formatDate.js';
 
-export default function Topbar({ title, searchValue, onSearch, onMenu, notifications = [] }) {
-  const [notifOpen, setNotifOpen] = useState(false);
+export default function Topbar({ title, searchValue, onSearch, onMenu }) {
   const [profileOpen, setProfileOpen] = useState(false);
-  const notifRef = useRef(null);
   const profileRef = useRef(null);
+  const location = useLocation();
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const { notificationItems = [], markNotificationRead, general } = useStore();
+  const { notificationItems = [] } = useStore();
 
-  // Collapse topbar notifications with the real feed, keeping any passed items too.
-  const merged = [...notifications].map((n, i) => ({ id: 'legacy-' + i, ...n }));
-  const allItems = [...notificationItems, ...merged]
-    .sort((a, b) => (b.dateTs || 0) - (a.dateTs || 0));
-  const unreadCount = allItems.filter((n) => !n.read).length;
+  const unreadCount = notificationItems.filter((n) => !n.read).length;
+  const onNotifications = location.pathname === '/notifications';
 
   useEffect(() => {
     const handler = (e) => {
-      if (notifRef.current && !notifRef.current.contains(e.target)) setNotifOpen(false);
       if (profileRef.current && !profileRef.current.contains(e.target)) setProfileOpen(false);
     };
     document.addEventListener('mousedown', handler);
@@ -57,60 +51,16 @@ export default function Topbar({ title, searchValue, onSearch, onMenu, notificat
       </div>
 
       <div className="topbar-actions">
-        <div className="dropdown" ref={notifRef}>
-          <button
-            className="icon-btn"
-            aria-label={`${t('topbar.notifications')} (${unreadCount})`}
-            onClick={() => setNotifOpen((v) => !v)}
-          >
-            <Icon name="bell" size={20} />
-            {unreadCount > 0 && (
-              <span className="icon-dot" aria-hidden="true" />
-            )}
-          </button>
-          {notifOpen && (
-            <div className="dropdown-menu notif-menu" role="menu">
-              <div className="dropdown-head">
-                {t('topbar.notifications')}
-                <span className="dropdown-head-count">{unreadCount} {t('notif.unreadLower')}</span>
-              </div>
-              {allItems.length === 0 ? (
-                <div className="dropdown-empty">{t('topbar.notifEmpty')}</div>
-              ) : (
-                <>
-                  {allItems.slice(0, 5).map((n) => (
-                    <button
-                      key={n.id}
-                      className="dropdown-item"
-                      onClick={() => {
-                        if (!n.read && !n.id.startsWith('legacy-')) markNotificationRead(n.id);
-                        setNotifOpen(false);
-                        navigate(n.route || '/notifications');
-                      }}
-                    >
-                      <span className={`dropdown-item-title ${n.read ? '' : 'unread'}`}>{n.title}</span>
-                      <span className="dropdown-item-sub">{n.message || n.sub}</span>
-                      <span className="dropdown-item-time">
-                        {n.dateTs
-                          ? formatNotificationDate(n.dateTs, general.dateFormat, general.timezone, { today: t('notif.group.today'), yesterday: t('notif.group.yesterday') })
-                          : (n.sub || '')}
-                      </span>
-                    </button>
-                  ))}
-                  <button
-                    className="dropdown-item notif-link-all"
-                    onClick={() => {
-                      setNotifOpen(false);
-                      navigate('/notifications');
-                    }}
-                  >
-                    {t('notif.viewAll')}
-                  </button>
-                </>
-              )}
-            </div>
+        <button
+          className={`icon-btn ${onNotifications ? 'active' : ''}`}
+          onClick={() => navigate('/notifications')}
+          aria-label={`${t('topbar.notifications')} (${unreadCount})`}
+        >
+          <Icon name="bell" size={20} />
+          {unreadCount > 0 && (
+            <span className="icon-dot" aria-hidden="true" />
           )}
-        </div>
+        </button>
 
         <div className="dropdown" ref={profileRef}>
           <button className="topbar-profile" aria-label={t('profile')} onClick={() => setProfileOpen((v) => !v)}>

@@ -376,6 +376,12 @@ h2 {
   outline-offset: 2px;
 }
 
+.icon-btn.active {
+  background: var(--primary-soft);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
 .icon-dot {
   position: absolute;
   top: 9px;
@@ -3073,7 +3079,7 @@ table.data-table tbody td {
 }
 
 /* ============================================================
-   SETTINGS — GENERAL + BILLING
+   SETTINGS — GENERAL
    ============================================================ */
 .settings-actions {
   display: flex;
@@ -3161,132 +3167,6 @@ table.data-table tbody td {
   font-size: 12px;
   color: var(--text-3);
   margin-top: 4px;
-}
-
-/* ---- Billing ---- */
-.billing-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-}
-
-.billing-card {
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface-2);
-  padding: 18px;
-  position: relative;
-  min-width: 0;
-}
-
-.billing-card-icon {
-  width: 42px;
-  height: 42px;
-  border-radius: var(--radius-sm);
-  background: var(--primary-soft);
-  color: var(--primary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.billing-card-body {
-  flex: 1;
-  min-width: 0;
-}
-
-.billing-label {
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-3);
-}
-
-.billing-value {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--text);
-  margin-top: 3px;
-}
-
-.billing-sub {
-  font-size: 12.5px;
-  color: var(--text-2);
-  margin-top: 3px;
-  overflow-wrap: anywhere;
-}
-
-.billing-status {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-2);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 3px 10px;
-}
-
-.billing-status .badge-dot {
-  background: var(--text-3);
-}
-
-.billing-status.on {
-  color: var(--green);
-}
-
-.billing-status.on .badge-dot {
-  background: var(--green);
-}
-
-.billing-row {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-  margin-top: 16px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 16px 18px;
-}
-
-.billing-cell {
-  min-width: 0;
-  border-right: 1px solid var(--border);
-  padding-right: 16px;
-}
-
-.billing-cell:last-child {
-  border-right: none;
-  padding-right: 0;
-}
-
-.billing-note {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  margin-top: 16px;
-  padding: 12px 14px;
-  border: 1px dashed var(--border-strong);
-  border-radius: var(--radius);
-  font-size: 12.5px;
-  color: var(--text-2);
-  background: var(--surface-2);
-}
-
-.billing-note svg {
-  flex-shrink: 0;
-  color: var(--amber);
-  margin-top: 1px;
 }
 
 /* ============================================================
@@ -3414,26 +3294,6 @@ table.data-table tbody tr.selected {
    RESPONSIVE — new sections
    ============================================================ */
 @media (max-width: 720px) {
-  .billing-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .billing-row {
-    grid-template-columns: 1fr;
-  }
-
-  .billing-cell {
-    border-right: none;
-    border-bottom: 1px solid var(--border);
-    padding-right: 0;
-    padding-bottom: 12px;
-  }
-
-  .billing-cell:last-child {
-    border-bottom: none;
-    padding-bottom: 0;
-  }
-
   .bulk-actions {
     margin-left: 0;
   }

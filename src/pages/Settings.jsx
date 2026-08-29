@@ -17,7 +17,6 @@ function formatStorageUsed(bytes) {
 const SECTIONS = [
   { id: 'general', icon: 'building', labelKey: 'settings.general' },
   { id: 'account', icon: 'user', labelKey: 'settings.account' },
-  { id: 'billing', icon: 'creditCard', labelKey: 'settings.billing' },
   { id: 'notifications', icon: 'bell', labelKey: 'settings.notifications' },
   { id: 'appearance', icon: 'monitor', labelKey: 'settings.appearance' },
   { id: 'language', icon: 'mail', labelKey: 'settings.language' },
@@ -151,12 +150,6 @@ export default function Settings() {
     [logoFile, general.companyLogo]
   );
 
-  // Billing is not connected to a payment provider yet; derive read-only state cleanly.
-  const planStatus = 'active';
-  const nextRenewal = new Intl.DateTimeFormat(language === 'id' ? 'id' : 'en', { month: 'long', year: 'numeric' }).format(
-    new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1)
-  );
-
   return (
     <>
       <Breadcrumb crumbs={[{ label: t('breadcrumb.home'), to: '/dashboard' }, { label: t('settings.title') }]} />
@@ -283,64 +276,6 @@ export default function Settings() {
                 <Button variant="primary" icon="save" disabled={genSaving} onClick={saveGeneral}>
                   {genSaving ? t('settings.general.saving') : t('settings.general.saveChanges')}
                 </Button>
-              </div>
-            </>
-          )}
-
-          {active === 'billing' && (
-            <>
-              <div className="settings-head">
-                <h2>{t('settings.billing')}</h2>
-                <p>{t('settings.billing.sub')}</p>
-              </div>
-
-              <div className="billing-grid">
-                <div className="billing-card">
-                  <div className="billing-card-icon"><Icon name="creditCard" size={22} /></div>
-                  <div className="billing-card-body">
-                    <div className="billing-label">{t('settings.billing.currentPlan')}</div>
-                    <div className="billing-value">{t('settings.billing.planName')}</div>
-                    <div className="billing-sub">{t('settings.billing.planDesc')}</div>
-                  </div>
-                  <span className={`billing-status ${planStatus === 'active' ? 'on' : ''}`}>
-                    <span className="badge-dot" />
-                    {t('settings.billing.statusActive')}
-                  </span>
-                </div>
-
-                <div className="billing-card">
-                  <div className="billing-card-icon"><Icon name="documents" size={22} /></div>
-                  <div className="billing-card-body">
-                    <div className="billing-label">{t('settings.billing.storage')}</div>
-                    <div className="billing-value">{bytesLabel(totals?.storageBytes || 0)}</div>
-                    <div className="billing-sub">{t('settings.billing.storageOf', { total: `${general.storageLimitGB} GB` })}</div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="billing-row">
-                <div className="billing-cell">
-                  <div className="billing-label">{t('settings.billing.cycle')}</div>
-                  <div className="billing-sub">{t('settings.billing.cycleValue')}</div>
-                </div>
-                <div className="billing-cell">
-                  <div className="billing-label">{t('settings.billing.nextRenewal')}</div>
-                  <div className="billing-sub">{nextRenewal}</div>
-                </div>
-                <div className="billing-cell">
-                  <div className="billing-label">{t('settings.billing.paymentMethod')}</div>
-                  <div className="billing-sub">{t('settings.billing.paymentDefault')}</div>
-                </div>
-              </div>
-
-              <div className="billing-note">
-                <Icon name="alert" size={16} />
-                {t('settings.billing.note')}
-              </div>
-
-              <div className="settings-save-row settings-actions">
-                <Button variant="secondary" icon="refresh" disabled onClick={(e) => e.preventDefault()}>{t('settings.billing.manage')}</Button>
-                <Button variant="primary" icon="download" disabled onClick={(e) => e.preventDefault()}>{t('settings.billing.export')}</Button>
               </div>
             </>
           )}
