@@ -1,7 +1,5 @@
 import { useState } from 'react';
-import { useStore } from '../store/StoreContext.jsx';
-import { useSearch } from '../components/Layout.jsx';
-import { useToast } from '../store/ToastContext.jsx';
+import { useStore, useSearch, useToast } from '../store/hooks.js';
 import { useTranslation } from '../store/useTranslation.js';
 import Avatar from '../components/Avatar.jsx';
 import Button from '../components/Button.jsx';

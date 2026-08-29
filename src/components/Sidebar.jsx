@@ -7,6 +7,7 @@ const mainNav = [
   { to: '/dashboard', icon: 'dashboard', labelKey: 'dashboard' },
   { to: '/documents', icon: 'documents', labelKey: 'documents' },
   { to: '/inbox', icon: 'inbox', labelKey: 'inbox' },
+  { to: '/notifications', icon: 'bell', labelKey: 'notifications' },
   { to: '/data-tables', icon: 'table', labelKey: 'data-tables' },
 ];
 

@@ -1,4 +1,4 @@
-import { useStore } from './StoreContext.jsx';
+import { useStore } from './hooks.js';
 import { translations } from './i18n.js';
 
 export function useTranslation() {

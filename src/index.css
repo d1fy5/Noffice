@@ -2742,6 +2742,264 @@ table.data-table tbody td {
   overflow-y: auto;
 }
 
+/* ============================================================
+   NOTIFICATIONS PAGE
+   ============================================================ */
+.notif-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
+.notif-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 14px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-2);
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.notif-tab:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.notif-tab.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+.notif-tab-icon {
+  display: flex;
+}
+
+.notif-tab-count {
+  background: var(--primary-soft);
+  color: var(--primary);
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.notif-tab.active .notif-tab-count {
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+}
+
+.notif-card {
+  overflow: hidden;
+}
+
+.notif-list-wrap {
+  padding: 8px 0;
+}
+
+.notif-group + .notif-group {
+  border-top: 1px solid var(--border);
+  margin-top: 6px;
+}
+
+.notif-group-label {
+  padding: 14px 20px 8px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-3);
+}
+
+.notif-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.notif-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 14px 20px;
+  cursor: pointer;
+  border-top: 1px solid var(--border);
+  transition: background 0.15s;
+}
+
+.notif-row:hover {
+  background: var(--surface-2);
+}
+
+.notif-row:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+
+.notif-row.unread {
+  background: var(--primary-soft);
+}
+
+.notif-row.unread:hover {
+  background: var(--primary-soft);
+}
+
+.notif-icon-wrap {
+  flex-shrink: 0;
+}
+
+.notif-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-2);
+  background: var(--surface-2);
+}
+
+.notif-icon.type-submission,
+.notif-icon.type-document {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.notif-icon.type-approval,
+.notif-icon.type-rejection {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.notif-icon.type-message {
+  background: var(--violet-soft);
+  color: var(--violet);
+}
+
+.notif-icon.type-storage {
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+
+.notif-icon.type-employee {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.notif-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.notif-title {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.notif-row.unread .notif-title {
+  font-weight: 700;
+}
+
+.notif-msg {
+  display: block;
+  font-size: 13px;
+  color: var(--text-2);
+  margin-top: 3px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.notif-time {
+  display: block;
+  font-size: 12px;
+  color: var(--text-3);
+  margin-top: 6px;
+}
+
+.notif-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.notif-unread-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--primary);
+  flex-shrink: 0;
+}
+
+.view-btn-mini {
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.view-btn-mini:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+
+/* Topbar dropdown tweaks for the fuller feed */
+.dropdown-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.dropdown-head-count {
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 12px;
+}
+
+.dropdown-item-title.unread {
+  color: var(--primary);
+}
+
+.dropdown-item-time {
+  font-size: 11.5px;
+  color: var(--text-3);
+  margin-top: 2px;
+}
+
+.notif-link-all {
+  align-items: center;
+  margin-top: 4px;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  padding-top: 10px;
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.notif-link-all:hover {
+  background: var(--primary-soft);
+}
+
 /* Search clear inside topbar */
 .search-clear {
   position: absolute;
@@ -2812,6 +3070,377 @@ table.data-table tbody td {
 .dark .toast {
   background: var(--surface);
   border-color: var(--border);
+}
+
+/* ============================================================
+   SETTINGS — GENERAL + BILLING
+   ============================================================ */
+.settings-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.logo-dropzone {
+  width: 100%;
+  border: 2px dashed var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  padding: 26px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  min-height: 150px;
+}
+
+.logo-dropzone:hover,
+.logo-dropzone:focus-visible {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.logo-dropzone.dropzone-error {
+  border-color: var(--red);
+}
+
+.logo-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 6px;
+}
+
+.logo-preview img {
+  max-width: 120px;
+  max-height: 72px;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  padding: 8px;
+}
+
+.logo-preview-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.storage-limits {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-top: 6px;
+}
+
+.storage-limits span:last-child {
+  color: var(--primary);
+}
+
+.storage-slider {
+  width: 100%;
+  accent-color: var(--primary);
+  margin-top: 14px;
+  cursor: pointer;
+}
+
+.storage-range-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-3);
+  margin-top: 4px;
+}
+
+/* ---- Billing ---- */
+.billing-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.billing-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  padding: 18px;
+  position: relative;
+  min-width: 0;
+}
+
+.billing-card-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: var(--radius-sm);
+  background: var(--primary-soft);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.billing-card-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.billing-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-3);
+}
+
+.billing-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  margin-top: 3px;
+}
+
+.billing-sub {
+  font-size: 12.5px;
+  color: var(--text-2);
+  margin-top: 3px;
+  overflow-wrap: anywhere;
+}
+
+.billing-status {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+
+.billing-status .badge-dot {
+  background: var(--text-3);
+}
+
+.billing-status.on {
+  color: var(--green);
+}
+
+.billing-status.on .badge-dot {
+  background: var(--green);
+}
+
+.billing-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-top: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+}
+
+.billing-cell {
+  min-width: 0;
+  border-right: 1px solid var(--border);
+  padding-right: 16px;
+}
+
+.billing-cell:last-child {
+  border-right: none;
+  padding-right: 0;
+}
+
+.billing-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 16px;
+  padding: 12px 14px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  font-size: 12.5px;
+  color: var(--text-2);
+  background: var(--surface-2);
+}
+
+.billing-note svg {
+  flex-shrink: 0;
+  color: var(--amber);
+  margin-top: 1px;
+}
+
+/* ============================================================
+   EMPLOYEES — BULK + PAGINATION + TABLE
+   ============================================================ */
+.emp-controls {
+  align-items: center;
+}
+
+.emp-controls .filter-select {
+  min-width: 170px;
+}
+
+.bulk-actions {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.bulk-selected {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--primary);
+  background: var(--primary-soft);
+  padding: 4px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.bulk-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 40;
+  min-width: 190px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  padding: 6px;
+  animation: pop 0.14s ease;
+}
+
+.bulk-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: none;
+  padding: 9px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.bulk-item:hover {
+  background: var(--surface-2);
+}
+
+.bulk-item.danger {
+  color: var(--red);
+}
+
+.bulk-item.danger:hover {
+  background: var(--red-soft);
+}
+
+table.data-table .col-check {
+  width: 40px;
+  padding-right: 4px;
+}
+
+.data-table .col-check input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+table.data-table tbody tr.selected {
+  background: var(--primary-soft);
+}
+
+.emp-table tbody .cell-email {
+  color: var(--text-2);
+}
+
+.page-ellipsis {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 36px;
+  color: var(--text-3);
+  font-size: 13px;
+}
+
+.clear-selection {
+  margin-left: 10px;
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--primary);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.clear-selection:hover {
+  text-decoration: underline;
+}
+
+.pagination {
+  align-items: center;
+}
+
+/* ============================================================
+   RESPONSIVE — new sections
+   ============================================================ */
+@media (max-width: 720px) {
+  .billing-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .billing-row {
+    grid-template-columns: 1fr;
+  }
+
+  .billing-cell {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    padding-right: 0;
+    padding-bottom: 12px;
+  }
+
+  .billing-cell:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+
+  .bulk-actions {
+    margin-left: 0;
+  }
+
+  .emp-controls .filter-select {
+    min-width: 0;
+  }
 }
 
 

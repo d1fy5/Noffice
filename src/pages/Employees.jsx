@@ -1,7 +1,6 @@
-import { useMemo, useState } from 'react';
-import { useStore, DEPARTMENTS, EMPLOYEE_STATUSES } from '../store/StoreContext.jsx';
-import { useSearch } from '../components/Layout.jsx';
-import { useToast } from '../store/ToastContext.jsx';
+import { useEffect, useMemo, useState } from 'react';
+import { useStore, useSearch, useToast } from '../store/hooks.js';
+import { DEPARTMENTS, EMPLOYEE_STATUSES } from '../store/constants.js';
 import { useTranslation } from '../store/useTranslation.js';
 import Avatar from '../components/Avatar.jsx';
 import Badge from '../components/Badge.jsx';
@@ -23,6 +22,10 @@ const EMPTY_FORM = {
   status: 'Active',
 };
 
+const PAGE_SIZE = 8;
+
+const PAGE_WINDOW = 2;
+
 export default function Employees() {
   const { query } = useSearch();
   const { employees, addEmployee, updateEmployee, deleteEmployee } = useStore();
@@ -31,11 +34,14 @@ export default function Employees() {
 
   const [status, setStatus] = useState('all');
   const [dept, setDept] = useState('all');
+  const [page, setPage] = useState(1);
+  const [selected, setSelected] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [errors, setErrors] = useState({});
   const [confirmId, setConfirmId] = useState(null);
+  const [bulkOpen, setBulkOpen] = useState(false);
 
   const q = query.trim().toLowerCase();
 
@@ -47,7 +53,63 @@ export default function Employees() {
     return rows;
   }, [employees, status, dept, q]);
 
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount);
+
+  useEffect(() => {
+    if (currentPage > pageCount) setPage(pageCount);
+  }, [currentPage, pageCount]);
+
+  useEffect(() => {
+    setSelected([]);
+  }, [dept, status, q]);
+
+  const paged = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return filtered.slice(start, start + PAGE_SIZE);
+  }, [filtered, currentPage]);
+
   const fullName = (e) => `${e.firstName} ${e.lastName}`.trim();
+
+  const isAllSelected = filtered.length > 0 && selected.length === filtered.length;
+
+  const toggleSelect = (id) => {
+    setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+  };
+
+  const toggleSelectAll = () => {
+    if (isAllSelected) setSelected([]);
+    else setSelected(filtered.map((e) => e.id));
+  };
+
+  const clearSelection = () => setSelected([]);
+
+  const bulkDelete = () => {
+    if (!selected.length) return;
+    setConfirmId('__bulk__');
+  };
+
+  const handleBulkStatus = (newStatus) => {
+    if (!selected.length) return;
+    selected.forEach((id) => updateEmployee(id, { status: newStatus }));
+    const n = selected.length;
+    notify(`${t('emp.bulkStatusDone')} — ${n} ${n === 1 ? t('emp.unit') : t('emp.units')}`);
+    setSelected([]);
+  };
+
+  const doDelete = () => {
+    if (confirmId === '__bulk__') {
+      selected.forEach((id) => deleteEmployee(id));
+      setSelected([]);
+      setConfirmId(null);
+      const n = selected.length;
+      notify(`${t('action.delete')} — ${n} ${n === 1 ? t('emp.unit') : t('emp.units')}`);
+    } else if (confirmId) {
+      deleteEmployee(confirmId);
+      setConfirmId(null);
+      notify(t('action.delete'));
+    }
+  };
 
   const openAdd = () => {
     setForm(EMPTY_FORM);
@@ -82,12 +144,20 @@ export default function Employees() {
     setModalOpen(false);
   };
 
-  const doDelete = () => {
-    if (!confirmId) return;
-    deleteEmployee(confirmId);
-    setConfirmId(null);
-    notify(t('action.delete'));
-  };
+  const pageNumbers = useMemo(() => {
+    const nums = [];
+    for (let i = 1; i <= pageCount; i++) {
+      if (i === 1 || i === pageCount || Math.abs(i - currentPage) <= PAGE_WINDOW) {
+        nums.push(i);
+      } else if (nums[nums.length - 1] !== '…') {
+        nums.push('…');
+      }
+    }
+    return nums;
+  }, [pageCount, currentPage]);
+
+  const start = filtered.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
+  const end = Math.min(currentPage * PAGE_SIZE, filtered.length);
 
   return (
     <>
@@ -98,7 +168,7 @@ export default function Employees() {
         actions={<Button variant="primary" icon="userPlus" onClick={openAdd}>{t('action.addEmployee')}</Button>}
       />
 
-      <div className="table-controls">
+      <div className="table-controls emp-controls">
         <select className="filter-select" value={dept} onChange={(e) => setDept(e.target.value)} aria-label={t('status.allDepts')}>
           <option value="all">{t('status.allDepts')}</option>
           {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
@@ -107,6 +177,35 @@ export default function Employees() {
           <option value="all">{t('status.all')}</option>
           {EMPLOYEE_STATUSES.map((s) => <option key={s} value={s}>{t(`status.${s.toLowerCase()}`)}</option>)}
         </select>
+
+        <div className="bulk-actions">
+          {selected.length > 0 && (
+            <span className="bulk-selected">{t('emp.selected', { count: selected.length })}</span>
+          )}
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={() => setBulkOpen((v) => !v)}
+            disabled={selected.length === 0}
+            aria-haspopup="listbox"
+            aria-expanded={bulkOpen}
+          >
+            <span className="btn-icon"><Icon name="dots" size={16} /></span>
+            {t('emp.bulk')}
+          </button>
+          {bulkOpen && selected.length > 0 && (
+            <div className="bulk-menu" role="listbox">
+              <button className="bulk-item" role="option" onClick={() => { handleBulkStatus('Active'); setBulkOpen(false); }}>
+                <Icon name="check" size={15} /> {t('emp.bulkActive')}
+              </button>
+              <button className="bulk-item" role="option" onClick={() => { handleBulkStatus('Inactive'); setBulkOpen(false); }}>
+                <Icon name="x" size={15} /> {t('emp.bulkInactive')}
+              </button>
+              <button className="bulk-item bulk-danger" role="option" onClick={() => { bulkDelete(); setBulkOpen(false); }}>
+                <Icon name="trash" size={15} /> {t('emp.bulkDelete')}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="card table-card">
@@ -120,25 +219,43 @@ export default function Employees() {
         ) : (
           <>
             <div className="table-scroll">
-              <table className="data-table">
+              <table className="data-table emp-table">
                 <thead>
                   <tr>
+                    <th className="col-check">
+                      <input
+                        type="checkbox"
+                        aria-label={t('emp.bulkToggle')}
+                        checked={isAllSelected}
+                        onChange={toggleSelectAll}
+                      />
+                    </th>
                     <th>{t('emp.col.employee')}</th>
                     <th>{t('emp.col.dept')}</th>
                     <th>{t('emp.col.role')}</th>
                     <th>{t('emp.col.email')}</th>
                     <th>{t('emp.col.status')}</th>
+                    <th>{t('emp.col.joined')}</th>
                     <th>{t('emp.col.actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((e) => (
-                    <tr key={e.id}>
+                  {paged.map((e) => (
+                    <tr key={e.id} className={selected.includes(e.id) ? 'selected' : ''}>
+                      <td className="col-check">
+                        <input
+                          type="checkbox"
+                          aria-label={`${t('emp.bulkToggle')} ${fullName(e)}`}
+                          checked={selected.includes(e.id)}
+                          onChange={() => toggleSelect(e.id)}
+                        />
+                      </td>
                       <td>
                         <div className="employee-cell">
                           <Avatar name={fullName(e)} size="sm" />
                           <div>
                             <div className="emp-name">{fullName(e)}</div>
+                            {e.email && <div className="cell-sub">{e.email}</div>}
                           </div>
                         </div>
                       </td>
@@ -146,6 +263,7 @@ export default function Employees() {
                       <td>{e.role}</td>
                       <td className="cell-email">{e.email}</td>
                       <td><Badge status={e.status.toLowerCase()} /></td>
+                      <td className="cell-date">{e.dateJoined || '—'}</td>
                       <td>
                         <span className="row-actions">
                           <button className="action-btn" onClick={() => openEdit(e)} aria-label={`${t('action.edit')} ${fullName(e)}`}><Icon name="edit" size={16} /></button>
@@ -157,7 +275,33 @@ export default function Employees() {
                 </tbody>
               </table>
             </div>
-            <div className="card-footer pagination-info">{filtered.length} {t('emp.subtitle').toLowerCase()}</div>
+
+            <div className="card-footer pagination">
+              <div className="pagination-info">
+                {t('table.showing')} {start}–{end} {t('emp.of')} {filtered.length} {t('emp.activeEmployeesLower')}
+                {selected.length > 0 && (
+                  <button className="clear-selection" onClick={clearSelection}>{t('emp.clearSelection')} ({selected.length})</button>
+                )}
+              </div>
+              <div className="page-btns">
+                <button className="page-btn" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)} aria-label={t('emp.prev')}>←</button>
+                {pageNumbers.map((n, i) =>
+                  n === '…' ? (
+                    <span key={`ellipsis-${i}`} className="page-ellipsis">…</span>
+                  ) : (
+                    <button
+                      key={n}
+                      className={`page-btn ${n === currentPage ? 'active' : ''}`}
+                      onClick={() => setPage(n)}
+                      aria-label={`${t('emp.goToPage')} ${n}`}
+                    >
+                      {n}
+                    </button>
+                  )
+                )}
+                <button className="page-btn" disabled={currentPage === pageCount} onClick={() => setPage(currentPage + 1)} aria-label="Next page">→</button>
+              </div>
+            </div>
           </>
         )}
       </div>
@@ -207,8 +351,8 @@ export default function Employees() {
 
       <ConfirmDialog
         open={!!confirmId}
-        title={t('emp.delete.title')}
-        message={t('emp.delete.msg')}
+        title={confirmId === '__bulk__' ? t('emp.bulkDeleteTitle') : t('emp.delete.title')}
+        message={confirmId === '__bulk__' ? t('emp.bulkDeleteMsg', { count: selected.length }) : t('emp.delete.msg')}
         confirmLabel={t('action.delete')}
         onCancel={() => setConfirmId(null)}
         onConfirm={doDelete}

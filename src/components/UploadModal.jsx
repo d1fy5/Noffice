@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { useStore, UPLOAD_CATEGORIES } from '../store/StoreContext.jsx';
+import { useStore, useToast } from '../store/hooks.js';
+import { UPLOAD_CATEGORIES } from '../store/constants.js';
 import { useTranslation } from '../store/useTranslation.js';
-import { useToast } from '../store/ToastContext.jsx';
 import Modal from './Modal.jsx';
 import Button from './Button.jsx';
 import FormField from './FormField.jsx';

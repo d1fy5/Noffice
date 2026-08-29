@@ -2,7 +2,9 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Icon from './Icon.jsx';
 import Avatar from './Avatar.jsx';
+import { useStore } from '../store/hooks.js';
 import { useTranslation } from '../store/useTranslation.js';
+import { formatNotificationDate } from '../utils/formatDate.js';
 
 export default function Topbar({ title, searchValue, onSearch, onMenu, notifications = [] }) {
   const [notifOpen, setNotifOpen] = useState(false);
@@ -11,6 +13,13 @@ export default function Topbar({ title, searchValue, onSearch, onMenu, notificat
   const profileRef = useRef(null);
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const { notificationItems = [], markNotificationRead, general } = useStore();
+
+  // Collapse topbar notifications with the real feed, keeping any passed items too.
+  const merged = [...notifications].map((n, i) => ({ id: 'legacy-' + i, ...n }));
+  const allItems = [...notificationItems, ...merged]
+    .sort((a, b) => (b.dateTs || 0) - (a.dateTs || 0));
+  const unreadCount = allItems.filter((n) => !n.read).length;
 
   useEffect(() => {
     const handler = (e) => {
@@ -51,33 +60,53 @@ export default function Topbar({ title, searchValue, onSearch, onMenu, notificat
         <div className="dropdown" ref={notifRef}>
           <button
             className="icon-btn"
-            aria-label={`${t('topbar.notifications')} (${notifications.length})`}
+            aria-label={`${t('topbar.notifications')} (${unreadCount})`}
             onClick={() => setNotifOpen((v) => !v)}
           >
             <Icon name="bell" size={20} />
-            {notifications.length > 0 && (
+            {unreadCount > 0 && (
               <span className="icon-dot" aria-hidden="true" />
             )}
           </button>
           {notifOpen && (
             <div className="dropdown-menu notif-menu" role="menu">
-              <div className="dropdown-head">{t('topbar.notifications')}</div>
-              {notifications.length === 0 ? (
+              <div className="dropdown-head">
+                {t('topbar.notifications')}
+                <span className="dropdown-head-count">{unreadCount} {t('notif.unreadLower')}</span>
+              </div>
+              {allItems.length === 0 ? (
                 <div className="dropdown-empty">{t('topbar.notifEmpty')}</div>
               ) : (
-                notifications.slice(0, 6).map((n, i) => (
+                <>
+                  {allItems.slice(0, 5).map((n) => (
+                    <button
+                      key={n.id}
+                      className="dropdown-item"
+                      onClick={() => {
+                        if (!n.read && !n.id.startsWith('legacy-')) markNotificationRead(n.id);
+                        setNotifOpen(false);
+                        navigate(n.route || '/notifications');
+                      }}
+                    >
+                      <span className={`dropdown-item-title ${n.read ? '' : 'unread'}`}>{n.title}</span>
+                      <span className="dropdown-item-sub">{n.message || n.sub}</span>
+                      <span className="dropdown-item-time">
+                        {n.dateTs
+                          ? formatNotificationDate(n.dateTs, general.dateFormat, general.timezone, { today: t('notif.group.today'), yesterday: t('notif.group.yesterday') })
+                          : (n.sub || '')}
+                      </span>
+                    </button>
+                  ))}
                   <button
-                    key={i}
-                    className="dropdown-item"
+                    className="dropdown-item notif-link-all"
                     onClick={() => {
                       setNotifOpen(false);
-                      navigate(n.route || '/documents');
+                      navigate('/notifications');
                     }}
                   >
-                    <span className="dropdown-item-title">{n.title}</span>
-                    <span className="dropdown-item-sub">{n.sub}</span>
+                    {t('notif.viewAll')}
                   </button>
-                ))
+                </>
               )}
             </div>
           )}

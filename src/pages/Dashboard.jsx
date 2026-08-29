@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useStore, formatBytes } from '../store/StoreContext.jsx';
-import { useSearch } from '../components/Layout.jsx';
+import { useStore, useSearch } from '../store/hooks.js';
+import { formatBytes } from '../store/utils.js';
 import { useTranslation } from '../store/useTranslation.js';
 import StatCard from '../components/StatCard.jsx';
 import Badge from '../components/Badge.jsx';

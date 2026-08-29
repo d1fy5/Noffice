@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
-import { useStore, DEPARTMENTS } from '../store/StoreContext.jsx';
-import { useSearch } from '../components/Layout.jsx';
-import { useToast } from '../store/ToastContext.jsx';
+import { useStore, useSearch, useToast } from '../store/hooks.js';
+import { DEPARTMENTS } from '../store/constants.js';
 import { useTranslation } from '../store/useTranslation.js';
 import Avatar from '../components/Avatar.jsx';
 import Badge from '../components/Badge.jsx';

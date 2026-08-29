@@ -1,17 +1,23 @@
-import { useState } from 'react';
-import { useStore, DEPARTMENTS } from '../store/StoreContext.jsx';
+import { useMemo, useState } from 'react';
+import { useStore, useTheme, useToast } from '../store/hooks.js';
+import { DEPARTMENTS, TIMEZONES, DATE_FORMATS, MAX_STORAGE_GB } from '../store/constants.js';
 import { useTranslation } from '../store/useTranslation.js';
-import { useTheme } from '../store/ThemeContext.jsx';
-import { useToast } from '../store/ToastContext.jsx';
 import Button from '../components/Button.jsx';
 import Icon from '../components/Icon.jsx';
 import Avatar from '../components/Avatar.jsx';
 import FormField from '../components/FormField.jsx';
 import Breadcrumb from '../components/Breadcrumb.jsx';
 import PageHeader from '../components/PageHeader.jsx';
+import { formatBytes as bytesLabel } from '../utils/formatDate.js';
+
+function formatStorageUsed(bytes) {
+  return bytesLabel(bytes);
+}
 
 const SECTIONS = [
+  { id: 'general', icon: 'building', labelKey: 'settings.general' },
   { id: 'account', icon: 'user', labelKey: 'settings.account' },
+  { id: 'billing', icon: 'creditCard', labelKey: 'settings.billing' },
   { id: 'notifications', icon: 'bell', labelKey: 'settings.notifications' },
   { id: 'appearance', icon: 'monitor', labelKey: 'settings.appearance' },
   { id: 'language', icon: 'mail', labelKey: 'settings.language' },
@@ -41,16 +47,25 @@ export default function Settings() {
     appearance, setAppearance,
     security, setSecurity,
     language, setLanguage,
+    general, setGeneral,
+    totals,  // contains storageBytes
   } = useStore();
   const { theme, chosen, setTheme } = useTheme();
   const { notify } = useToast();
 
-  const [active, setActive] = useState('account');
+  const [active, setActive] = useState('general');
 
   const [accForm, setAccForm] = useState({ ...account });
   const [pwd, setPwd] = useState({ current: '', next: '', confirm: '' });
   const [securityNotif, setSecurityNotif] = useState('');
   const [accMsg, setAccMsg] = useState('');
+
+  // General settings form
+  const [genForm, setGenForm] = useState({ ...general });
+  const [logoFile, setLogoFile] = useState(null);
+  const [logoErr, setLogoErr] = useState('');
+  const [genSaving, setGenSaving] = useState(false);
+  const [genMsg, setGenMsg] = useState(null);
 
   const saveAccount = () => {
     setAccount(accForm);
@@ -79,6 +94,69 @@ export default function Settings() {
     notify(t('settings.sec.passChanged'));
   };
 
+  const LOGO_MAX_BYTES = 2 * 1024 * 1024;
+  const ALLOWED_LOGO_TYPES = ['image/jpeg', 'image/png', 'image/svg+xml'];
+
+  const handleLogo = (file) => {
+    setLogoErr('');
+    if (!file) return;
+    const okType = ALLOWED_LOGO_TYPES.includes(file.type) || /\.(jpe?g|png|svg)$/i.test(file.name);
+    if (!okType) {
+      setLogoErr(t('settings.general.logoInvalid'));
+      return;
+    }
+    if (file.size > LOGO_MAX_BYTES) {
+      setLogoErr(t('settings.general.logoLarge'));
+      return;
+    }
+    setLogoFile(file);
+  };
+
+  const resetGeneral = () => {
+    setGenForm({ ...general });
+    setLogoFile(null);
+    setLogoErr('');
+    setGenMsg(null);
+  };
+
+  const saveGeneral = () => {
+    setGenSaving(true);
+    setGenMsg(null);
+    setTimeout(() => {
+      let next = { ...genForm, storageLimitGB: Math.min(Math.max(genForm.storageLimitGB, 1), MAX_STORAGE_GB) };
+      if (logoFile) {
+        const reader = new FileReader();
+        reader.onload = () => {
+          next = { ...next, companyLogo: reader.result };
+          setGeneral(next);
+          setGenSaving(false);
+          setGenMsg({ kind: 'success', text: t('settings.saved') });
+          notify(t('settings.saved'));
+        };
+        reader.readAsDataURL(logoFile);
+      } else {
+        setGeneral(next);
+        setGenSaving(false);
+        setGenMsg({ kind: 'success', text: t('settings.saved') });
+        notify(t('settings.saved'));
+      }
+    }, 600);
+  };
+
+  const storageUsedText = t('settings.general.storageUsed', { used: formatStorageUsed(totals?.storageBytes || 0), total: `${genForm.storageLimitGB} GB` });
+
+  // Logo preview: newly picked file wins, otherwise the saved logo (if any).
+  const logoPreview = useMemo(
+    () => (logoFile ? URL.createObjectURL(logoFile) : (general.companyLogo || '')),
+    [logoFile, general.companyLogo]
+  );
+
+  // Billing is not connected to a payment provider yet; derive read-only state cleanly.
+  const planStatus = 'active';
+  const nextRenewal = new Intl.DateTimeFormat(language === 'id' ? 'id' : 'en', { month: 'long', year: 'numeric' }).format(
+    new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1)
+  );
+
   return (
     <>
       <Breadcrumb crumbs={[{ label: t('breadcrumb.home'), to: '/dashboard' }, { label: t('settings.title') }]} />
@@ -99,6 +177,174 @@ export default function Settings() {
         </aside>
 
         <div className="card settings-section">
+          {active === 'general' && (
+            <>
+              <div className="settings-head">
+                <h2>{t('settings.general')}</h2>
+                <p>{t('settings.general.sub')}</p>
+              </div>
+
+              <FormField label={t('settings.general.companyName')} htmlFor="gen-company" required>
+                <input
+                  className="form-input"
+                  id="gen-company"
+                  value={genForm.companyName}
+                  onChange={(e) => setGenForm({ ...genForm, companyName: e.target.value })}
+                  placeholder="Noffice"
+                />
+              </FormField>
+
+              <FormField label={t('settings.general.companyLogo')}>
+                <div
+                  className={`logo-dropzone ${logoErr ? 'dropzone-error' : ''}`}
+                  onClick={() => document.getElementById('logo-input')?.click()}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    if (e.dataTransfer.files && e.dataTransfer.files[0]) handleLogo(e.dataTransfer.files[0]);
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      document.getElementById('logo-input')?.click();
+                    }
+                  }}
+                  aria-label={t('settings.general.companyLogo')}
+                >
+                  {(logoPreview) ? (
+                    <div className="logo-preview">
+                      <img src={logoPreview} alt={t('settings.general.logoPreview')} />
+                      <div className="logo-preview-name">{(logoFile || {}).name || general.companyName}</div>
+                    </div>
+                  ) : (
+                    <>
+                      <span className="drop-icon"><Icon name="upload" size={24} /></span>
+                      <div className="drop-title">{t('settings.general.logoDrop')}</div>
+                      <div className="drop-text">{t('settings.general.logoText')}</div>
+                      <div className="drop-formats">JPG · PNG · SVG</div>
+                    </>
+                  )}
+                  <input id="logo-input" type="file" hidden accept=".jpg,.jpeg,.png,.svg,image/jpeg,image/png,image/svg+xml" onChange={(e) => { handleLogo(e.target.files[0]); e.target.value = ''; }} />
+                </div>
+                {logoErr && <div className="form-error" role="alert">{logoErr}</div>}
+                {!logoErr && <div className="form-hint">{t('settings.general.logoHint')}</div>}
+              </FormField>
+
+              <div className="form-row">
+                <FormField label={t('settings.language')} htmlFor="gen-lang">
+                  <select className="form-select" id="gen-lang" value={genForm.defaultLanguage} onChange={(e) => setGenForm({ ...genForm, defaultLanguage: e.target.value })}>
+                    <option value="en">{t('settings.lang.en')}</option>
+                    <option value="id">{t('settings.lang.id')}</option>
+                  </select>
+                </FormField>
+                <FormField label={t('settings.general.timezone')} htmlFor="gen-tz">
+                  <select className="form-select" id="gen-tz" value={genForm.timezone} onChange={(e) => setGenForm({ ...genForm, timezone: e.target.value })}>
+                    {TIMEZONES.map((z) => <option key={z.value} value={z.value}>{z.label}</option>)}
+                  </select>
+                </FormField>
+              </div>
+
+              <FormField label={t('settings.general.dateFormat')} htmlFor="gen-df">
+                <select className="form-select" id="gen-df" value={genForm.dateFormat} onChange={(e) => setGenForm({ ...genForm, dateFormat: e.target.value })}>
+                  {DATE_FORMATS.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
+                </select>
+              </FormField>
+
+              <div className="settings-head" style={{ marginBottom: 12 }}>
+                <h2>{t('settings.general.storage')}</h2>
+                <p>{t('settings.general.storageSub')}</p>
+              </div>
+              <div className="storage-limits">
+                <span>{storageUsedText}</span>
+                <span>{t('settings.general.storageSelected', { value: genForm.storageLimitGB, total: MAX_STORAGE_GB })}</span>
+              </div>
+              <input
+                className="storage-slider"
+                type="range"
+                min="5"
+                step="5"
+                max={MAX_STORAGE_GB}
+                value={Math.min(genForm.storageLimitGB, MAX_STORAGE_GB)}
+                onChange={(e) => setGenForm({ ...genForm, storageLimitGB: Number(e.target.value) })}
+                aria-label={t('settings.general.storage')}
+              />
+              <div className="storage-range-labels">
+                <span>5 GB</span>
+                <span>{MAX_STORAGE_GB} GB</span>
+              </div>
+
+              {genMsg && genMsg.kind === 'error' && <div className="form-error" role="alert">{genMsg.text}</div>}
+              {genMsg && genMsg.kind === 'success' && <div className="form-hint form-success">{genMsg.text}</div>}
+
+              <div className="settings-save-row settings-actions">
+                <Button variant="secondary" onClick={resetGeneral}>{t('action.cancel')}</Button>
+                <Button variant="primary" icon="save" disabled={genSaving} onClick={saveGeneral}>
+                  {genSaving ? t('settings.general.saving') : t('settings.general.saveChanges')}
+                </Button>
+              </div>
+            </>
+          )}
+
+          {active === 'billing' && (
+            <>
+              <div className="settings-head">
+                <h2>{t('settings.billing')}</h2>
+                <p>{t('settings.billing.sub')}</p>
+              </div>
+
+              <div className="billing-grid">
+                <div className="billing-card">
+                  <div className="billing-card-icon"><Icon name="creditCard" size={22} /></div>
+                  <div className="billing-card-body">
+                    <div className="billing-label">{t('settings.billing.currentPlan')}</div>
+                    <div className="billing-value">{t('settings.billing.planName')}</div>
+                    <div className="billing-sub">{t('settings.billing.planDesc')}</div>
+                  </div>
+                  <span className={`billing-status ${planStatus === 'active' ? 'on' : ''}`}>
+                    <span className="badge-dot" />
+                    {t('settings.billing.statusActive')}
+                  </span>
+                </div>
+
+                <div className="billing-card">
+                  <div className="billing-card-icon"><Icon name="documents" size={22} /></div>
+                  <div className="billing-card-body">
+                    <div className="billing-label">{t('settings.billing.storage')}</div>
+                    <div className="billing-value">{bytesLabel(totals?.storageBytes || 0)}</div>
+                    <div className="billing-sub">{t('settings.billing.storageOf', { total: `${general.storageLimitGB} GB` })}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="billing-row">
+                <div className="billing-cell">
+                  <div className="billing-label">{t('settings.billing.cycle')}</div>
+                  <div className="billing-sub">{t('settings.billing.cycleValue')}</div>
+                </div>
+                <div className="billing-cell">
+                  <div className="billing-label">{t('settings.billing.nextRenewal')}</div>
+                  <div className="billing-sub">{nextRenewal}</div>
+                </div>
+                <div className="billing-cell">
+                  <div className="billing-label">{t('settings.billing.paymentMethod')}</div>
+                  <div className="billing-sub">{t('settings.billing.paymentDefault')}</div>
+                </div>
+              </div>
+
+              <div className="billing-note">
+                <Icon name="alert" size={16} />
+                {t('settings.billing.note')}
+              </div>
+
+              <div className="settings-save-row settings-actions">
+                <Button variant="secondary" icon="refresh" disabled onClick={(e) => e.preventDefault()}>{t('settings.billing.manage')}</Button>
+                <Button variant="primary" icon="download" disabled onClick={(e) => e.preventDefault()}>{t('settings.billing.export')}</Button>
+              </div>
+            </>
+          )}
+
           {active === 'account' && (
             <>
               <div className="settings-head">
