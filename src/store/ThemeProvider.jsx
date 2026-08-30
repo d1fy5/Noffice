@@ -1,7 +1,6 @@
-import { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
-import { useStore } from './StoreContext.jsx';
-
-const ThemeContext = createContext(null);
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useStore } from './hooks.js';
+import { ThemeContext } from './contexts.js';
 
 function getSystemTheme() {
   if (typeof window !== 'undefined' && window.matchMedia) {
@@ -44,8 +43,4 @@ export function ThemeProvider({ children }) {
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
-}
-
-export function useTheme() {
-  return useContext(ThemeContext);
 }

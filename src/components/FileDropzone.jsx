@@ -61,7 +61,7 @@ export default function FileDropzone({ file, onFile, error }) {
   );
 }
 
-export function formatSize(bytes) {
+function formatSize(bytes) {
   if (!bytes || bytes <= 0) return '0 B';
   const units = ['B', 'KB', 'MB', 'GB', 'TB'];
   let i = 0;

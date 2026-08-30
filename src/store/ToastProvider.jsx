@@ -1,7 +1,6 @@
-import { createContext, useContext, useCallback, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import Icon from '../components/Icon.jsx';
-
-const ToastContext = createContext(null);
+import { ToastContext } from './contexts.js';
 
 const kinds = {
   success: { icon: 'check', className: 'toast-success' },
@@ -53,8 +52,4 @@ export function ToastProvider({ children }) {
       </div>
     </ToastContext.Provider>
   );
-}
-
-export function useToast() {
-  return useContext(ToastContext);
 }

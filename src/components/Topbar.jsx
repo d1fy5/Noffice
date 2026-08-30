@@ -1,20 +1,23 @@
 import { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import Icon from './Icon.jsx';
 import Avatar from './Avatar.jsx';
+import { useStore } from '../store/hooks.js';
 import { useTranslation } from '../store/useTranslation.js';
 
-export default function Topbar({ title, searchValue, onSearch, onMenu, notifications = [] }) {
-  const [notifOpen, setNotifOpen] = useState(false);
+export default function Topbar({ title, searchValue, onSearch, onMenu }) {
   const [profileOpen, setProfileOpen] = useState(false);
-  const notifRef = useRef(null);
   const profileRef = useRef(null);
+  const location = useLocation();
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const { notificationItems = [] } = useStore();
+
+  const unreadCount = notificationItems.filter((n) => !n.read).length;
+  const onNotifications = location.pathname === '/notifications';
 
   useEffect(() => {
     const handler = (e) => {
-      if (notifRef.current && !notifRef.current.contains(e.target)) setNotifOpen(false);
       if (profileRef.current && !profileRef.current.contains(e.target)) setProfileOpen(false);
     };
     document.addEventListener('mousedown', handler);
@@ -48,40 +51,16 @@ export default function Topbar({ title, searchValue, onSearch, onMenu, notificat
       </div>
 
       <div className="topbar-actions">
-        <div className="dropdown" ref={notifRef}>
-          <button
-            className="icon-btn"
-            aria-label={`${t('topbar.notifications')} (${notifications.length})`}
-            onClick={() => setNotifOpen((v) => !v)}
-          >
-            <Icon name="bell" size={20} />
-            {notifications.length > 0 && (
-              <span className="icon-dot" aria-hidden="true" />
-            )}
-          </button>
-          {notifOpen && (
-            <div className="dropdown-menu notif-menu" role="menu">
-              <div className="dropdown-head">{t('topbar.notifications')}</div>
-              {notifications.length === 0 ? (
-                <div className="dropdown-empty">{t('topbar.notifEmpty')}</div>
-              ) : (
-                notifications.slice(0, 6).map((n, i) => (
-                  <button
-                    key={i}
-                    className="dropdown-item"
-                    onClick={() => {
-                      setNotifOpen(false);
-                      navigate(n.route || '/documents');
-                    }}
-                  >
-                    <span className="dropdown-item-title">{n.title}</span>
-                    <span className="dropdown-item-sub">{n.sub}</span>
-                  </button>
-                ))
-              )}
-            </div>
+        <button
+          className={`icon-btn ${onNotifications ? 'active' : ''}`}
+          onClick={() => navigate('/notifications')}
+          aria-label={`${t('topbar.notifications')} (${unreadCount})`}
+        >
+          <Icon name="bell" size={20} />
+          {unreadCount > 0 && (
+            <span className="icon-dot" aria-hidden="true" />
           )}
-        </div>
+        </button>
 
         <div className="dropdown" ref={profileRef}>
           <button className="topbar-profile" aria-label={t('profile')} onClick={() => setProfileOpen((v) => !v)}>

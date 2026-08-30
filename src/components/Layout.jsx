@@ -1,15 +1,9 @@
-import { createContext, useContext, useState } from 'react';
+import { useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { useStore } from '../store/StoreContext.jsx';
+import { SearchContext } from '../store/contexts.js';
 import { useTranslation } from '../store/useTranslation.js';
 import Sidebar from './Sidebar.jsx';
 import Topbar from './Topbar.jsx';
-
-const SearchContext = createContext({ query: '', setQuery: () => {} });
-
-export function useSearch() {
-  return useContext(SearchContext);
-}
 
 const titleKeyMap = {
   '/dashboard': 'dashboard',
@@ -17,6 +11,7 @@ const titleKeyMap = {
   '/inbox': 'inbox',
   '/data-tables': 'data-tables',
   '/employees': 'employees',
+  '/notifications': 'notifications',
   '/settings': 'settings',
 };
 
@@ -24,16 +19,9 @@ export default function Layout({ children }) {
   const [query, setQuery] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
-  const { documents } = useStore();
   const { t } = useTranslation();
 
   const title = titleKeyMap[location.pathname] ? t(titleKeyMap[location.pathname]) : 'Noffice';
-
-  // Derive notifications from actual pending data (not dummy)
-  const pendingDocs = documents.filter((d) => d.status === 'pending').length;
-  const notifItems = pendingDocs > 0
-    ? [{ title: `${pendingDocs} ${t('topbar.pendingApproval')}`, sub: `${t('topbar.viewPending')} →`, route: '/documents' }]
-    : [];
 
   return (
     <SearchContext.Provider value={{ query, setQuery }}>
@@ -45,7 +33,6 @@ export default function Layout({ children }) {
             searchValue={query}
             onSearch={setQuery}
             onMenu={() => setSidebarOpen(true)}
-            notifications={notifItems}
           />
           <main className="main">{children}</main>
         </div>

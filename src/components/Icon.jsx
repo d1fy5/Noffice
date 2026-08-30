@@ -41,6 +41,8 @@ const paths = {
   dots: <path d="M12 5h.01M12 12h.01M12 19h.01" strokeLinecap="round" strokeLinejoin="round" />,
   filter: <path d="M22 3H2l8 9.46V19l4 2v-8.54z" strokeLinecap="round" strokeLinejoin="round" />,
   save: <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2zM17 21v-8H7v8M7 3v5h8" strokeLinecap="round" strokeLinejoin="round" />,
+  alert: <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01" strokeLinecap="round" strokeLinejoin="round" />,
+  building: <path d="M3 21h18M5 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16M19 21V11a2 2 0 0 0-2-2h-2M9 7h2M9 11h2M9 15h2" strokeLinecap="round" strokeLinejoin="round" />,
 };
 
 export default function Icon({ name, size = 20, strokeWidth = 1.8, className = '' }) {

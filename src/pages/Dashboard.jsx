@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useStore, formatBytes } from '../store/StoreContext.jsx';
-import { useSearch } from '../components/Layout.jsx';
+import { useStore, useSearch } from '../store/hooks.js';
+import { formatBytes } from '../store/utils.js';
 import { useTranslation } from '../store/useTranslation.js';
 import { useAuth } from '../store/AuthContext.jsx';
 import StatCard from '../components/StatCard.jsx';
@@ -23,7 +23,10 @@ export default function Dashboard() {
   const q = query.trim().toLowerCase();
   const openUpload = () => setUploadOpen(true);
 
-  const recent = documents
+  // Trashed documents are not part of the active workspace view.
+  const activeDocs = documents.filter((d) => !d.isTrashed);
+
+  const recent = activeDocs
     .filter((d) => !q || d.title.toLowerCase().includes(q) || d.author.toLowerCase().includes(q))
     .slice(0, 5);
 
@@ -101,21 +104,21 @@ export default function Dashboard() {
         <div>
           <SectionHead title={t('dash.category')} />
           <div className="card">
-            {documents.length === 0 ? (
+            {activeDocs.length === 0 ? (
               <EmptyState icon="chart" title={t('dash.empty.category.title')} description={t('dash.empty.category.desc')} />
             ) : (
-              <div className="card-body category-list">{categoryRows(documents)}</div>
+              <div className="card-body category-list">{categoryRows(activeDocs)}</div>
             )}
           </div>
 
           <SectionHead title={t('dash.activity')} />
           <div className="card">
-            {documents.length === 0 ? (
+            {activeDocs.length === 0 ? (
               <EmptyState icon="activity" title={t('dash.empty.activity.title')} description={t('dash.empty.activity.desc')} />
             ) : (
               <div className="card-body">
                 <div className="chart-bars" role="img" aria-label={t('dash.activity')}>
-                  {activitySegments(documents).map((b, i) => (
+                  {activitySegments(activeDocs).map((b, i) => (
                     <div key={i} className={`chart-bar ${b.active ? 'highlight' : ''}`} style={{ height: `${b.h}%` }} />
                   ))}
                 </div>
