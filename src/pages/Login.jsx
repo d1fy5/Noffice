@@ -4,7 +4,7 @@ import { useAuth } from '../store/AuthContext.jsx';
 import { useTranslation } from '../store/useTranslation.js';
 import Button from '../components/Button.jsx';
 import Icon from '../components/Icon.jsx';
-import { useToast } from '../store/ToastContext.jsx';
+import { useToast } from '../store/hooks.js';
 
 export default function Login() {
   const { login } = useAuth();

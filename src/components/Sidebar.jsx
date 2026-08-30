@@ -3,7 +3,7 @@ import Icon from './Icon.jsx';
 import Avatar from './Avatar.jsx';
 import { useTranslation } from '../store/useTranslation.js';
 import { useAuth } from '../store/AuthContext.jsx';
-import { useToast } from '../store/ToastContext.jsx';
+import { useToast } from "../store/hooks.js";
 
 const mainNav = [
   { to: '/dashboard', icon: 'dashboard', labelKey: 'dashboard' },
