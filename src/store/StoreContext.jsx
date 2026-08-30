@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
+import { EmployeeAPI, DocumentAPI } from '../services/api.js';
 
 export const DEPARTMENTS = [
   'Engineering',
@@ -47,9 +48,24 @@ function uid() {
 export const StoreContext = createContext(null);
 
 export function StoreProvider({ children }) {
-  const [documents, setDocuments] = useState(() => load(KEYS.documents, []));
-  const [employees, setEmployees] = useState(() => load(KEYS.employees, []));
+  const [documents, setDocuments] = useState([]);
+  const [employees, setEmployees] = useState([]);
   const [messages, setMessages] = useState(() => load(KEYS.messages, []));
+  
+  // Load data from backend on mount
+  useEffect(() => {
+    async function fetchInitialData() {
+      try {
+        const docs = await DocumentAPI.getAll();
+        const emps = await EmployeeAPI.getAll();
+        setDocuments(docs || []);
+        setEmployees(emps || []);
+      } catch (err) {
+        console.error("Failed to fetch data from backend", err);
+      }
+    }
+    fetchInitialData();
+  }, []);
   const [account, setAccount] = useState(() =>
     load(KEYS.account, {
       firstName: '',
@@ -75,8 +91,7 @@ export function StoreProvider({ children }) {
   );
   const [language, setLanguage] = useState(() => load(KEYS.language, 'en'));
 
-  useEffect(() => localStorage.setItem(KEYS.documents, JSON.stringify(documents)), [documents]);
-  useEffect(() => localStorage.setItem(KEYS.employees, JSON.stringify(employees)), [employees]);
+  useEffect(() => localStorage.setItem(KEYS.messages, JSON.stringify(messages)), [messages]);
   useEffect(() => localStorage.setItem(KEYS.messages, JSON.stringify(messages)), [messages]);
   useEffect(() => localStorage.setItem(KEYS.account, JSON.stringify(account)), [account]);
   useEffect(
@@ -88,12 +103,16 @@ export function StoreProvider({ children }) {
   useEffect(() => localStorage.setItem(KEYS.language, JSON.stringify(language)), [language]);
 
   // Documents
-  const addDocuments = useCallback((items) => {
+  const addDocuments = useCallback(async (items) => {
     const now = Date.now();
-    const created = items.map((item, idx) => {
+    const created = [];
+    
+    for (let idx = 0; idx < items.length; idx++) {
+      const item = items[idx];
       const f = item.file;
       const name = (item.name && item.name.trim()) || f.name;
-      return {
+      
+      const doc = {
         id: uid() + idx,
         title: name,
         description: item.description || '',
@@ -111,7 +130,15 @@ export function StoreProvider({ children }) {
         type: extOf(f.name),
         dept: item.category || account.department || 'General',
       };
-    });
+      
+      try {
+        await DocumentAPI.create(doc);
+        created.push(doc);
+      } catch (err) {
+        console.error("Failed to create document", err);
+      }
+    }
+    
     setDocuments((d) => [...created, ...d]);
     return created;
   }, [account]);
@@ -125,10 +152,16 @@ export function StoreProvider({ children }) {
   }, []);
 
   // Employees
-  const addEmployee = useCallback((data) => {
+  const addEmployee = useCallback(async (data) => {
     const emp = { id: uid(), ...data };
-    setEmployees((e) => [...e, emp]);
-    return emp;
+    try {
+      await EmployeeAPI.create(emp);
+      setEmployees((e) => [...e, emp]);
+      return emp;
+    } catch (err) {
+      console.error("Failed to create employee", err);
+      return null;
+    }
   }, []);
 
   const updateEmployee = useCallback((id, data) => {

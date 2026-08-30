@@ -89,13 +89,39 @@ export default function Employees() {
     notify(t('action.delete'));
   };
 
+  const exportCSV = () => {
+    if (filtered.length === 0) return;
+    const header = ['ID', 'First Name', 'Last Name', 'Department', 'Role', 'Email', 'Status'];
+    const rows = filtered.map((e) => [e.id, e.firstName, e.lastName, e.department, e.role, e.email, e.status]);
+    const csv = [header, ...rows]
+      .map((row) => row.map((c) => `"${String(c || '').replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'noffice-employees.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+    notify('Berhasil mengekspor data karyawan (CSV)');
+  };
+
   return (
     <>
       <Breadcrumb crumbs={[{ label: t('breadcrumb.home'), to: '/dashboard' }, { label: t('emp.title') }]} />
       <PageHeader
         title={t('emp.title')}
         subtitle={t('emp.subtitle')}
-        actions={<Button variant="primary" icon="userPlus" onClick={openAdd}>{t('action.addEmployee')}</Button>}
+        actions={
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <Button variant="secondary" icon="download" onClick={exportCSV} disabled={filtered.length === 0}>
+              {t('action.export')}
+            </Button>
+            <Button variant="primary" icon="userPlus" onClick={openAdd}>
+              {t('action.addEmployee')}
+            </Button>
+          </div>
+        }
       />
 
       <div className="table-controls">

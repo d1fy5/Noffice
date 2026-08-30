@@ -1,22 +1,37 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import Icon from './Icon.jsx';
 import Avatar from './Avatar.jsx';
 import { useTranslation } from '../store/useTranslation.js';
+import { useAuth } from '../store/AuthContext.jsx';
+import { useToast } from '../store/ToastContext.jsx';
 
 const mainNav = [
   { to: '/dashboard', icon: 'dashboard', labelKey: 'dashboard' },
   { to: '/documents', icon: 'documents', labelKey: 'documents' },
   { to: '/inbox', icon: 'inbox', labelKey: 'inbox' },
-  { to: '/data-tables', icon: 'table', labelKey: 'data-tables' },
+  { to: '/data-tables', icon: 'table', labelKey: 'data-tables', adminOnly: true },
 ];
 
 const secondaryNav = [
-  { to: '/employees', icon: 'employees', labelKey: 'employees' },
+  { to: '/employees', icon: 'employees', labelKey: 'employees', adminOnly: true },
   { to: '/settings', icon: 'settings', labelKey: 'settings' },
 ];
 
 export default function Sidebar({ open, onClose }) {
   const { t } = useTranslation();
+  const { user, isAdmin, logout } = useAuth();
+  const { notify } = useToast();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    notify('Anda berhasil logout.', 'info');
+    navigate('/login');
+  };
+
+  const filteredMainNav = mainNav.filter(item => !item.adminOnly || isAdmin);
+  const filteredSecondaryNav = secondaryNav.filter(item => !item.adminOnly || isAdmin);
+
   return (
     <>
       <div className={`drawer-backdrop ${open ? 'show' : ''}`} onClick={onClose} aria-hidden="true" />
@@ -31,7 +46,7 @@ export default function Sidebar({ open, onClose }) {
 
         <nav className="sidebar-nav">
           <div className="nav-group-label">{t('nav.main')}</div>
-          {mainNav.map((item) => (
+          {filteredMainNav.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
@@ -43,27 +58,31 @@ export default function Sidebar({ open, onClose }) {
             </NavLink>
           ))}
 
-          <div className="nav-group-label">{t('nav.org')}</div>
-          {secondaryNav.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-              onClick={onClose}
-            >
-              <span className="nav-icon"><Icon name={item.icon} size={19} /></span>
-              {t(item.labelKey)}
-            </NavLink>
-          ))}
+          {filteredSecondaryNav.length > 0 && (
+            <>
+              <div className="nav-group-label">{t('nav.org')}</div>
+              {filteredSecondaryNav.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+                  onClick={onClose}
+                >
+                  <span className="nav-icon"><Icon name={item.icon} size={19} /></span>
+                  {t(item.labelKey)}
+                </NavLink>
+              ))}
+            </>
+          )}
         </nav>
 
         <div className="sidebar-profile">
-          <Avatar name="Noffice User" />
+          <Avatar name={user?.name || "Noffice User"} />
           <div>
-            <div className="sp-name">{t('profile')}</div>
-            <div className="sp-role">{t('profileRole')}</div>
+            <div className="sp-name">{user?.name || t('profile')}</div>
+            <div className="sp-role">{user?.role === 'admin' ? 'Administrator' : 'Karyawan'}</div>
           </div>
-          <span className="sp-logout" aria-label={t('admin.logout') || 'Logout'}>
+          <span className="sp-logout" aria-label="Logout" onClick={handleLogout} style={{cursor: 'pointer'}}>
             <Icon name="logout" size={18} />
           </span>
         </div>

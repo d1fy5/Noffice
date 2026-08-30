@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useStore, formatBytes } from '../store/StoreContext.jsx';
 import { useSearch } from '../components/Layout.jsx';
 import { useTranslation } from '../store/useTranslation.js';
+import { useAuth } from '../store/AuthContext.jsx';
 import StatCard from '../components/StatCard.jsx';
 import Badge from '../components/Badge.jsx';
 import EmptyState from '../components/EmptyState.jsx';
@@ -15,6 +16,7 @@ export default function Dashboard() {
   const { query } = useSearch();
   const { totals, documents } = useStore();
   const { t } = useTranslation();
+  const { isAdmin } = useAuth();
   const navigate = useNavigate();
   const [uploadOpen, setUploadOpen] = useState(false);
 
@@ -35,9 +37,14 @@ export default function Dashboard() {
 
       <div className="stat-grid">
         <StatCard label={t('stat.totalDocuments')} value={totals.totalDocuments.toLocaleString()} icon="documents" sub={totals.totalDocuments ? t('stat.sub.totalTruth') : t('stat.sub.totalEmpty')} />
-        <StatCard label={t('stat.pendingApprovals')} value={totals.pendingApprovals.toLocaleString()} icon="clock" sub={totals.pendingApprovals ? t('stat.sub.pendingTruth') : t('stat.sub.pendingEmpty')} />
-        <StatCard label={t('stat.activeEmployees')} value={totals.activeEmployees.toLocaleString()} icon="employees" sub={totals.activeEmployees ? t('stat.sub.employeesTruth') : t('stat.sub.employeesEmpty')} />
-        <StatCard label={t('stat.storageUsed')} value={formatBytes(totals.storageBytes)} icon="chart" sub={formatBytes(totals.storageBytes) === '0 B' ? t('stat.sub.storageEmpty') : t('stat.sub.storageTruth')} />
+        
+        {isAdmin && (
+          <>
+            <StatCard label={t('stat.pendingApprovals')} value={totals.pendingApprovals.toLocaleString()} icon="clock" sub={totals.pendingApprovals ? t('stat.sub.pendingTruth') : t('stat.sub.pendingEmpty')} />
+            <StatCard label={t('stat.activeEmployees')} value={totals.activeEmployees.toLocaleString()} icon="employees" sub={totals.activeEmployees ? t('stat.sub.employeesTruth') : t('stat.sub.employeesEmpty')} />
+            <StatCard label={t('stat.storageUsed')} value={formatBytes(totals.storageBytes)} icon="chart" sub={formatBytes(totals.storageBytes) === '0 B' ? t('stat.sub.storageEmpty') : t('stat.sub.storageTruth')} />
+          </>
+        )}
       </div>
 
       <div className="dash-two dash-grid-wide">
@@ -78,10 +85,12 @@ export default function Dashboard() {
               <span className="qo-icon"><Icon name="upload" size={18} /></span>
               {t('action.upload')}
             </button>
-            <button className="quick-op" onClick={() => navigate('/employees')}>
-              <span className="qo-icon"><Icon name="userPlus" size={18} /></span>
-              {t('action.addEmployee')}
-            </button>
+            {isAdmin && (
+              <button className="quick-op" onClick={() => navigate('/employees')}>
+                <span className="qo-icon"><Icon name="userPlus" size={18} /></span>
+                {t('action.addEmployee')}
+              </button>
+            )}
             <button className="quick-op" onClick={() => navigate('/inbox')}>
               <span className="qo-icon"><Icon name="message" size={18} /></span>
               {t('action.newMessage')}
