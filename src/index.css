@@ -3343,4 +3343,140 @@ table.data-table tbody tr.selected {
   }
 }
 
+/* ============================================================
+   MOBILE LAYOUT REFINEMENTS
+   Targets small viewports without changing the desktop layout.
+   ============================================================ */
+
+/* ---- Dashboard: Quick Operations (avoid 3 overcrowded columns) ---- */
+@media (max-width: 900px) {
+  .quick-op-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .quick-op {
+    font-size: 13.5px;
+    gap: 10px;
+    padding: 12px 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .quick-op-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .quick-op {
+    padding: 13px 14px;
+  }
+}
+
+/* ---- Documents: folder/category navigation on mobile ----
+   Folders become a horizontally scrollable strip. Items never shrink
+   below their content width so the label and count never collapse or
+   overlap; they simply scroll sideways. */
+@media (max-width: 960px) {
+  .doc-folders {
+    scrollbar-width: none;
+  }
+
+  .doc-folders::-webkit-scrollbar {
+    display: none;
+  }
+
+  .doc-folders .folder-item {
+    flex-shrink: 0;
+    min-width: max-content;
+  }
+}
+
+/* Tighten folder row padding on narrow phones */
+@media (max-width: 480px) {
+  .doc-folders {
+    padding: 10px 8px;
+  }
+
+  .folder-item {
+    font-size: 13px;
+  }
+}
+
+/* ---- Documents toolbar on small screens ---- */
+@media (max-width: 480px) {
+  .doc-view-controls .view-toggle {
+    justify-content: stretch;
+  }
+
+  .doc-view-controls .view-toggle .view-btn {
+    flex: 1;
+  }
+
+  .trash-actions {
+    justify-content: stretch;
+  }
+
+  .trash-actions .btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* ---- Topbar: keep menu / search / notifications / profile in one row ----
+   Allow the search field to shrink so nothing pushes off the viewport. */
+@media (max-width: 960px) {
+  .icon-btn,
+  .topbar-profile {
+    flex-shrink: 0;
+  }
+
+  .topbar-actions {
+    flex-shrink: 0;
+  }
+
+  .topbar-search {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .topbar {
+    gap: 8px;
+    padding: 0 10px;
+  }
+
+  .topbar-actions {
+    gap: 4px;
+  }
+
+  .topbar-search input {
+    font-size: 12.5px;
+  }
+}
+
+/* ---- General mobile containment ----
+   Cards, grids and content containers follow the viewport width so text
+   wraps naturally instead of overflowing the screen. */
+@media (max-width: 768px) {
+  .page-head-actions,
+  .doc-layout > div,
+  .doc-folders,
+  .doc-grid,
+  .stat-grid,
+  .dash-two,
+  .dash-grid,
+  .dash-grid-wide,
+  .card,
+  .doc-card,
+  .submission-row,
+  .empty-state,
+  .section-header {
+    max-width: 100%;
+  }
+
+  table.data-table {
+    max-width: 100%;
+  }
+}
+
 
