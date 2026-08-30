@@ -8,14 +8,22 @@ export const DEPARTMENTS = [
 export const RECIPIENT_STATUSES = ['Approved', 'Pending', 'Rejected'];
 export const EMPLOYEE_STATUSES = ['Active', 'Inactive'];
 
-export const UPLOAD_CATEGORIES = [
-  'Reports',
-  'Finance',
-  'HR & Talent',
-  'Legal & Compliance',
-  'Engineering',
-  'Operations',
+// Document categories for a notary office. The `id` is the value stored on
+// each document (its `category`/`dept`) and also the folder id on the
+// Documents page. Labels are resolved through i18n using `labelKey`.
+export const DOC_CATEGORIES = [
+  { id: 'Akta', labelKey: 'doc.cat.akta' },
+  { id: 'Perjanjian', labelKey: 'doc.cat.perjanjian' },
+  { id: 'Sertifikat & Dokumen Tanah', labelKey: 'doc.cat.tanah' },
+  { id: 'Dokumen Klien', labelKey: 'doc.cat.klien' },
+  { id: 'Surat & Legalitas', labelKey: 'doc.cat.sah' },
+  { id: 'Dokumen Perusahaan', labelKey: 'doc.cat.perusahaan' },
+  { id: 'Administrasi', labelKey: 'doc.cat.administrasi' },
+  { id: 'Lainnya', labelKey: 'doc.cat.lainnya' },
 ];
+
+// Kept for the Upload modal category dropdown.
+export const UPLOAD_CATEGORIES = DOC_CATEGORIES.map((c) => c.id);
 
 export const STORAGE_KEYS = {
   documents: 'noffice.documents',

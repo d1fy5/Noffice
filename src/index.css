@@ -518,6 +518,20 @@ h2 {
   color: var(--text);
 }
 
+.btn-danger {
+  background: var(--red);
+  color: #fff;
+}
+
+.btn-danger:hover {
+  background: var(--red);
+  filter: brightness(0.94);
+}
+
+.btn-danger:active {
+  transform: translateY(1px);
+}
+
 .btn-sm {
   min-height: 32px;
   padding: 4px 12px;
@@ -993,6 +1007,32 @@ h2 {
 .folder-item.active .folder-count {
   background: var(--surface);
   color: var(--primary);
+}
+
+.folder-item.folder-trash {
+  margin-top: 6px;
+  color: var(--text-3);
+}
+
+.folder-item.folder-trash.active {
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.folder-item.folder-trash.active .folder-count {
+  background: var(--surface);
+  color: var(--red);
+}
+
+.trash-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+
+.action-btn.danger:hover {
+  background: var(--red-soft);
+  color: var(--red);
 }
 
 .doc-view-controls {

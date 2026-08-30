@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useStore, useSearch, useToast } from '../store/hooks.js';
 import { useTranslation } from '../store/useTranslation.js';
+import { DOC_CATEGORIES } from '../store/constants.js';
 import Badge from '../components/Badge.jsx';
 import Button from '../components/Button.jsx';
 import Icon from '../components/Icon.jsx';
@@ -11,16 +12,26 @@ import UploadModal from '../components/UploadModal.jsx';
 import Breadcrumb from '../components/Breadcrumb.jsx';
 import PageHeader from '../components/PageHeader.jsx';
 
-const DEPT_TO_FOLDER = {
-  Engineering: 'Reports',
-  'HR & Talent': 'HR Documents',
-  Finance: 'Finance',
-  'Legal & Compliance': 'Legal',
-};
+const CATEGORY_IDS = DOC_CATEGORIES.map((c) => c.id);
+
+// Determines which folder a document belongs to. Uses the stored category
+// (the value set on upload) and falls back to a default folder for any
+// legacy values that no longer match the notary categories.
+function categoryOf(d) {
+  const c = d.category || d.dept;
+  return CATEGORY_IDS.includes(c) ? c : 'Lainnya';
+}
 
 export default function Documents() {
   const { query } = useSearch();
-  const { documents, deleteDocument, updateDocument } = useStore();
+  const {
+    documents,
+    deleteDocument,
+    restoreDocument,
+    deleteDocumentPermanently,
+    emptyTrash,
+    updateDocument,
+  } = useStore();
   const { notify } = useToast();
   const { t } = useTranslation();
 
@@ -30,22 +41,26 @@ export default function Documents() {
   const [view, setView] = useState('grid');
   const [selected, setSelected] = useState(null);
   const [confirmId, setConfirmId] = useState(null);
+  const [permanentId, setPermanentId] = useState(null);
+  const [emptyConfirm, setEmptyConfirm] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
 
   const q = query.trim().toLowerCase();
+  const inTrash = folder === 'trash';
 
-  const FOLDERS = [
-    { id: 'all', label: t('doc.all') },
-    { id: 'Reports', label: t('doc.reports') },
-    { id: 'Finance', label: t('doc.finance') },
-    { id: 'HR Documents', label: t('doc.hr') },
-    { id: 'Legal', label: t('doc.legal') },
-  ];
+  const FOLDERS = useMemo(
+    () => [
+      { id: 'all', label: t('doc.all'), icon: 'folders', trash: false },
+      ...DOC_CATEGORIES.map((c) => ({ id: c.id, label: t(c.labelKey), icon: 'folders', trash: false })),
+      { id: 'trash', label: t('doc.trash'), icon: 'trash', trash: true },
+    ],
+    [t]
+  );
 
   const filtered = useMemo(() => {
-    let rows = documents;
-    if (folder !== 'all') {
-      rows = rows.filter((d) => (DEPT_TO_FOLDER[d.dept] || 'Reports') === folder);
+    let rows = inTrash ? documents.filter((d) => d.isTrashed) : documents.filter((d) => !d.isTrashed);
+    if (!inTrash && folder !== 'all') {
+      rows = rows.filter((d) => categoryOf(d) === folder);
     }
     if (status !== 'all') rows = rows.filter((d) => d.status === status);
     if (q) rows = rows.filter((d) => `${d.title} ${d.author} ${d.dept}`.toLowerCase().includes(q));
@@ -53,29 +68,77 @@ export default function Documents() {
     else if (sort === 'oldest') rows = [...rows].sort((a, b) => (a.dateTs || 0) - (b.dateTs || 0));
     else if (sort === 'size') rows = [...rows].sort((a, b) => (b.sizeBytes || 0) - (a.sizeBytes || 0));
     return rows;
-  }, [documents, folder, status, sort, q]);
+  }, [documents, folder, status, sort, q, inTrash]);
 
   const folderCount = (fid) => {
-    if (fid === 'all') return documents.length;
-    return documents.filter((d) => (DEPT_TO_FOLDER[d.dept] || 'Reports') === fid).length;
+    if (fid === 'trash') return documents.filter((d) => d.isTrashed).length;
+    if (fid === 'all') return documents.filter((d) => !d.isTrashed).length;
+    return documents.filter((d) => !d.isTrashed && categoryOf(d) === fid).length;
   };
 
   const currentFolderLabel = FOLDERS.find((f) => f.id === folder)?.label || t('doc.all');
 
   const openUpload = () => setUploadOpen(true);
 
-  const doDelete = () => {
+  const doMoveToTrash = () => {
     if (!confirmId) return;
     const doc = documents.find((d) => d.id === confirmId);
     deleteDocument(confirmId);
     setConfirmId(null);
     if (selected && selected.id === confirmId) setSelected(null);
-    notify(`${doc ? doc.title : 'Document'} ${t('action.delete')}`);
+    notify(`${doc ? doc.title : 'Document'} ${t('doc.trash.moved')}`);
+  };
+
+  const doPermanentDelete = () => {
+    if (!permanentId) return;
+    deleteDocumentPermanently(permanentId);
+    setPermanentId(null);
+    notify(t('doc.trash.permanentMsg'));
+  };
+
+  const doEmptyTrash = () => {
+    emptyTrash();
+    setEmptyConfirm(false);
+    notify(t('doc.trash.emptyMsg'));
   };
 
   const confirmDelete = (doc) => {
     if (selected && selected.id === doc.id) setSelected(null);
     setConfirmId(doc.id);
+  };
+
+  const renderActions = (d) => {
+    if (inTrash) {
+      return (
+        <>
+          <button
+            className="action-btn"
+            onClick={() => {
+              restoreDocument(d.id);
+              notify(`${d.title} ${t('doc.trash.restoredMsg')}`);
+            }}
+            aria-label={`${t('doc.trash.restore')} ${d.title}`}
+            title={t('doc.trash.restore')}
+          >
+            <Icon name="back" size={16} />
+          </button>
+          <button
+            className="action-btn danger"
+            onClick={() => setPermanentId(d.id)}
+            aria-label={`${t('doc.trash.permanent')} ${d.title}`}
+            title={t('doc.trash.permanent')}
+          >
+            <Icon name="trash" size={16} />
+          </button>
+        </>
+      );
+    }
+    return (
+      <>
+        <button className="action-btn" onClick={() => setSelected(d)} aria-label={`${t('action.view')} ${d.title}`}><Icon name="eye" size={16} /></button>
+        <button className="action-btn" onClick={() => confirmDelete(d)} aria-label={`${t('action.delete')} ${d.title}`}><Icon name="trash" size={16} /></button>
+      </>
+    );
   };
 
   return (
@@ -93,10 +156,10 @@ export default function Documents() {
           {FOLDERS.map((f) => (
             <button
               key={f.id}
-              className={`folder-item ${folder === f.id ? 'active' : ''}`}
+              className={`folder-item ${folder === f.id ? 'active' : ''} ${f.trash ? 'folder-trash' : ''}`}
               onClick={() => setFolder(f.id)}
             >
-              <span className="folder-icon"><Icon name="folders" size={17} /></span>
+              <span className="folder-icon"><Icon name={f.icon} size={17} /></span>
               {f.label}
               <span className="folder-count">{folderCount(f.id)}</span>
             </button>
@@ -131,20 +194,26 @@ export default function Documents() {
             {filtered.length} {t('doc.count').toLowerCase()} {currentFolderLabel}
           </p>
 
+          {inTrash && filtered.length > 0 && (
+            <div className="trash-actions">
+              <Button variant="ghost" icon="trash" onClick={() => setEmptyConfirm(true)}>{t('doc.trash.emptyTrash')}</Button>
+            </div>
+          )}
+
           {filtered.length === 0 ? (
             <div className="card">
               <EmptyState
-                icon="documents"
-                title={t('doc.empty.title')}
-                description={t('doc.empty.desc')}
-                action={<Button variant="primary" icon="upload" onClick={openUpload}>{t('action.upload')}</Button>}
+                icon={inTrash ? 'trash' : 'documents'}
+                title={inTrash ? t('doc.trash.empty.title') : t('doc.empty.title')}
+                description={inTrash ? t('doc.trash.empty.desc') : t('doc.empty.desc')}
+                action={inTrash ? null : <Button variant="primary" icon="upload" onClick={openUpload}>{t('action.upload')}</Button>}
               />
             </div>
           ) : view === 'grid' ? (
             <div className="doc-grid">
               {filtered.map((d) => (
                 <div className="doc-card" key={d.id}>
-                  <button className="doc-card-main" onClick={() => setSelected(d)} aria-label={`${t('action.view')} ${d.title}`}>
+                  <button className="doc-card-main" onClick={() => (inTrash ? null : setSelected(d))} aria-label={`${t('action.view')} ${d.title}`}>
                     <div className="doc-thumb">
                       <span className="thumb-file"><Icon name="file" size={30} /></span>
                     </div>
@@ -158,8 +227,7 @@ export default function Documents() {
                     </div>
                   </button>
                   <div className="doc-card-actions">
-                    <button className="action-btn" onClick={() => setSelected(d)} aria-label={`${t('action.view')} ${d.title}`}><Icon name="eye" size={16} /></button>
-                    <button className="action-btn" onClick={() => confirmDelete(d)} aria-label={`${t('action.delete')} ${d.title}`}><Icon name="trash" size={16} /></button>
+                    {renderActions(d)}
                   </div>
                 </div>
               ))}
@@ -190,8 +258,7 @@ export default function Documents() {
                         <td><Badge status={d.status} /></td>
                         <td>
                           <span className="row-actions">
-                            <button className="action-btn" onClick={() => setSelected(d)} aria-label={`${t('action.view')} ${d.title}`}><Icon name="eye" size={16} /></button>
-                            <button className="action-btn" onClick={() => confirmDelete(d)} aria-label={`${t('action.delete')} ${d.title}`}><Icon name="trash" size={16} /></button>
+                            {renderActions(d)}
                           </span>
                         </td>
                       </tr>
@@ -204,7 +271,7 @@ export default function Documents() {
         </div>
       </div>
 
-      {selected && (
+      {selected && !inTrash && (
         <Modal open onClose={() => setSelected(null)} title={selected.title}>
           <div className="doc-thumb modal-thumb">
             <span className="thumb-file"><Icon name="file" size={34} /></span>
@@ -249,8 +316,30 @@ export default function Documents() {
         message={t('doc.delete.msg')}
         confirmLabel={t('action.delete')}
         onCancel={() => setConfirmId(null)}
-        onConfirm={doDelete}
+        onConfirm={doMoveToTrash}
       />
+
+      <ConfirmDialog
+        open={!!permanentId}
+        title={t('doc.trash.permanent.title')}
+        message={t('doc.trash.permanent.msg', { name: documents.find((d) => d.id === permanentId)?.title || '' })}
+        confirmLabel={t('doc.trash.permanent')}
+        danger
+        onCancel={() => setPermanentId(null)}
+        onConfirm={doPermanentDelete}
+      />
+
+      {emptyConfirm && (
+        <ConfirmDialog
+          open
+          title={t('doc.trash.emptyTrash.title')}
+          message={t('doc.trash.emptyTrash.msg', { count: documents.filter((d) => d.isTrashed).length })}
+          confirmLabel={t('doc.trash.emptyTrash')}
+          danger
+          onCancel={() => setEmptyConfirm(false)}
+          onConfirm={doEmptyTrash}
+        />
+      )}
 
       <UploadModal open={uploadOpen} onClose={() => setUploadOpen(false)} />
     </>

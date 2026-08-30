@@ -2,7 +2,7 @@ import Button from './Button.jsx';
 import Icon from './Icon.jsx';
 import { useTranslation } from '../store/useTranslation.js';
 
-export default function ConfirmDialog({ open, title, message, confirmLabel = 'Delete', onCancel, onConfirm }) {
+export default function ConfirmDialog({ open, title, message, confirmLabel = 'Delete', onCancel, onConfirm, danger = false }) {
   const { t } = useTranslation();
   if (!open) return null;
   return (
@@ -18,7 +18,7 @@ export default function ConfirmDialog({ open, title, message, confirmLabel = 'De
           <p style={{ margin: 0, color: 'var(--text-2)', fontSize: 14, lineHeight: 1.6 }}>{message}</p>
           <div className="modal-actions" style={{ justifyContent: 'flex-end' }}>
             <Button variant="secondary" onClick={onCancel}>{t('action.cancel')}</Button>
-            <Button variant="primary" onClick={onConfirm}>{confirmLabel}</Button>
+            <Button variant={danger ? 'danger' : 'primary'} onClick={onConfirm}>{confirmLabel}</Button>
           </div>
         </div>
       </div>

@@ -13,7 +13,7 @@ export function buildInitialNotifications(target = {}) {
     out.push({ id: 'notif-' + uid() + '-' + out.length, dateTs: now - offsetDays * DAY, read: false, ...n });
   };
 
-  const pending = (target.documents || []).filter((d) => d.status === 'pending');
+  const pending = (target.documents || []).filter((d) => !d.isTrashed && d.status === 'pending');
   pending.slice(0, 5).forEach((d, i) => {
     push({
       type: 'submission',

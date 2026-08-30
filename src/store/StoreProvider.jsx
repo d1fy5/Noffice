@@ -89,6 +89,11 @@ export function StoreProvider({ children }) {
         status: 'pending',
         type: extOf(f.name),
         dept: item.category || account.department || 'General',
+        // Soft-delete / trash fields. Kept compatible with the existing
+        // document shape so it can migrate to a backend later.
+        isTrashed: false,
+        trashedAt: null,
+        trashedBy: null,
       };
     });
     setDocuments((d) => [...created, ...d]);
@@ -108,8 +113,35 @@ export function StoreProvider({ children }) {
     return created;
   }, [account]);
 
+  // Soft delete: moves a document to the Trash instead of removing its data.
+  // The document is kept and can be restored later.
   const deleteDocument = useCallback((id) => {
+    const who = account.firstName ? `${account.firstName} ${account.lastName}`.trim() : 'You';
+    setDocuments((d) =>
+      d.map((doc) =>
+        doc.id === id ? { ...doc, isTrashed: true, trashedAt: Date.now(), trashedBy: who } : doc
+      )
+    );
+  }, [account]);
+
+  // Restore: brings a trashed document back to its previous category.
+  const restoreDocument = useCallback((id) => {
+    setDocuments((d) =>
+      d.map((doc) =>
+        doc.id === id ? { ...doc, isTrashed: false, trashedAt: null, trashedBy: null } : doc
+      )
+    );
+  }, []);
+
+  // Permanent delete: really removes the document data. Only called from the
+  // Trash view after explicit confirmation.
+  const deleteDocumentPermanently = useCallback((id) => {
     setDocuments((d) => d.filter((doc) => doc.id !== id));
+  }, []);
+
+  // Empty the Trash: only removes documents that are currently in the Trash.
+  const emptyTrash = useCallback(() => {
+    setDocuments((d) => d.filter((doc) => !doc.isTrashed));
   }, []);
 
   const updateDocument = useCallback((id, patch) => {
@@ -208,34 +240,36 @@ export function StoreProvider({ children }) {
   }, []);
 
 
-  // Submissions derived from documents
+  // Submissions derived from documents (trashed documents are excluded).
   const submissions = useMemo(
     () =>
-      documents.map((d, i) => ({
-        id: `SUB-${(1082 - i + 10000) % 10000}`,
-        empId: d.id,
-        name: d.author,
-        dept: d.dept,
-        doc: d.title,
-        subId: d.id,
-        date: d.date,
-        dateTs: d.dateTs,
-        status: d.status,
-        size: d.size,
-      })),
+      documents
+        .filter((d) => !d.isTrashed)
+        .map((d, i) => ({
+          id: `SUB-${(1082 - i + 10000) % 10000}`,
+          empId: d.id,
+          name: d.author,
+          dept: d.dept,
+          doc: d.title,
+          subId: d.id,
+          date: d.date,
+          dateTs: d.dateTs,
+          status: d.status,
+          size: d.size,
+        })),
     [documents]
   );
 
-  const totals = useMemo(
-    () => ({
-      totalDocuments: documents.length,
-      pendingApprovals: documents.filter((d) => d.status === 'pending').length,
+  const totals = useMemo(() => {
+    const active = documents.filter((d) => !d.isTrashed);
+    return {
+      totalDocuments: active.length,
+      pendingApprovals: active.filter((d) => d.status === 'pending').length,
       activeEmployees: employees.filter((e) => (e.status || '').toLowerCase() === 'active').length,
-      storageBytes: documents.reduce((s, d) => s + (d.sizeBytes || 0), 0),
-      reports: documents.length,
-    }),
-    [documents, employees]
-  );
+      storageBytes: active.reduce((s, d) => s + (d.sizeBytes || 0), 0),
+      reports: active.length,
+    };
+  }, [documents, employees]);
 
   const value = {
     documents,
@@ -253,6 +287,9 @@ export function StoreProvider({ children }) {
     addDocuments,
     deleteDocument,
     updateDocument,
+    restoreDocument,
+    deleteDocumentPermanently,
+    emptyTrash,
     addEmployee,
     updateEmployee,
     deleteEmployee,
