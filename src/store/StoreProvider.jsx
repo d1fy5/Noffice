@@ -175,6 +175,29 @@ export function StoreProvider({ children }) {
     setDocuments((d) => d.map((doc) => (doc.id === id ? { ...doc, ...patch } : doc)));
   }, []);
 
+  // Update status dokumen (approve/decline) dan persist ke backend.
+  // Local state di-update optimistically; jika backend gagal, dikembalikan ke
+  // status sebelumnya agar UI tetap sinkron dengan penyimpanan.
+  const updateDocumentStatus = useCallback(async (id, status, userId) => {
+    let prevStatus = null;
+    setDocuments((d) =>
+      d.map((doc) => (doc.id === id ? ((prevStatus = doc.status), { ...doc, status }) : doc))
+    );
+    try {
+      const result = await DocumentAPI.updateStatus(id, status, userId);
+      if (!result.success) {
+        throw new Error(result.message || 'Failed to update status');
+      }
+      return true;
+    } catch (err) {
+      console.error('Failed to persist document status', err);
+      setDocuments((d) =>
+        d.map((doc) => (doc.id === id ? { ...doc, status: prevStatus } : doc))
+      );
+      return false;
+    }
+  }, []);
+
   // Employees
   const addEmployee = useCallback(async (data) => {
     const emp = {
@@ -321,6 +344,7 @@ export function StoreProvider({ children }) {
     addDocuments,
     deleteDocument,
     updateDocument,
+    updateDocumentStatus,
     restoreDocument,
     deleteDocumentPermanently,
     emptyTrash,

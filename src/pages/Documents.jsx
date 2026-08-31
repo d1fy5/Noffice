@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useStore, useSearch, useToast } from '../store/hooks.js';
 import { useTranslation } from '../store/useTranslation.js';
+import { useAuth } from '../store/AuthContext.jsx';
 import { DOC_CATEGORIES } from '../store/constants.js';
 import Badge from '../components/Badge.jsx';
 import Button from '../components/Button.jsx';
@@ -31,9 +32,11 @@ export default function Documents() {
     deleteDocumentPermanently,
     emptyTrash,
     updateDocument,
+    updateDocumentStatus,
   } = useStore();
   const { notify } = useToast();
   const { t } = useTranslation();
+  const { isAdmin, user } = useAuth();
 
   const [folder, setFolder] = useState('all');
   const [status, setStatus] = useState('all');
@@ -44,6 +47,7 @@ export default function Documents() {
   const [permanentId, setPermanentId] = useState(null);
   const [emptyConfirm, setEmptyConfirm] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [decision, setDecision] = useState(null);
 
   const q = query.trim().toLowerCase();
   const inTrash = folder === 'trash';
@@ -105,6 +109,21 @@ export default function Documents() {
   const confirmDelete = (doc) => {
     if (selected && selected.id === doc.id) setSelected(null);
     setConfirmId(doc.id);
+  };
+
+  // Approve / Decline untuk admin. Status disimpan ke backend dan local state
+  // diupdate tanpa reload halaman.
+  const handleDecision = async (action) => {
+    if (!selected) return;
+    const nextStatus = action === 'approve' ? 'approved' : 'rejected';
+    const ok = await updateDocumentStatus(selected.id, nextStatus, user?.id);
+    setDecision(null);
+    if (ok) {
+      setSelected((s) => (s ? { ...s, status: nextStatus } : s));
+      notify(nextStatus === 'approved' ? t('doc.approve.done') : t('doc.decline.done'), 'success');
+    } else {
+      notify(t('doc.decision.failed'), 'error');
+    }
   };
 
   const renderActions = (d) => {
@@ -306,6 +325,13 @@ export default function Documents() {
           <div className="modal-actions">
             <Button variant="secondary" icon="download" onClick={() => notify(t('action.download') + ' (demo)')}>{t('action.download')}</Button>
             <Button variant="ghost" icon="trash" onClick={() => confirmDelete(selected)}>{t('action.delete')}</Button>
+            {isAdmin && selected.status === 'pending' && (
+              <>
+                <span className="modal-actions-spacer" />
+                <Button variant="primary" icon="check" onClick={() => setDecision('approve')}>{t('doc.approve')}</Button>
+                <Button variant="danger" icon="x" onClick={() => setDecision('decline')}>{t('doc.decline')}</Button>
+              </>
+            )}
           </div>
         </Modal>
       )}
@@ -317,6 +343,25 @@ export default function Documents() {
         confirmLabel={t('action.delete')}
         onCancel={() => setConfirmId(null)}
         onConfirm={doMoveToTrash}
+      />
+
+      <ConfirmDialog
+        open={decision === 'approve'}
+        title={t('doc.approve.title')}
+        message={t('doc.approve.msg')}
+        confirmLabel={t('doc.approve.confirm')}
+        onCancel={() => setDecision(null)}
+        onConfirm={() => handleDecision('approve')}
+      />
+
+      <ConfirmDialog
+        open={decision === 'decline'}
+        title={t('doc.decline.title')}
+        message={t('doc.decline.msg')}
+        confirmLabel={t('doc.decline.confirm')}
+        danger
+        onCancel={() => setDecision(null)}
+        onConfirm={() => handleDecision('decline')}
       />
 
       <ConfirmDialog

@@ -1192,6 +1192,11 @@ h2 {
   gap: 10px;
   margin-top: 20px;
   flex-wrap: wrap;
+  align-items: center;
+}
+
+.modal-actions-spacer {
+  flex: 1;
 }
 
 @keyframes fade {
@@ -1752,6 +1757,37 @@ table.data-table {
   }
 }
 
+@media (max-width: 1199px) {
+  .doc-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .doc-folders {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    gap: 8px;
+    padding: 12px;
+    scrollbar-width: none;
+  }
+
+  .doc-folders::-webkit-scrollbar {
+    display: none;
+  }
+
+  .folder-item {
+    flex: 0 0 auto;
+    width: auto;
+    white-space: nowrap;
+  }
+
+  .folder-item .folder-count {
+    margin-left: 6px;
+  }
+}
+
 @media (max-width: 768px) {
   .doc-layout,
   .settings-layout {
@@ -1859,13 +1895,14 @@ table.data-table {
   }
 
   .modal-overlay {
-    padding: 12px;
+    padding: 16px;
   }
 
   .modal,
   .modal-wide,
   .modal-sm {
     max-width: 100%;
+    max-height: calc(100dvh - 32px);
   }
 
   .modal-footer-btns {
@@ -1884,6 +1921,11 @@ table.data-table {
   .modal-actions .btn {
     width: 100%;
     justify-content: center;
+    min-height: 44px;
+  }
+
+  .modal-actions-spacer {
+    display: none;
   }
 
   .account-avatar-row {
@@ -2283,6 +2325,7 @@ table.data-table {
 .doc-detail-list > div {
   display: flex;
   justify-content: space-between;
+  align-items: flex-start;
   gap: 16px;
   padding: 10px 0;
   border-bottom: 1px solid var(--border);

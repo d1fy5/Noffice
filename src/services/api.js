@@ -47,5 +47,13 @@ export const DocumentAPI = {
       body: JSON.stringify(docData)
     });
     return res.json();
+  },
+  updateStatus: async (documentId, status, userId) => {
+    const res = await fetch(`${API_URL}/documents/${documentId}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status, userId })
+    });
+    return res.json();
   }
 };

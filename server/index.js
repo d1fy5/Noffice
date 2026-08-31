@@ -71,6 +71,36 @@ app.post('/api/documents', async (req, res) => {
   }
 });
 
+// Update dokumen status (approve/decline). Hanya admin yang boleh mengubah
+// status, dan nilai status dibatasi ke convention yang sudah dipakai project
+// (pending / approved / rejected).
+app.patch('/api/documents/:id/status', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, userId } = req.body;
+
+    const VALID_STATUSES = ['pending', 'approved', 'rejected'];
+    if (!VALID_STATUSES.includes(status)) {
+      return res.status(400).json({ success: false, message: 'Status tidak valid' });
+    }
+
+    const document = await dbGet('SELECT id FROM documents WHERE id = ?', [id]);
+    if (!document) {
+      return res.status(404).json({ success: false, message: 'Dokumen tidak ditemukan' });
+    }
+
+    const user = userId ? await dbGet('SELECT role FROM users WHERE id = ?', [userId]) : null;
+    if (!user || user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Hanya admin yang dapat mengubah status dokumen' });
+    }
+
+    await dbRun('UPDATE documents SET status = ? WHERE id = ?', [status, id]);
+    res.json({ success: true, id, status });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 // --- START SERVER ---
 app.listen(PORT, () => {
   console.log(`Backend Server running on http://localhost:${PORT}`);
