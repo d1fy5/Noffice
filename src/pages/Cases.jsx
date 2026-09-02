@@ -194,11 +194,7 @@ export default function Cases() {
 
   const getStatusBadge = (st) => {
     const s = CASE_STATUSES.find((item) => item.id === st) || CASE_STATUSES[0];
-    return (
-      <span className="badge" style={{ color: s.color, backgroundColor: s.bg, border: `1px solid ${s.color}33` }}>
-        {s.label}
-      </span>
-    );
+    return <span className={`badge status-badge ${s.variant}`}>{s.label}</span>;
   };
 
   return (
@@ -275,8 +271,8 @@ export default function Cases() {
             }
           />
         ) : (
-          <div className="table-responsive">
-            <table className="table">
+          <div className="table-scroll">
+            <table className="data-table">
               <thead>
                 <tr>
                   <th>No. Kasus & Layanan</th>
@@ -297,7 +293,7 @@ export default function Cases() {
                   return (
                     <tr key={c.id}>
                       <td>
-                        <div style={{ fontWeight: 600, color: 'var(--primary-dark)' }}>{c.caseNumber}</div>
+                        <div style={{ fontWeight: 600, color: 'var(--text)' }}>{c.caseNumber}</div>
                         <div className="sub-meta">{c.serviceType} — {c.notes || 'Tanpa catatan'}</div>
                       </td>
                       <td>
@@ -306,7 +302,7 @@ export default function Cases() {
                       </td>
                       <td>
                         {c.aktaNumber ? (
-                          <strong style={{ color: '#16a34a', fontFamily: 'monospace' }}>{c.aktaNumber}</strong>
+                          <strong style={{ color: 'var(--green)', fontFamily: 'monospace' }}>{c.aktaNumber}</strong>
                         ) : (
                           <span className="text-muted" style={{ fontSize: '0.85rem' }}>Belum terbit</span>
                         )}
@@ -316,12 +312,12 @@ export default function Cases() {
                           <div style={{ fontSize: '0.75rem', fontWeight: 600, marginBottom: '2px' }}>
                             {checkedCount}/{checklist.length} Dokumen ({pct}%)
                           </div>
-                          <div style={{ height: '6px', background: '#e2e8f0', borderRadius: '3px', overflow: 'hidden' }}>
+                          <div style={{ height: '6px', background: 'var(--surface-2)', borderRadius: '3px', overflow: 'hidden' }}>
                             <div
                               style={{
                                 height: '100%',
                                 width: `${pct}%`,
-                                background: pct === 100 ? '#16a34a' : 'var(--primary)',
+                                background: pct === 100 ? 'var(--green)' : 'var(--primary)',
                               }}
                             />
                           </div>
@@ -409,17 +405,17 @@ export default function Cases() {
         </div>
 
         {/* Checklist Setup */}
-        <div className="mt-5 p-4" style={{ background: 'var(--neutral-50)', borderRadius: '8px' }}>
-          <h4 style={{ fontSize: '0.9rem', fontWeight: 600, marginBottom: '0.5rem' }}>
+        <div className="mt-5 p-4" style={{ background: 'var(--surface-2)', borderRadius: '10px', border: '1px solid var(--border)' }}>
+          <h4 style={{ fontSize: '0.9rem', fontWeight: 600, marginBottom: '0.75rem' }}>
             Checklist Persyaratan Dokumen ({currentServiceConfig.name})
           </h4>
           <div className="checklist-setup-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
             {customChecklist.map((item, idx) => (
-              <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fff', padding: '0.4rem 0.75rem', borderRadius: '4px', border: '1px solid #e2e8f0' }}>
-                <span style={{ fontSize: '0.85rem' }}>✓ {item}</span>
+              <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--surface)', padding: '0.45rem 0.8rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text)' }}>✓ {item}</span>
                 <button
                   type="button"
-                  style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', fontSize: '0.8rem' }}
+                  style={{ border: 'none', background: 'transparent', color: 'var(--red)', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600, padding: '2px 6px', borderRadius: '6px', flexShrink: 0 }}
                   onClick={() => removeChecklistItem(idx)}
                 >
                   ✕ Hapus
@@ -434,7 +430,7 @@ export default function Cases() {
               value={newItemText}
               onChange={(e) => setNewItemText(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addCustomChecklistItem())}
-              style={{ flex: 1, padding: '0.4rem 0.75rem', fontSize: '0.85rem' }}
+              style={{ flex: 1, padding: '0.45rem 0.8rem', fontSize: '0.85rem', height: 'auto', minHeight: '38px' }}
             />
             <Button variant="ghost" size="sm" onClick={addCustomChecklistItem}>
               + Tambah

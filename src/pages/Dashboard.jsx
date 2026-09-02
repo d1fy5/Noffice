@@ -44,11 +44,7 @@ export default function Dashboard() {
 
   const getStatusBadge = (st) => {
     const s = CASE_STATUSES.find((item) => item.id === st) || CASE_STATUSES[0];
-    return (
-      <span className="badge" style={{ color: s.color, backgroundColor: s.bg, border: `1px solid ${s.color}33` }}>
-        {s.label}
-      </span>
-    );
+    return <span className={`badge status-badge ${s.variant}`}>{s.label}</span>;
   };
 
   const todayStr = new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
@@ -56,15 +52,11 @@ export default function Dashboard() {
   return (
     <>
       {/* Welcome Hero Banner */}
-      <div 
-        className="card mb-4" 
+      <div
+        className="card hero-banner mb-4"
         style={{
-          background: 'linear-gradient(135deg, #0b1329 0%, #1e293b 100%)',
-          color: '#ffffff',
           padding: '24px 28px',
           borderRadius: '20px',
-          border: '1px solid rgba(255,255,255,0.08)',
-          boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
           position: 'relative',
           overflow: 'hidden',
         }}
@@ -72,15 +64,15 @@ export default function Dashboard() {
         <div style={{ position: 'relative', zIndex: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
-              <span className="badge" style={{ background: 'rgba(37,99,235,0.25)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.3)', padding: '4px 12px' }}>
+              <span className="badge" style={{ background: 'var(--primary-soft)', color: 'var(--primary)', border: '1px solid var(--border)' }}>
                 🟢 Local AI Engine Active
               </span>
-              <span style={{ fontSize: '0.82rem', color: '#94a3b8' }}>📅 {todayStr}</span>
+              <span style={{ fontSize: '0.82rem', color: 'var(--text-3)' }}>📅 {todayStr}</span>
             </div>
-            <h1 style={{ color: '#ffffff', fontSize: '24px', fontWeight: 800, letterSpacing: '-0.02em', margin: '4px 0' }}>
+            <h1 style={{ color: 'var(--text)', fontSize: '24px', fontWeight: 800, letterSpacing: '-0.02em', margin: '4px 0' }}>
               Selamat datang kembali, {user?.name || 'Notaris & PPAT'}! 👋
             </h1>
-            <p style={{ color: '#94a3b8', fontSize: '0.9rem', margin: 0, maxWidth: '640px' }}>
+            <p style={{ color: 'var(--text-2)', fontSize: '0.9rem', margin: 0, maxWidth: '640px' }}>
               Sistem Manajemen Kantor Notaris & PPAT 100% Offline-First. Seluruh data permohonan akta dan identitas klien tersimpan dengan aman di PC lokal.
             </p>
           </div>
@@ -303,7 +295,7 @@ export default function Dashboard() {
 
           {/* Local AI Engine Status Card */}
           <SectionHead title="🤖 Local Notary AI Status" subtitle="Kecerdasan buatan 100% offline" />
-          <div className="card" style={{ background: 'linear-gradient(135deg, rgba(37,99,235,0.06) 0%, rgba(99,102,241,0.06) 100%)', border: '1px solid rgba(37,99,235,0.2)', padding: '20px' }}>
+          <div className="card ai-status-card" style={{ padding: '20px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
               <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'var(--primary-gradient)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem' }}>
                 🤖

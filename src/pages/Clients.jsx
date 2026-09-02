@@ -22,6 +22,25 @@ const EMPTY_FORM = {
   address: '',
 };
 
+const shortLocation = (addr) => {
+  if (!addr) return null;
+  const first = String(addr).split(/\r?\n/)[0].replace(/Pekerjaan:|No\.?\s?Telp:|Telp\.?|WhatsApp:|WA:|Email:/gi, '').trim();
+  if (!first) return null;
+  const kec = first.match(/Kec[.\s][^,\n]*/);
+  const kel = first.match(/Kel[.\s][^,\n]*/);
+  if (kec) return kec[0].replace(/^Kec[.\s]*/i, '').trim();
+  if (kel) return kel[0].replace(/^Kel[.\s]*/i, '').trim();
+  const segs = first.split(',').map((s) => s.trim()).filter(Boolean);
+  if (segs.length > 1) return segs[segs.length - 1];
+  return first.length > 36 ? first.slice(0, 33) + '…' : first;
+};
+
+const maskPhone = (p) => {
+  const digits = String(p || '').replace(/\D/g, '');
+  if (digits.length < 8) return p || '-';
+  return digits.slice(0, 4) + '••••' + digits.slice(-4);
+};
+
 export default function Clients() {
   const navigate = useNavigate();
   const { query } = useSearch();
@@ -177,8 +196,8 @@ export default function Clients() {
             }
           />
         ) : (
-          <div className="table-responsive">
-            <table className="table">
+          <div className="table-scroll">
+            <table className="data-table">
               <thead>
                 <tr>
                   <th>Klien</th>
@@ -198,7 +217,7 @@ export default function Clients() {
                         <Avatar name={c.name} />
                         <div>
                           <div className="user-name">{c.name}</div>
-                          <div className="user-sub">{c.address || 'Alamat belum diisi'}</div>
+                          <div className="user-sub">📍 {shortLocation(c.address) ?? 'Alamat belum diisi'}</div>
                         </div>
                       </div>
                     </td>
@@ -206,10 +225,12 @@ export default function Clients() {
                       <code style={{ fontSize: '0.85rem', fontWeight: 600 }}>{c.nik}</code>
                     </td>
                     <td>
-                      <div>{c.phone}</div>
+                      <div className="cell-trunc">{maskPhone(c.phone)}</div>
                       <div className="sub-meta">{c.email || '-'}</div>
                     </td>
-                    <td>{c.job || '-'}</td>
+                    <td>
+                      <span className="cell-trunc">{c.job || '-'}</span>
+                    </td>
                     <td>{c.createdAt || '-'}</td>
                     <td>
                       <span className="badge info">{clientCasesCount(c.id)} Kasus</span>
@@ -378,7 +399,7 @@ export default function Clients() {
           </h3>
 
           {cases.filter((c) => c.clientId === selectedClient.id).length === 0 ? (
-            <div className="p-4 text-center text-muted" style={{ background: 'var(--neutral-50)', borderRadius: '8px' }}>
+            <div className="p-4 text-center text-muted" style={{ background: 'var(--surface-2)', borderRadius: '8px' }}>
               Klien ini belum memiliki permohonan akta.
             </div>
           ) : (
