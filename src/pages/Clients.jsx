@@ -232,6 +232,7 @@ export default function Clients() {
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         title={editing ? 'Edit Data Klien' : 'Tambah Klien Baru'}
+        wide={true}
         footer={
           <>
             <Button variant="secondary" onClick={() => setModalOpen(false)}>
@@ -244,20 +245,29 @@ export default function Clients() {
         }
       >
         {/* AI Extract KTP / Teks Box */}
-        <div className="p-3 mb-4" style={{ background: '#f8fafc', borderRadius: '8px', border: '1px dashed #cbd5e1' }}>
-          <label style={{ fontSize: '0.82rem', fontWeight: 600, color: '#334155', display: 'block', marginBottom: '4px' }}>
-            🤖 AI Data Extractor (Paste Teks KTP / Result OCR Berkas):
+        <div 
+          style={{ 
+            background: 'linear-gradient(135deg, rgba(37,99,235,0.06) 0%, rgba(99,102,241,0.08) 100%)', 
+            borderRadius: '12px', 
+            border: '1px solid rgba(37,99,235,0.25)',
+            padding: '16px',
+            marginBottom: '20px'
+          }}
+        >
+          <label style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+            <span>🤖 AI Data Extractor</span>
+            <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-2)' }}>(Paste teks hasil scan KTP di sini untuk auto-fill form)</span>
           </label>
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: '10px' }}>
             <input
               type="text"
-              placeholder="Paste teks hasil scan KTP / dokumen di sini..."
+              placeholder="Paste hasil scan KTP / teks dokumen di sini..."
               value={rawText}
               onChange={(e) => setRawText(e.target.value)}
-              style={{ flex: 1, fontSize: '0.8rem', padding: '6px 10px' }}
+              style={{ flex: 1 }}
             />
-            <Button variant="secondary" size="sm" onClick={handleAiExtract} disabled={extracting}>
-              {extracting ? 'Ekstrak...' : '⚡ Ekstrak ke Form'}
+            <Button variant="primary" size="sm" onClick={handleAiExtract} disabled={extracting}>
+              {extracting ? 'Mengestrak...' : '⚡ Ekstrak ke Form'}
             </Button>
           </div>
         </div>
@@ -312,7 +322,7 @@ export default function Clients() {
             />
           </FormField>
         </div>
-        <div className="mt-4">
+        <div style={{ marginTop: '14px' }}>
           <FormField label="Alamat Lengkap (KTP)">
             <textarea
               rows={3}

@@ -337,14 +337,15 @@ export default function Cases() {
       <Modal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        title="Buat Permohonan / Kasus Akta Baru"
+        title="Buat Permohonan Kasus Baru"
+        wide={true}
         footer={
           <>
             <Button variant="secondary" onClick={() => setModalOpen(false)}>
               Batal
             </Button>
             <Button variant="primary" onClick={handleCreateCase}>
-              Buat Kasus & Checklist
+              Buat Permohonan Kasus
             </Button>
           </>
         }
@@ -438,6 +439,7 @@ export default function Cases() {
           open={!!selectedCase}
           onClose={() => setSelectedCase(null)}
           title={`Detail Kasus: ${selectedCase.caseNumber}`}
+          wide={true}
           footer={
             <Button variant="secondary" onClick={() => setSelectedCase(null)}>
               Tutup

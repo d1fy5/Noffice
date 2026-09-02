@@ -1701,50 +1701,108 @@ table.data-table {
 .form-hint {
   font-size: 12.5px;
   color: var(--text-3);
-  margin-top: 6px;
+  margin-top: 5px;
 }
 
 .form-error {
   font-size: 12.5px;
   color: var(--red);
-  margin-top: 6px;
+  margin-top: 5px;
+  font-weight: 500;
 }
 
 .form-success {
   color: var(--green);
 }
 
+/* Global Form Controls & Grid */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px 20px;
+}
+
+@media (max-width: 640px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.form-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="date"],
+input[type="datetime-local"],
+input[type="search"],
+select,
+textarea,
 .form-input,
 .form-control,
 .form-textarea,
 .form-select {
   width: 100%;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
-  padding: 10px 12px;
+  height: 42px;
+  padding: 9px 14px;
   font-size: 13.5px;
-  font-family: inherit;
+  font-family: var(--font);
   color: var(--text);
   background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
   outline: none;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: var(--shadow-sm);
 }
 
+select,
 .form-select {
   cursor: pointer;
 }
 
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus,
+input[type="number"]:focus,
+input[type="date"]:focus,
+input[type="datetime-local"]:focus,
+input[type="search"]:focus,
+select:focus,
+textarea:focus,
 .form-input:focus,
 .form-control:focus,
 .form-textarea:focus,
 .form-select:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
+  background: var(--surface);
 }
 
+textarea,
 .form-textarea {
   resize: vertical;
-  min-height: 90px;
+  min-height: 85px;
+  height: auto;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-3);
+  font-size: 13px;
 }
 
 .form-row {
