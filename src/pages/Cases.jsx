@@ -1,3 +1,8 @@
+import { useState, useMemo } from 'react';
+import { useStore, useSearch, useToast } from '../store/hooks.js';
+import { useTranslation } from '../store/useTranslation.js';
+import { useAuth } from '../store/AuthContext.jsx';
+import { NOTARY_SERVICES } from '../store/constants.js';
 import { AiAPI } from '../services/api.js';
 import AiDraftGeneratorModal from '../components/AiDraftGeneratorModal.jsx';
 import PrintReceiptModal from '../components/PrintReceiptModal.jsx';
