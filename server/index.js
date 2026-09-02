@@ -1,5 +1,7 @@
 import express from 'express';
 import cors from 'cors';
+import fs from 'fs';
+import path from 'path';
 import { dbGet, dbQuery, dbRun, hashPassword } from './db.js';
 import { checkAiStatus, extractDocumentData, generateLegalClause, auditCaseData, generateCopilotResponse } from './aiEngine.js';
 
@@ -351,8 +353,26 @@ app.post('/api/ai/chat', async (req, res) => {
   }
 });
 
+// --- ROUTES SYSTEM BACKUP ---
+app.get('/api/system/backup', (req, res) => {
+  try {
+    const dbPath = path.resolve('server/database.sqlite');
+    if (fs.existsSync(dbPath)) {
+      const filename = `noffice-backup-${new Date().toISOString().slice(0, 10)}.sqlite`;
+      res.setHeader('Content-Type', 'application/x-sqlite3');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      fs.createReadStream(dbPath).pipe(res);
+    } else {
+      res.status(404).json({ error: 'Database file not found' });
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // --- START SERVER ---
 app.listen(PORT, () => {
   console.log(`Backend Server running on http://localhost:${PORT}`);
 });
+
 

@@ -388,6 +388,19 @@ export default function Settings() {
               <div className="settings-save-row">
                 <Button variant="primary" onClick={saveSecurity}>{t('action.updatePassword')}</Button>
               </div>
+
+              {/* 1-Click Local Database Backup Box */}
+              <div className="mt-5 p-4" style={{ background: 'var(--surface-2)', borderRadius: '12px', border: '1px solid var(--border)', marginTop: '24px' }}>
+                <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '6px', color: 'var(--text)' }}>💾 Backup Database SQLite 1-Klik</h3>
+                <p style={{ fontSize: '0.83rem', color: 'var(--text-2)', marginBottom: '14px', lineHeight: 1.4 }}>
+                  Unduh salinan cadangan file database SQLite (`database.sqlite`) ke Flashdisk atau Harddisk Eksternal setiap sore hari untuk menjamin keamanan penuh data kantor Notaris.
+                </p>
+                <a href="http://localhost:3001/api/system/backup" download style={{ textDecoration: 'none' }}>
+                  <Button variant="secondary" icon="download">
+                    Unduh Backup Database (.sqlite)
+                  </Button>
+                </a>
+              </div>
               <ToggleRow label={t('settings.sec.2fa')} desc={t('settings.sec.2faDesc')} checked={security.twoFactor} onChange={(v) => setSecurity({ ...security, twoFactor: v })} />
               <ToggleRow label={t('settings.sec.session')} desc={t('settings.sec.sessionDesc')} checked={security.keepSession} onChange={(v) => setSecurity({ ...security, keepSession: v })} />
             </>

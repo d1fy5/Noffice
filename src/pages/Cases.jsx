@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useStore, useSearch, useToast } from '../store/hooks.js';
 import { useTranslation } from '../store/useTranslation.js';
 import { useAuth } from '../store/AuthContext.jsx';
@@ -14,6 +15,7 @@ import FormField from '../components/FormField.jsx';
 import PageHeader from '../components/PageHeader.jsx';
 
 export default function Cases() {
+  const location = useLocation();
   const { query } = useSearch();
   const { clients, cases, employees, general, addCase, updateCaseStatus, updateCaseDetails, toggleChecklistItem, generateAktaNumber } = useStore();
   const { notify } = useToast();
@@ -27,6 +29,14 @@ export default function Cases() {
   const [aiAuditResult, setAiAuditResult] = useState(null);
   const [draftModalOpen, setDraftModalOpen] = useState(false);
   const [receiptModalOpen, setReceiptModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (location.state?.createForClient) {
+      const targetClientId = location.state.createForClient;
+      setForm((prev) => ({ ...prev, clientId: targetClientId }));
+      setModalOpen(true);
+    }
+  }, [location.state]);
 
   // Billing & Appointment local edit state
   const [billingForm, setBillingForm] = useState({
@@ -446,198 +456,242 @@ export default function Cases() {
             </Button>
           }
         >
-          <div className="case-detail-header p-4 mb-4" style={{ background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          {/* Header Banner Kasus */}
+          <div 
+            style={{ 
+              background: 'linear-gradient(135deg, var(--surface) 0%, var(--surface-2) 100%)', 
+              padding: '20px', 
+              borderRadius: '14px', 
+              border: '1px solid var(--border-strong)',
+              marginBottom: '20px',
+              boxShadow: 'var(--shadow-sm)'
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 600 }}>{selectedCase.serviceType}</h3>
-                <div className="text-muted" style={{ fontSize: '0.85rem' }}>
-                  Klien: <strong>{getClientName(selectedCase.clientId)}</strong> • Petugas: {selectedCase.assignedTo}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: 'var(--text)' }}>{selectedCase.serviceType}</h3>
+                  {getStatusBadge(selectedCase.status)}
                 </div>
-                <div className="mt-1" style={{ fontSize: '0.85rem' }}>{selectedCase.notes}</div>
-              </div>
-              <div>{getStatusBadge(selectedCase.status)}</div>
-            </div>
-
-            {/* Nomor Akta Section & AI Draft */}
-            <div className="mt-4 pt-3" style={{ borderTop: '1px dashed #cbd5e1', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-              <div>
-                <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Nomor Akta Resmi Notaris:</div>
-                {selectedCase.aktaNumber ? (
-                  <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#16a34a', fontFamily: 'monospace' }}>
-                    {selectedCase.aktaNumber}
-                  </div>
-                ) : (
-                  <div className="text-muted" style={{ fontSize: '0.85rem', italic: 'true' }}>
-                    Belum diterbitkan
+                <div style={{ fontSize: '0.88rem', color: 'var(--text-2)', marginTop: '4px' }}>
+                  Klien: <strong style={{ color: 'var(--text)' }}>{getClientName(selectedCase.clientId)}</strong> • Petugas: <span>{selectedCase.assignedTo}</span>
+                </div>
+                {selectedCase.notes && (
+                  <div style={{ fontSize: '0.83rem', color: 'var(--text-3)', marginTop: '4px', fontStyle: 'italic' }}>
+                    "{selectedCase.notes}"
                   </div>
                 )}
               </div>
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                <Button variant="secondary" size="sm" icon="download" onClick={() => setReceiptModalOpen(true)}>
+
+              {/* Action Buttons Toolbar */}
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                <Button variant="secondary" size="sm" onClick={() => setReceiptModalOpen(true)}>
                   🖨️ Cetak Tanda Terima
                 </Button>
-                <Button variant="secondary" size="sm" icon="fileText" onClick={() => setDraftModalOpen(true)}>
+                <Button variant="secondary" size="sm" onClick={() => setDraftModalOpen(true)}>
                   ⚡ AI Draft Pasal
                 </Button>
                 {!selectedCase.aktaNumber && (
-                  <Button variant="primary" size="sm" icon="check" onClick={() => handleGenerateAkta(selectedCase.id)}>
+                  <Button variant="primary" size="sm" onClick={() => handleGenerateAkta(selectedCase.id)}>
                     ⚡ Generate Akta
                   </Button>
                 )}
               </div>
             </div>
-          </div>
 
-          {/* Financial Billing & Appointment Section */}
-          <div className="p-3 mb-4" style={{ background: '#fff8f0', borderRadius: '8px', border: '1px solid #fed7aa' }}>
-            <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#c2410c', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>💰 Biaya Transaksi & 📅 Jadwal TTD Klien</span>
-              <span className={`badge ${billingForm.paymentStatus === 'paid' ? 'success' : billingForm.paymentStatus === 'partial' ? 'warning' : 'danger'}`}>
-                {billingForm.paymentStatus === 'paid' ? 'LUNAS' : billingForm.paymentStatus === 'partial' ? 'DP (SEBAGIAN)' : 'BELUM LUNAS'}
-              </span>
-            </div>
-
-            <div className="form-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '8px' }}>
-              <div>
-                <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>Honorarium Notaris (Rp):</label>
-                <input
-                  type="number"
-                  value={billingForm.notaryFee}
-                  onChange={(e) => setBillingForm({ ...billingForm, notaryFee: Number(e.target.value) })}
-                  style={{ width: '100%', fontSize: '0.8rem', padding: '4px 8px' }}
-                />
-              </div>
-              <div>
-                <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>Pajak (BPHTB/PPH) (Rp):</label>
-                <input
-                  type="number"
-                  value={billingForm.taxFee}
-                  onChange={(e) => setBillingForm({ ...billingForm, taxFee: Number(e.target.value) })}
-                  style={{ width: '100%', fontSize: '0.8rem', padding: '4px 8px' }}
-                />
-              </div>
-              <div>
-                <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>Status Pembayaran:</label>
-                <select
-                  value={billingForm.paymentStatus}
-                  onChange={(e) => setBillingForm({ ...billingForm, paymentStatus: e.target.value })}
-                  style={{ width: '100%', fontSize: '0.8rem', padding: '4px 8px' }}
-                >
-                  <option value="unpaid">Belum Lunas</option>
-                  <option value="partial">DP (Sebagian)</option>
-                  <option value="paid">Lunas</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr auto', gap: '8px', alignItems: 'end' }}>
-              <div>
-                <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>Tanggal TTD Akta:</label>
-                <input
-                  type="date"
-                  value={billingForm.appointmentDate}
-                  onChange={(e) => setBillingForm({ ...billingForm, appointmentDate: e.target.value })}
-                  style={{ width: '100%', fontSize: '0.8rem', padding: '4px 8px' }}
-                />
-              </div>
-              <div>
-                <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>Jam TTD:</label>
-                <input
-                  type="time"
-                  value={billingForm.appointmentTime}
-                  onChange={(e) => setBillingForm({ ...billingForm, appointmentTime: e.target.value })}
-                  style={{ width: '100%', fontSize: '0.8rem', padding: '4px 8px' }}
-                />
-              </div>
-              <Button variant="primary" size="sm" onClick={handleSaveBilling}>
-                Simpan Biaya & Jadwal
-              </Button>
-            </div>
-          </div>
-
-          {/* AI Case Audit Widget */}
-          {aiAuditResult && (
-            <div className="mb-4 p-3" style={{ background: '#f0f9ff', borderRadius: '8px', border: '1px solid #bae6fd' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600, color: '#0369a1', fontSize: '0.88rem' }}>
-                🤖 AI Auditor & Analisis Risiko Notaris ({aiAuditResult.status})
-              </div>
-              {aiAuditResult.warnings && aiAuditResult.warnings.map((w, idx) => (
-                <div key={idx} style={{ fontSize: '0.8rem', color: '#b91c1c', marginTop: '4px' }}>
-                  {w}
-                </div>
-              ))}
-              {aiAuditResult.suggestions && aiAuditResult.suggestions.map((s, idx) => (
-                <div key={idx} style={{ fontSize: '0.8rem', color: '#0369a1', marginTop: '4px' }}>
-                  {s}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Workflow Status Selector */}
-          <div className="mb-4">
-            <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: '0.4rem' }}>
-              Ubah Status Workflow Kasus:
-            </label>
-            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-              {CASE_STATUSES.map((st) => (
-                <button
-                  key={st.id}
-                  type="button"
-                  onClick={() => handleStatusChange(selectedCase.id, st.id)}
-                  style={{
-                    padding: '0.35rem 0.6rem',
-                    fontSize: '0.75rem',
-                    borderRadius: '4px',
-                    border: selectedCase.status === st.id ? `2px solid ${st.color}` : '1px solid #cbd5e1',
-                    background: selectedCase.status === st.id ? st.bg : '#fff',
-                    color: selectedCase.status === st.id ? st.color : '#334155',
-                    fontWeight: selectedCase.status === st.id ? 700 : 400,
-                    cursor: 'pointer',
-                  }}
-                >
-                  {st.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Checklist Interaktif */}
-          <div>
-            <h4 style={{ fontSize: '0.95rem', fontWeight: 600, marginBottom: '0.5rem' }}>
-              Checklist Kelengkapan Dokumen Persyaratan
-            </h4>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              {(selectedCase.checklist || []).length === 0 ? (
-                <div className="text-muted">Tidak ada checklist berkas.</div>
+            {/* Nomor Akta Status Strip */}
+            <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: '1px dashed var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.83rem', color: 'var(--text-2)', fontWeight: 600 }}>Nomor Akta Resmi Notaris:</span>
+              {selectedCase.aktaNumber ? (
+                <span style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--green)', fontFamily: 'monospace', letterSpacing: '0.5px' }}>
+                  {selectedCase.aktaNumber}
+                </span>
               ) : (
-                selectedCase.checklist.map((item) => (
-                  <label
-                    key={item.id}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.6rem',
-                      padding: '0.5rem 0.75rem',
-                      background: item.isChecked ? '#f0fdf4' : '#fff',
-                      border: item.isChecked ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      fontSize: '0.88rem',
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={!!item.isChecked}
-                      onChange={() => handleToggleCheck(selectedCase.id, item.id, !!item.isChecked)}
-                    />
-                    <span style={{ textDecoration: item.isChecked ? 'line-through' : 'none', color: item.isChecked ? '#166534' : '#1e293b' }}>
-                      {item.itemName}
-                    </span>
-                  </label>
-                ))
+                <span style={{ fontSize: '0.83rem', color: 'var(--text-3)', fontStyle: 'italic' }}>
+                  (Belum Diterbitkan — Klik tombol 'Generate Akta' di atas saat TTD)
+                </span>
               )}
             </div>
+          </div>
+
+          {/* Selector Status Workflow Kasus */}
+          <div 
+            style={{ 
+              background: 'var(--surface)', 
+              padding: '14px 18px', 
+              borderRadius: '12px', 
+              border: '1px solid var(--border-strong)',
+              marginBottom: '20px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '16px',
+              flexWrap: 'wrap'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text)' }}>📌 Status Workflow Kasus:</span>
+              <span>{getStatusBadge(selectedCase.status)}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, maxWidth: '380px' }}>
+              <select
+                value={selectedCase.status}
+                onChange={(e) => handleStatusChange(selectedCase.id, e.target.value)}
+                style={{ fontWeight: 600, fontSize: '0.85rem' }}
+              >
+                {CASE_STATUSES.map((st) => (
+                  <option key={st.id} value={st.id}>
+                    {st.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* 2-Column Main Dashboard Layout */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
+            
+            {/* Left Column: Checklist Berkas & AI Auditor */}
+            <div>
+              {/* Checklist Berkas */}
+              <div style={{ background: 'var(--surface)', padding: '18px', borderRadius: '12px', border: '1px solid var(--border)', marginBottom: '20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700 }}>
+                    📋 Checklist Dokumen Persyaratan
+                  </h4>
+                  {selectedCase.checklist && (
+                    <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--primary)', background: 'rgba(37,99,235,0.1)', padding: '3px 8px', borderRadius: '99px' }}>
+                      {selectedCase.checklist.filter(i => i.isChecked).length} / {selectedCase.checklist.length} Terpenuhi
+                    </span>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {(selectedCase.checklist || []).length === 0 ? (
+                    <div style={{ fontSize: '0.83rem', color: 'var(--text-3)' }}>Tidak ada checklist berkas.</div>
+                  ) : (
+                    selectedCase.checklist.map((item) => (
+                      <label
+                        key={item.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px',
+                          padding: '10px 14px',
+                          background: item.isChecked ? 'rgba(22,163,74,0.06)' : 'var(--surface-2)',
+                          border: item.isChecked ? '1px solid rgba(22,163,74,0.3)' : '1px solid var(--border)',
+                          borderRadius: '8px',
+                          cursor: 'pointer',
+                          fontSize: '0.85rem',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={!!item.isChecked}
+                          onChange={() => handleToggleCheck(selectedCase.id, item.id, !!item.isChecked)}
+                          style={{ width: '16px', height: '16px', accentColor: 'var(--green)' }}
+                        />
+                        <span style={{ textDecoration: item.isChecked ? 'line-through' : 'none', color: item.isChecked ? 'var(--green)' : 'var(--text)', fontWeight: item.isChecked ? 600 : 400 }}>
+                          {item.itemName}
+                        </span>
+                      </label>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* AI Case Audit Widget */}
+              {aiAuditResult && (
+                <div style={{ background: 'linear-gradient(135deg, rgba(37,99,235,0.06), rgba(99,102,241,0.06))', padding: '16px', borderRadius: '12px', border: '1px solid rgba(37,99,235,0.25)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700, color: 'var(--primary)', fontSize: '0.88rem', marginBottom: '8px' }}>
+                    🤖 AI Auditor & Analisis Risiko Notaris ({aiAuditResult.status})
+                  </div>
+                  {aiAuditResult.warnings && aiAuditResult.warnings.map((w, idx) => (
+                    <div key={idx} style={{ fontSize: '0.8rem', color: 'var(--red)', marginTop: '4px', display: 'flex', gap: '6px' }}>
+                      <span>⚠️</span> <span>{w}</span>
+                    </div>
+                  ))}
+                  {aiAuditResult.suggestions && aiAuditResult.suggestions.map((s, idx) => (
+                    <div key={idx} style={{ fontSize: '0.8rem', color: 'var(--primary)', marginTop: '4px', display: 'flex', gap: '6px' }}>
+                      <span>💡</span> <span>{s}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Right Column: Financial Billing & Appointment */}
+            <div>
+              <div style={{ background: 'var(--surface)', padding: '18px', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '1px solid var(--border)', paddingBottom: '10px' }}>
+                  <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700 }}>
+                    💰 Biaya Honorarium & 📅 Agenda TTD
+                  </h4>
+                  <span className={`badge ${billingForm.paymentStatus === 'paid' ? 'success' : billingForm.paymentStatus === 'partial' ? 'warning' : 'danger'}`}>
+                    {billingForm.paymentStatus === 'paid' ? 'LUNAS' : billingForm.paymentStatus === 'partial' ? 'DP (SEBAGIAN)' : 'BELUM LUNAS'}
+                  </span>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Honorarium Notaris (Rp):</label>
+                  <input
+                    type="number"
+                    value={billingForm.notaryFee}
+                    onChange={(e) => setBillingForm({ ...billingForm, notaryFee: Number(e.target.value) })}
+                    placeholder="0"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Pajak Transaksi (BPHTB/PPH) (Rp):</label>
+                  <input
+                    type="number"
+                    value={billingForm.taxFee}
+                    onChange={(e) => setBillingForm({ ...billingForm, taxFee: Number(e.target.value) })}
+                    placeholder="0"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Status Pembayaran:</label>
+                  <select
+                    value={billingForm.paymentStatus}
+                    onChange={(e) => setBillingForm({ ...billingForm, paymentStatus: e.target.value })}
+                  >
+                    <option value="unpaid">Belum Lunas</option>
+                    <option value="partial">DP (Sebagian)</option>
+                    <option value="paid">Lunas</option>
+                  </select>
+                </div>
+
+                <div style={{ borderTop: '1px dashed var(--border)', paddingTop: '14px', marginTop: '14px' }}>
+                  <div className="form-grid" style={{ marginBottom: '14px' }}>
+                    <div className="form-group">
+                      <label className="form-label">Tanggal TTD Akta:</label>
+                      <input
+                        type="date"
+                        value={billingForm.appointmentDate}
+                        onChange={(e) => setBillingForm({ ...billingForm, appointmentDate: e.target.value })}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Jam TTD:</label>
+                      <input
+                        type="time"
+                        value={billingForm.appointmentTime}
+                        onChange={(e) => setBillingForm({ ...billingForm, appointmentTime: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <Button variant="primary" style={{ width: '100%' }} onClick={handleSaveBilling}>
+                    💾 Simpan Rincian Biaya & Jadwal
+                  </Button>
+                </div>
+              </div>
+            </div>
+
           </div>
         </Modal>
       )}

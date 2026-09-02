@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useStore, useSearch, useToast } from '../store/hooks.js';
 import { useTranslation } from '../store/useTranslation.js';
 import { AiAPI } from '../services/api.js';
@@ -22,6 +23,7 @@ const EMPTY_FORM = {
 };
 
 export default function Clients() {
+  const navigate = useNavigate();
   const { query } = useSearch();
   const { clients, cases, addClient, updateClient, deleteClient } = useStore();
   const { notify } = useToast();
@@ -213,7 +215,14 @@ export default function Clients() {
                       <span className="badge info">{clientCasesCount(c.id)} Kasus</span>
                     </td>
                     <td style={{ textAlign: 'right' }}>
-                      <div className="btn-group-sm">
+                      <div className="btn-group-sm" style={{ justifyContent: 'flex-end' }}>
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={() => navigate('/cases', { state: { createForClient: c.id } })}
+                        >
+                          + Buat Akta
+                        </Button>
                         <Button variant="ghost" size="sm" icon="eye" onClick={() => setSelectedClient(c)} />
                         <Button variant="ghost" size="sm" icon="edit" onClick={() => openEdit(c)} />
                         <Button variant="ghost" size="sm" icon="trash" onClick={() => setConfirmId(c.id)} />

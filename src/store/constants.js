@@ -111,16 +111,18 @@ export const NOTARY_SERVICES = [
   }
 ];
 
-// Status workflow permohonan / kasus notaris
+// Status workflow permohonan / kasus notaris & PPAT
 export const CASE_STATUSES = [
   { id: 'pending', label: 'Baru (Pending)', color: 'var(--neutral-500)', bg: '#f1f5f9' },
   { id: 'review', label: 'Peninjauan Notaris', color: '#0284c7', bg: '#e0f2fe' },
   { id: 'kurang', label: 'Berkas Belum Lengkap', color: '#d97706', bg: '#fef3c7' },
   { id: 'lengkap', label: 'Berkas Lengkap', color: '#16a34a', bg: '#dcfce7' },
   { id: 'draft', label: 'Drafting Akta', color: '#7c3aed', bg: '#f3e8ff' },
-  { id: 'ttd', label: 'Siap Tanda Tangan', color: '#0891b2', bg: '#cffaff' },
-  { id: 'selesai', label: 'Akta Selesai', color: '#15803d', bg: '#bbf7d0' },
-  { id: 'arsip', label: 'Diarsipkan', color: '#475569', bg: '#e2e8f0' },
+  { id: 'ttd', label: 'Siap TTD (Minuta Akta)', color: '#0891b2', bg: '#cffaff' },
+  { id: 'selesai', label: 'Akta Ditandatangani', color: '#15803d', bg: '#bbf7d0' },
+  { id: 'ahu_bpn', label: 'Pengurusan AHU / BPN', color: '#ea580c', bg: '#ffedd5' },
+  { id: 'salinan_selesai', label: 'Salinan Akta Diserahkan', color: '#2563eb', bg: '#eff6ff' },
+  { id: 'arsip', label: 'Minuta Tersimpan di Arsip', color: '#475569', bg: '#e2e8f0' },
   { id: 'rejected', label: 'Dibatalkan', color: '#dc2626', bg: '#fee2e2' },
 ];
 
