@@ -3,11 +3,13 @@ import { StoreContext } from './contexts.js';
 import { STORAGE_KEYS } from './constants.js';
 import { load, uid, formatBytes, extOf } from './utils.js';
 import { buildInitialNotifications } from './seed.js';
-import { EmployeeAPI, DocumentAPI } from '../services/api.js';
+import { EmployeeAPI, DocumentAPI, ClientAPI, CaseAPI } from '../services/api.js';
 
 export function StoreProvider({ children }) {
   const [documents, setDocuments] = useState([]);
   const [employees, setEmployees] = useState([]);
+  const [clients, setClients] = useState([]);
+  const [cases, setCases] = useState([]);
   const [messages, setMessages] = useState(() => load(STORAGE_KEYS.messages, []));
   
   // Load data from backend on mount
@@ -16,8 +18,12 @@ export function StoreProvider({ children }) {
       try {
         const docs = await DocumentAPI.getAll();
         const emps = await EmployeeAPI.getAll();
+        const cls = await ClientAPI.getAll();
+        const cs = await CaseAPI.getAll();
         setDocuments(docs || []);
         setEmployees(emps || []);
+        setClients(cls || []);
+        setCases(cs || []);
       } catch (err) {
         console.error("Failed to fetch data from backend", err);
       }
@@ -140,35 +146,53 @@ export function StoreProvider({ children }) {
     return created;
   }, [account]);
 
-  // Soft delete: moves a document to the Trash instead of removing its data.
-  // The document is kept and can be restored later.
-  const deleteDocument = useCallback((id) => {
+  // Soft delete: moves a document to the Trash in DB.
+  const deleteDocument = useCallback(async (id) => {
     const who = account.firstName ? `${account.firstName} ${account.lastName}`.trim() : 'You';
     setDocuments((d) =>
       d.map((doc) =>
-        doc.id === id ? { ...doc, isTrashed: true, trashedAt: Date.now(), trashedBy: who } : doc
+        doc.id === id ? { ...doc, isTrashed: true, trashedAt: new Date().toISOString(), trashedBy: who } : doc
       )
     );
+    try {
+      await DocumentAPI.softDelete(id, who);
+    } catch (err) {
+      console.error('Failed to soft delete document', err);
+    }
   }, [account]);
 
   // Restore: brings a trashed document back to its previous category.
-  const restoreDocument = useCallback((id) => {
+  const restoreDocument = useCallback(async (id) => {
     setDocuments((d) =>
       d.map((doc) =>
         doc.id === id ? { ...doc, isTrashed: false, trashedAt: null, trashedBy: null } : doc
       )
     );
+    try {
+      await DocumentAPI.restore(id);
+    } catch (err) {
+      console.error('Failed to restore document', err);
+    }
   }, []);
 
-  // Permanent delete: really removes the document data. Only called from the
-  // Trash view after explicit confirmation.
-  const deleteDocumentPermanently = useCallback((id) => {
+  // Permanent delete: really removes the document data from DB.
+  const deleteDocumentPermanently = useCallback(async (id) => {
     setDocuments((d) => d.filter((doc) => doc.id !== id));
+    try {
+      await DocumentAPI.deletePermanently(id);
+    } catch (err) {
+      console.error('Failed to permanently delete document', err);
+    }
   }, []);
 
-  // Empty the Trash: only removes documents that are currently in the Trash.
-  const emptyTrash = useCallback(() => {
+  // Empty the Trash: only removes documents that are currently in the Trash in DB.
+  const emptyTrash = useCallback(async () => {
     setDocuments((d) => d.filter((doc) => !doc.isTrashed));
+    try {
+      await DocumentAPI.emptyTrash();
+    } catch (err) {
+      console.error('Failed to empty trash', err);
+    }
   }, []);
 
   const updateDocument = useCallback((id, patch) => {
@@ -317,6 +341,127 @@ export function StoreProvider({ children }) {
     [documents]
   );
 
+  // Clients Handlers
+  const addClient = useCallback(async (data) => {
+    const newClient = {
+      id: 'c-' + uid(),
+      createdAt: new Date().toISOString().split('T')[0],
+      ...data
+    };
+    try {
+      await ClientAPI.create(newClient);
+      setClients((prev) => [newClient, ...prev]);
+      return newClient;
+    } catch (err) {
+      console.error('Failed to create client', err);
+      return null;
+    }
+  }, []);
+
+  const updateClient = useCallback(async (id, data) => {
+    try {
+      await ClientAPI.update(id, data);
+      setClients((prev) => prev.map((c) => (c.id === id ? { ...c, ...data } : c)));
+      return true;
+    } catch (err) {
+      console.error('Failed to update client', err);
+      return false;
+    }
+  }, []);
+
+  const deleteClient = useCallback(async (id) => {
+    try {
+      await ClientAPI.delete(id);
+      setClients((prev) => prev.filter((c) => c.id !== id));
+      return true;
+    } catch (err) {
+      console.error('Failed to delete client', err);
+      return false;
+    }
+  }, []);
+
+  // Cases Handlers
+  const addCase = useCallback(async (data, checklistItems = []) => {
+    const newCase = {
+      id: 'kasus-' + Date.now(),
+      caseNumber: `KASUS/${new Date().getFullYear()}/${(new Date().getMonth() + 1).toString().padStart(2, '0')}/${(cases.length + 1).toString().padStart(3, '0')}`,
+      status: 'pending',
+      createdAt: new Date().toISOString().split('T')[0],
+      aktaNumber: '',
+      ...data,
+      checklist: checklistItems.map((item, idx) => ({
+        id: 'chk-' + uid() + idx,
+        itemName: typeof item === 'string' ? item : item.itemName,
+        isChecked: 0
+      }))
+    };
+    try {
+      await CaseAPI.create(newCase);
+      setCases((prev) => [newCase, ...prev]);
+      return newCase;
+    } catch (err) {
+      console.error('Failed to create case', err);
+      return null;
+    }
+  }, [cases.length]);
+
+  const updateCaseStatus = useCallback(async (id, status) => {
+    try {
+      await CaseAPI.updateStatus(id, status);
+      setCases((prev) => prev.map((c) => (c.id === id ? { ...c, status } : c)));
+      return true;
+    } catch (err) {
+      console.error('Failed to update case status', err);
+      return false;
+    }
+  }, []);
+
+  const updateCaseDetails = useCallback(async (id, details) => {
+    try {
+      await CaseAPI.updateDetails(id, details);
+      setCases((prev) => prev.map((c) => (c.id === id ? { ...c, ...details } : c)));
+      return true;
+    } catch (err) {
+      console.error('Failed to update case details', err);
+      return false;
+    }
+  }, []);
+
+  const toggleChecklistItem = useCallback(async (caseId, itemId, isChecked) => {
+    try {
+      await CaseAPI.toggleChecklist(caseId, itemId, isChecked);
+      setCases((prev) =>
+        prev.map((c) => {
+          if (c.id !== caseId) return c;
+          const updatedChecklist = (c.checklist || []).map((i) =>
+            i.id === itemId ? { ...i, isChecked: isChecked ? 1 : 0 } : i
+          );
+          return { ...c, checklist: updatedChecklist };
+        })
+      );
+      return true;
+    } catch (err) {
+      console.error('Failed to toggle checklist item', err);
+      return false;
+    }
+  }, []);
+
+  const generateAktaNumber = useCallback(async (caseId) => {
+    try {
+      const res = await CaseAPI.generateAktaNumber(caseId);
+      if (res.success && res.aktaNumber) {
+        setCases((prev) =>
+          prev.map((c) => (c.id === caseId ? { ...c, aktaNumber: res.aktaNumber, status: 'draft' } : c))
+        );
+        return res.aktaNumber;
+      }
+      return null;
+    } catch (err) {
+      console.error('Failed to generate akta number', err);
+      return null;
+    }
+  }, []);
+
   const totals = useMemo(() => {
     const active = documents.filter((d) => !d.isTrashed);
     return {
@@ -325,12 +470,17 @@ export function StoreProvider({ children }) {
       activeEmployees: employees.filter((e) => (e.status || '').toLowerCase() === 'active').length,
       storageBytes: active.reduce((s, d) => s + (d.sizeBytes || 0), 0),
       reports: active.length,
+      totalClients: clients.length,
+      totalCases: cases.length,
+      activeCases: cases.filter((c) => c.status !== 'selesai' && c.status !== 'arsip' && c.status !== 'rejected').length,
     };
-  }, [documents, employees]);
+  }, [documents, employees, clients, cases]);
 
   const value = {
     documents,
     employees,
+    clients,
+    cases,
     messages,
     submissions,
     account,
@@ -351,6 +501,14 @@ export function StoreProvider({ children }) {
     addEmployee,
     updateEmployee,
     deleteEmployee,
+    addClient,
+    updateClient,
+    deleteClient,
+    addCase,
+    updateCaseStatus,
+    updateCaseDetails,
+    toggleChecklistItem,
+    generateAktaNumber,
     addMessage,
     deleteMessage,
     markNotificationRead,

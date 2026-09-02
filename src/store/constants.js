@@ -25,6 +25,106 @@ export const DOC_CATEGORIES = [
 // Kept for the Upload modal category dropdown.
 export const UPLOAD_CATEGORIES = DOC_CATEGORIES.map((c) => c.id);
 
+// Notary Service Types & Default Document Checklists
+export const NOTARY_SERVICES = [
+  {
+    id: 'AJB',
+    name: 'Akta Jual Beli (AJB)',
+    defaultChecklist: [
+      'KTP Penjual & Pembeli (beserta Suami/Istri)',
+      'Kartu Keluarga (KK) Penjual & Pembeli',
+      'Surat Nikah / Akta Cerai',
+      'Sertifikat Asli Tanah (SHM/SHGB)',
+      'PBB 5 Tahun Terakhir & STTS Baru',
+      'Bukti Setor BPHTB & PPH',
+      'Surat Persetujuan Suami/Istri',
+    ]
+  },
+  {
+    id: 'AKT-PT',
+    name: 'Pendirian PT / CV / Yayasan',
+    defaultChecklist: [
+      'KTP Para Pendiri & Pengurus',
+      'NPWP Para Pendiri & Pengurus',
+      'Persetujuan Nama Perusahaan dari Kemenkumham',
+      'Surat Keterangan Domisili Usaha',
+      'Rincian Modal & Komposisi Saham',
+    ]
+  },
+  {
+    id: 'HIBAH',
+    name: 'Akta Hibah',
+    defaultChecklist: [
+      'KTP Pemberi & Penerima Hibah',
+      'Kartu Keluarga (KK) Kedua Pihak',
+      'Sertifikat Asli Tanah/Bangunan',
+      'Surat Persetujuan Ahli Waris Kasus Hibah',
+      'PBB 5 Tahun Terakhir',
+    ]
+  },
+  {
+    id: 'WARIS',
+    name: 'Surat Keterangan Waris (SKW)',
+    defaultChecklist: [
+      'Surat Kematian dari Kelurahan/Rumah Sakit',
+      'KTP & KK Seluruh Ahli Waris',
+      'Surat Nikah Almarhum/Almarhumah',
+      'Silsilah / Bagan Ahli Waris dari Desa/Kelurahan',
+    ]
+  },
+  {
+    id: 'KUASA',
+    name: 'Surat Kuasa / Akta Kuasa',
+    defaultChecklist: [
+      'KTP Pemberi Kuasa',
+      'KTP Penerima Kuasa',
+      'Dokumen Objek Kuasa (Sertifikat/BPKB/dll)',
+    ]
+  },
+  {
+    id: 'PERJANJIAN',
+    name: 'Akta Perjanjian / Kontrak / Kredit',
+    defaultChecklist: [
+      'KTP Para Pihak',
+      'Draft Pokok Perjanjian / Term Sheet',
+      'Dokumen Jaminan (jika ada)',
+    ]
+  },
+  {
+    id: 'ROYA',
+    name: 'Roya / Pelunasan Hak Tanggungan',
+    defaultChecklist: [
+      'Surat Lunas / Pengantar Roya dari Bank',
+      'Sertifikat Asli Tanah',
+      'Sertifikat Hak Tanggungan (SHT) Asli',
+      'KTP Pemilik Tanah',
+    ]
+  },
+  {
+    id: 'LAINNYA',
+    name: 'Layanan Notaris Lainnya',
+    defaultChecklist: [
+      'KTP Pemohon',
+      'Kartu Keluarga (KK)',
+      'Dokumen Pendukung Utama',
+    ]
+  }
+];
+
+// Status workflow permohonan / kasus notaris
+export const CASE_STATUSES = [
+  { id: 'pending', label: 'Baru (Pending)', color: 'var(--neutral-500)', bg: '#f1f5f9' },
+  { id: 'review', label: 'Peninjauan Notaris', color: '#0284c7', bg: '#e0f2fe' },
+  { id: 'kurang', label: 'Berkas Belum Lengkap', color: '#d97706', bg: '#fef3c7' },
+  { id: 'lengkap', label: 'Berkas Lengkap', color: '#16a34a', bg: '#dcfce7' },
+  { id: 'draft', label: 'Drafting Akta', color: '#7c3aed', bg: '#f3e8ff' },
+  { id: 'ttd', label: 'Siap Tanda Tangan', color: '#0891b2', bg: '#cffaff' },
+  { id: 'selesai', label: 'Akta Selesai', color: '#15803d', bg: '#bbf7d0' },
+  { id: 'arsip', label: 'Diarsipkan', color: '#475569', bg: '#e2e8f0' },
+  { id: 'rejected', label: 'Dibatalkan', color: '#dc2626', bg: '#fee2e2' },
+];
+
+
 export const STORAGE_KEYS = {
   documents: 'noffice.documents',
   employees: 'noffice.employees',

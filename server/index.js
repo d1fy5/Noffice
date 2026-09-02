@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
-import { dbGet, dbQuery, dbRun } from './db.js';
+import { dbGet, dbQuery, dbRun, hashPassword } from './db.js';
+import { checkAiStatus, extractDocumentData, generateLegalClause, auditCaseData, generateCopilotResponse } from './aiEngine.js';
 
 const app = express();
 const PORT = 3001;
@@ -12,7 +13,9 @@ app.use(express.json());
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-    const user = await dbGet('SELECT * FROM users WHERE email = ? AND password = ?', [email, password]);
+    const hashed = hashPassword(password);
+    // Support both hashed password and legacy plain text
+    let user = await dbGet('SELECT * FROM users WHERE email = ? AND (password = ? OR password = ?)', [email, hashed, password]);
     
     if (user) {
       const { password, ...safeUser } = user;
@@ -101,7 +104,255 @@ app.patch('/api/documents/:id/status', async (req, res) => {
   }
 });
 
+// --- ROUTES CLIENTS (Klien Notaris) ---
+app.get('/api/clients', async (req, res) => {
+  try {
+    const clients = await dbQuery('SELECT * FROM clients ORDER BY createdAt DESC');
+    res.json(clients);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/clients', async (req, res) => {
+  try {
+    const { id, nik, name, birthdate, address, phone, email, job, createdAt } = req.body;
+    await dbRun(
+      'INSERT INTO clients (id, nik, name, birthdate, address, phone, email, job, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [id, nik, name, birthdate, address, phone, email, job, createdAt || new Date().toISOString().split('T')[0]]
+    );
+    res.json({ success: true, id });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/clients/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { nik, name, birthdate, address, phone, email, job } = req.body;
+    await dbRun(
+      'UPDATE clients SET nik = ?, name = ?, birthdate = ?, address = ?, phone = ?, email = ?, job = ? WHERE id = ?',
+      [nik, name, birthdate, address, phone, email, job, id]
+    );
+    res.json({ success: true, id });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/clients/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await dbRun('DELETE FROM clients WHERE id = ?', [id]);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- ROUTES CASES (Permohonan / Kasus Notaris) ---
+app.get('/api/cases', async (req, res) => {
+  try {
+    const cases = await dbQuery('SELECT * FROM cases ORDER BY createdAt DESC');
+    const items = await dbQuery('SELECT * FROM checklist_items');
+    
+    // Attach checklist items to each case
+    const result = cases.map(c => ({
+      ...c,
+      checklist: items.filter(i => i.caseId === c.id)
+    }));
+    
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/cases', async (req, res) => {
+  try {
+    const { id, caseNumber, clientId, serviceType, status, assignedTo, notes, createdAt, estimatedAt, checklist } = req.body;
+    await dbRun(
+      'INSERT INTO cases (id, caseNumber, clientId, serviceType, status, assignedTo, notes, createdAt, estimatedAt, aktaNumber) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [id, caseNumber, clientId, serviceType, status || 'pending', assignedTo, notes, createdAt || new Date().toISOString().split('T')[0], estimatedAt, '']
+    );
+
+    // Save checklist items if present
+    if (checklist && Array.isArray(checklist)) {
+      for (const item of checklist) {
+        await dbRun(
+          'INSERT INTO checklist_items (id, caseId, itemName, isChecked) VALUES (?, ?, ?, ?)',
+          [item.id || 'chk-' + Date.now() + Math.random().toString(36).substring(2, 6), id, item.itemName || item, item.isChecked ? 1 : 0]
+        );
+      }
+    }
+
+    res.json({ success: true, id });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.patch('/api/documents/:id/trash', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { trashedBy } = req.body;
+    await dbRun('UPDATE documents SET isTrashed = 1, trashedAt = ?, trashedBy = ? WHERE id = ?', [
+      new Date().toISOString(),
+      trashedBy || 'User',
+      id
+    ]);
+    res.json({ success: true, id });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.patch('/api/documents/:id/restore', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await dbRun('UPDATE documents SET isTrashed = 0, trashedAt = NULL, trashedBy = NULL WHERE id = ?', [id]);
+    res.json({ success: true, id });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/documents/:id/permanent', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await dbRun('DELETE FROM documents WHERE id = ?', [id]);
+    res.json({ success: true, id });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/documents/trash/empty', async (req, res) => {
+  try {
+    await dbRun('DELETE FROM documents WHERE isTrashed = 1');
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update Case Details (Billing & Appointment)
+app.put('/api/cases/:id/details', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { notaryFee, taxFee, pnbpFee, paymentStatus, appointmentDate, appointmentTime, notes } = req.body;
+    await dbRun(
+      'UPDATE cases SET notaryFee = ?, taxFee = ?, pnbpFee = ?, paymentStatus = ?, appointmentDate = ?, appointmentTime = ?, notes = ? WHERE id = ?',
+      [notaryFee || 0, taxFee || 0, pnbpFee || 0, paymentStatus || 'unpaid', appointmentDate || '', appointmentTime || '', notes || '', id]
+    );
+    res.json({ success: true, id });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.patch('/api/cases/:id/checklist', async (req, res) => {
+  try {
+    const { itemId, isChecked } = req.body;
+    await dbRun('UPDATE checklist_items SET isChecked = ?, checkedAt = ? WHERE id = ?', [
+      isChecked ? 1 : 0,
+      isChecked ? new Date().toISOString() : null,
+      itemId
+    ]);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Helper Romawi Bulan
+function toRomanMonth(monthZeroIndexed) {
+  const roman = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
+  return roman[monthZeroIndexed] || 'I';
+}
+
+// Generate Nomor Akta Otomatis (No. [Urut]/[Bulan Romawi]/[Tahun])
+app.post('/api/cases/:id/generate-akta', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const romanMonth = toRomanMonth(now.getMonth());
+
+    // Cek last number di akta_counter
+    let row = await dbGet('SELECT lastNumber FROM akta_counter WHERE year = ?', [currentYear]);
+    let nextNum = 1;
+    if (row) {
+      nextNum = row.lastNumber + 1;
+      await dbRun('UPDATE akta_counter SET lastNumber = ? WHERE year = ?', [nextNum, currentYear]);
+    } else {
+      await dbRun('INSERT INTO akta_counter (year, lastNumber) VALUES (?, ?)', [currentYear, nextNum]);
+    }
+
+    const aktaNumber = `No. ${nextNum}/${romanMonth}/${currentYear}`;
+
+    // Update di tabel cases
+    await dbRun('UPDATE cases SET aktaNumber = ? WHERE id = ?', [aktaNumber, id]);
+
+    res.json({ success: true, aktaNumber });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- ROUTES LOCAL AI NOTARY ENGINE ---
+app.get('/api/ai/status', async (req, res) => {
+  try {
+    const status = await checkAiStatus();
+    res.json(status);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/ai/extract', async (req, res) => {
+  try {
+    const { text } = req.body;
+    const result = await extractDocumentData(text);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/ai/draft-clause', async (req, res) => {
+  try {
+    const { serviceType, parameters } = req.body;
+    const result = await generateLegalClause(serviceType, parameters);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/ai/audit-case', async (req, res) => {
+  try {
+    const { caseData, clientData } = req.body;
+    const result = await auditCaseData(caseData, clientData);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/ai/chat', async (req, res) => {
+  try {
+    const { message, contextData } = req.body;
+    const reply = await generateCopilotResponse(message, contextData);
+    res.json({ success: true, reply });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // --- START SERVER ---
 app.listen(PORT, () => {
   console.log(`Backend Server running on http://localhost:${PORT}`);
 });
+

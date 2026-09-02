@@ -5,6 +5,8 @@ import { ToastProvider } from './store/ToastProvider.jsx';
 import { AuthProvider, useAuth } from './store/AuthContext.jsx';
 import Layout from './components/Layout.jsx';
 import Dashboard from './pages/Dashboard.jsx';
+import Clients from './pages/Clients.jsx';
+import Cases from './pages/Cases.jsx';
 import Documents from './pages/Documents.jsx';
 import Inbox from './pages/Inbox.jsx';
 import DataTables from './pages/DataTables.jsx';
@@ -49,6 +51,8 @@ export default function App() {
                         <Routes>
                           <Route path="/" element={<Navigate to="/dashboard" replace />} />
                           <Route path="/dashboard" element={<Dashboard />} />
+                          <Route path="/clients" element={<Clients />} />
+                          <Route path="/cases" element={<Cases />} />
                           <Route path="/documents" element={<Documents />} />
                           <Route path="/inbox" element={<Inbox />} />
                           <Route path="/notifications" element={<Notifications />} />

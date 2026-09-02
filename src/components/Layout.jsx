@@ -4,9 +4,12 @@ import { SearchContext } from '../store/contexts.js';
 import { useTranslation } from '../store/useTranslation.js';
 import Sidebar from './Sidebar.jsx';
 import Topbar from './Topbar.jsx';
+import AiCopilotDrawer from './AiCopilotDrawer.jsx';
 
 const titleKeyMap = {
   '/dashboard': 'dashboard',
+  '/clients': 'clients',
+  '/cases': 'cases',
   '/documents': 'documents',
   '/inbox': 'inbox',
   '/data-tables': 'data-tables',
@@ -36,6 +39,7 @@ export default function Layout({ children }) {
           />
           <main className="main">{children}</main>
         </div>
+        <AiCopilotDrawer />
       </div>
     </SearchContext.Provider>
   );

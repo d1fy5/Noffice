@@ -14,7 +14,7 @@ import PageHeader from '../components/PageHeader.jsx';
 
 export default function Dashboard() {
   const { query } = useSearch();
-  const { totals, documents } = useStore();
+  const { totals, documents, cases, clients } = useStore();
   const { t } = useTranslation();
   const { isAdmin } = useAuth();
   const navigate = useNavigate();
@@ -30,6 +30,14 @@ export default function Dashboard() {
     .filter((d) => !q || d.title.toLowerCase().includes(q) || d.author.toLowerCase().includes(q))
     .slice(0, 5);
 
+  // Upcoming / Today's appointments
+  const appointments = cases.filter((c) => c.appointmentDate);
+
+  const getClientName = (clientId) => {
+    const cl = clients.find((c) => c.id === clientId);
+    return cl ? cl.name : 'Klien';
+  };
+
   return (
     <>
       <PageHeader
@@ -39,14 +47,11 @@ export default function Dashboard() {
       />
 
       <div className="stat-grid">
+        <StatCard label="Permohonan / Kasus Aktif" value={(totals.activeCases || 0).toLocaleString()} icon="fileText" sub={`${totals.totalCases || 0} total permohonan`} />
+        <StatCard label="Total Klien Terdaftar" value={(totals.totalClients || 0).toLocaleString()} icon="user" sub="klien di database" />
         <StatCard label={t('stat.totalDocuments')} value={totals.totalDocuments.toLocaleString()} icon="documents" sub={totals.totalDocuments ? t('stat.sub.totalTruth') : t('stat.sub.totalEmpty')} />
-        
         {isAdmin && (
-          <>
-            <StatCard label={t('stat.pendingApprovals')} value={totals.pendingApprovals.toLocaleString()} icon="clock" sub={totals.pendingApprovals ? t('stat.sub.pendingTruth') : t('stat.sub.pendingEmpty')} />
-            <StatCard label={t('stat.activeEmployees')} value={totals.activeEmployees.toLocaleString()} icon="employees" sub={totals.activeEmployees ? t('stat.sub.employeesTruth') : t('stat.sub.employeesEmpty')} />
-            <StatCard label={t('stat.storageUsed')} value={formatBytes(totals.storageBytes)} icon="chart" sub={formatBytes(totals.storageBytes) === '0 B' ? t('stat.sub.storageEmpty') : t('stat.sub.storageTruth')} />
-          </>
+          <StatCard label={t('stat.pendingApprovals')} value={totals.pendingApprovals.toLocaleString()} icon="clock" sub={totals.pendingApprovals ? t('stat.sub.pendingTruth') : t('stat.sub.pendingEmpty')} />
         )}
       </div>
 
@@ -84,24 +89,51 @@ export default function Dashboard() {
 
           <SectionHead title={t('dash.quickOps')} />
           <div className="quick-op-grid">
+            <button className="quick-op" onClick={() => navigate('/cases')}>
+              <span className="qo-icon"><Icon name="plus" size={18} /></span>
+              Permohonan Baru
+            </button>
+            <button className="quick-op" onClick={() => navigate('/clients')}>
+              <span className="qo-icon"><Icon name="userPlus" size={18} /></span>
+              Tambah Klien
+            </button>
             <button className="quick-op" onClick={openUpload}>
               <span className="qo-icon"><Icon name="upload" size={18} /></span>
               {t('action.upload')}
             </button>
             {isAdmin && (
               <button className="quick-op" onClick={() => navigate('/employees')}>
-                <span className="qo-icon"><Icon name="userPlus" size={18} /></span>
+                <span className="qo-icon"><Icon name="user" size={18} /></span>
                 {t('action.addEmployee')}
               </button>
             )}
-            <button className="quick-op" onClick={() => navigate('/inbox')}>
-              <span className="qo-icon"><Icon name="message" size={18} /></span>
-              {t('action.newMessage')}
-            </button>
           </div>
         </div>
 
         <div>
+          <SectionHead title="📅 Agenda Penandatanganan Akta" subtitle="Jadwal kehadiran klien TTD" />
+          <div className="card mb-4">
+            {appointments.length === 0 ? (
+              <div className="p-4 text-center text-muted" style={{ fontSize: '0.85rem' }}>
+                Belum ada jadwal penandatanganan akta minggu ini.
+              </div>
+            ) : (
+              <div className="p-3">
+                {appointments.slice(0, 4).map((apt) => (
+                  <div key={apt.id} className="submission-row" style={{ padding: '8px 0', borderBottom: '1px solid #f1f5f9' }}>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: '0.88rem' }}>{apt.serviceType} — {getClientName(apt.clientId)}</div>
+                      <div className="sub-meta">📅 {apt.appointmentDate} • ⏰ Jam {apt.appointmentTime || '10:00'}</div>
+                    </div>
+                    <div>
+                      <span className="badge info">{apt.caseNumber}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           <SectionHead title={t('dash.category')} />
           <div className="card">
             {activeDocs.length === 0 ? (
