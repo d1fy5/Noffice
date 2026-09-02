@@ -77,6 +77,7 @@ export default function AiCopilotDrawer() {
       <button
         type="button"
         onClick={() => setOpen(!open)}
+        className="copilot-floating-btn"
         style={{
           position: 'fixed',
           bottom: '24px',
@@ -84,75 +85,91 @@ export default function AiCopilotDrawer() {
           zIndex: 999,
           display: 'flex',
           alignItems: 'center',
-          gap: '8px',
-          padding: '12px 18px',
+          gap: '10px',
+          padding: '12px 20px',
           borderRadius: '50px',
-          background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+          background: 'linear-gradient(135deg, #2563eb 0%, #4f46e5 100%)',
           color: '#fff',
-          border: '1px solid rgba(255,255,255,0.2)',
-          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.25)',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+          boxShadow: '0 8px 25px rgba(37, 99, 235, 0.4)',
           cursor: 'pointer',
-          fontWeight: 600,
+          fontWeight: 700,
           fontSize: '0.9rem',
-          transition: 'all 0.2s ease',
+          letterSpacing: '-0.01em',
+          transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
         }}
       >
-        <span style={{ fontSize: '1.2rem' }}>🤖</span>
-        <span>AI Copilot</span>
+        <span style={{ fontSize: '1.25rem' }}>🤖</span>
+        <span>Noffice Copilot</span>
         {open && <Icon name="x" size={16} />}
       </button>
 
       {/* Expandable Chat Drawer Window */}
       {open && (
         <div
+          className="copilot-window"
           style={{
             position: 'fixed',
-            bottom: '80px',
+            bottom: '84px',
             right: '24px',
-            width: '380px',
-            maxHeight: '560px',
-            height: '80vh',
+            width: '390px',
+            maxHeight: '580px',
+            height: '82vh',
             zIndex: 998,
-            background: '#ffffff',
-            borderRadius: '16px',
-            boxShadow: '0 12px 40px rgba(0,0,0,0.2)',
+            background: 'var(--surface)',
+            borderRadius: '20px',
+            boxShadow: 'var(--shadow-lg), 0 0 30px rgba(0,0,0,0.15)',
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
-            border: '1px solid #e2e8f0',
+            border: '1px solid var(--border)',
+            animation: 'fadeIn 0.25s ease-out',
           }}
         >
           {/* Header */}
           <div
             style={{
-              padding: '14px 16px',
-              background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+              padding: '16px 18px',
+              background: 'linear-gradient(135deg, #0b1329 0%, #1e293b 100%)',
               color: '#fff',
               display: 'flex',
-              justify: 'space-between',
+              justifyContent: 'space-between',
               alignItems: 'center',
+              borderBottom: '1px solid rgba(255,255,255,0.08)',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '1.2rem' }}>🤖</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{
+                width: '34px',
+                height: '34px',
+                borderRadius: '10px',
+                background: 'linear-gradient(135deg, #2563eb 0%, #6366f1 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '1.1rem',
+                boxShadow: '0 4px 10px rgba(37,99,235,0.4)',
+              }}>
+                🤖
+              </div>
               <div>
                 <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>Noffice AI Copilot</div>
-                <div style={{ fontSize: '0.7rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} />
+                <div style={{ fontSize: '0.72rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '5px', marginTop: '1px' }}>
+                  <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#10b981', display: 'inline-block', boxShadow: '0 0 6px #10b981' }} />
                   {status?.mode || '100% Offline AI Engine'}
                 </div>
               </div>
             </div>
             <button
               onClick={() => setOpen(false)}
-              style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
+              style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: '#cbd5e1', borderRadius: '8px', padding: '6px', cursor: 'pointer', display: 'flex' }}
             >
-              <Icon name="x" size={18} />
+              <Icon name="x" size={16} />
             </button>
           </div>
 
           {/* Quick Prompts bar */}
-          <div style={{ padding: '8px 12px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', gap: '6px', overflowX: 'auto' }}>
+          <div style={{ padding: '10px 12px', background: 'var(--surface-2)', borderBottom: '1px solid var(--border)', display: 'flex', gap: '6px', overflowX: 'auto' }}>
             {quickPrompts.map((qp, idx) => (
               <button
                 key={idx}
@@ -160,12 +177,14 @@ export default function AiCopilotDrawer() {
                 style={{
                   whiteSpace: 'nowrap',
                   fontSize: '0.75rem',
-                  padding: '4px 8px',
+                  padding: '5px 10px',
                   borderRadius: '12px',
-                  border: '1px solid #cbd5e1',
-                  background: '#fff',
+                  border: '1px solid var(--border)',
+                  background: 'var(--surface)',
                   cursor: 'pointer',
-                  color: '#334155',
+                  color: 'var(--text-2)',
+                  fontWeight: 600,
+                  transition: 'all 0.15s ease',
                 }}
               >
                 {qp}
@@ -177,12 +196,12 @@ export default function AiCopilotDrawer() {
           <div
             style={{
               flex: 1,
-              padding: '12px',
+              padding: '14px',
               overflowY: 'auto',
               display: 'flex',
               flexDirection: 'column',
-              gap: '10px',
-              background: '#f8fafc',
+              gap: '12px',
+              background: 'var(--bg)',
             }}
           >
             {messages.map((m, idx) => (
@@ -195,14 +214,14 @@ export default function AiCopilotDrawer() {
               >
                 <div
                   style={{
-                    padding: '10px 14px',
-                    borderRadius: m.sender === 'user' ? '14px 14px 2px 14px' : '14px 14px 14px 2px',
-                    background: m.sender === 'user' ? 'var(--primary)' : '#ffffff',
-                    color: m.sender === 'user' ? '#ffffff' : '#1e293b',
+                    padding: '10px 15px',
+                    borderRadius: m.sender === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+                    background: m.sender === 'user' ? 'var(--primary-gradient)' : 'var(--surface)',
+                    color: m.sender === 'user' ? '#ffffff' : 'var(--text)',
                     fontSize: '0.85rem',
-                    lineHeight: '1.4',
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
-                    border: m.sender === 'user' ? 'none' : '1px solid #e2e8f0',
+                    lineHeight: '1.45',
+                    boxShadow: m.sender === 'user' ? '0 4px 12px rgba(37, 99, 235, 0.25)' : 'var(--shadow-sm)',
+                    border: m.sender === 'user' ? 'none' : '1px solid var(--border)',
                     whiteSpace: 'pre-line',
                   }}
                 >
@@ -211,9 +230,10 @@ export default function AiCopilotDrawer() {
                 <div
                   style={{
                     fontSize: '0.65rem',
-                    color: '#94a3b8',
-                    marginTop: '2px',
+                    color: 'var(--text-3)',
+                    marginTop: '3px',
                     textAlign: m.sender === 'user' ? 'right' : 'left',
+                    fontWeight: 500,
                   }}
                 >
                   {m.time}
@@ -221,27 +241,30 @@ export default function AiCopilotDrawer() {
               </div>
             ))}
             {loading && (
-              <div style={{ alignSelf: 'flex-start', fontSize: '0.8rem', color: '#64748b', italic: 'true' }}>
-                AI sedang berpikir...
+              <div style={{ alignSelf: 'flex-start', fontSize: '0.8rem', color: 'var(--text-2)', fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ fontSize: '1rem' }}>⚡</span> AI Notaris sedang berpikir...
               </div>
             )}
             <div ref={messagesEndRef} />
           </div>
 
           {/* Input Box Footer */}
-          <div style={{ padding: '10px', background: '#fff', borderTop: '1px solid #e2e8f0', display: 'flex', gap: '8px' }}>
+          <div style={{ padding: '12px', background: 'var(--surface)', borderTop: '1px solid var(--border)', display: 'flex', gap: '8px' }}>
             <input
               type="text"
-              placeholder="Tanyakan sesuatu pada AI..."
+              placeholder="Tanyakan sesuatu pada AI Notaris..."
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSend()}
               style={{
                 flex: 1,
-                padding: '8px 12px',
+                padding: '9px 14px',
                 fontSize: '0.85rem',
-                borderRadius: '20px',
-                border: '1px solid #cbd5e1',
+                borderRadius: '24px',
+                border: '1px solid var(--border)',
+                background: 'var(--surface-2)',
+                color: 'var(--text)',
+                outline: 'none',
               }}
             />
             <Button variant="primary" size="sm" onClick={() => handleSend()} disabled={loading}>
@@ -253,3 +276,4 @@ export default function AiCopilotDrawer() {
     </>
   );
 }
+
