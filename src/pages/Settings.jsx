@@ -391,7 +391,7 @@ export default function Settings() {
 
               {/* 1-Click Local Database Backup Box */}
               <div className="mt-5 p-4" style={{ background: 'var(--surface-2)', borderRadius: '12px', border: '1px solid var(--border)', marginTop: '24px' }}>
-                <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '6px', color: 'var(--text)' }}>💾 Backup Database SQLite 1-Klik</h3>
+                <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text)' }}>Backup Database SQLite 1-Klik</h3>
                 <p style={{ fontSize: '0.83rem', color: 'var(--text-2)', marginBottom: '14px', lineHeight: 1.4 }}>
                   Unduh salinan cadangan file database SQLite (`database.sqlite`) ke Flashdisk atau Harddisk Eksternal setiap sore hari untuk menjamin keamanan penuh data kantor Notaris.
                 </p>

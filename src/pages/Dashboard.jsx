@@ -9,7 +9,6 @@ import EmptyState from '../components/EmptyState.jsx';
 import Button from '../components/Button.jsx';
 import Icon from '../components/Icon.jsx';
 import UploadModal from '../components/UploadModal.jsx';
-import PageHeader from '../components/PageHeader.jsx';
 import { CASE_STATUSES } from '../store/constants.js';
 
 export default function Dashboard() {
@@ -23,7 +22,6 @@ export default function Dashboard() {
   const q = query.trim().toLowerCase();
   const openUpload = () => setUploadOpen(true);
 
-  // Active non-trashed documents
   const activeDocs = documents.filter((d) => !d.isTrashed);
 
   const recentDocs = activeDocs
@@ -32,10 +30,9 @@ export default function Dashboard() {
 
   const recentCases = cases
     .filter((c) => !q || (c.caseNumber || '').toLowerCase().includes(q) || (c.serviceType || '').toLowerCase().includes(q))
-    .slice(0, 4);
+    .slice(0, 5);
 
-  // Upcoming appointments
-  const appointments = cases.filter((c) => c.appointmentDate);
+  const appointments = cases.filter((c) => c.appointmentDate).slice(0, 4);
 
   const getClientName = (clientId) => {
     const cl = clients.find((c) => c.id === clientId);
@@ -51,166 +48,124 @@ export default function Dashboard() {
 
   return (
     <>
-      {/* Welcome Hero Banner */}
-      <div
-        className="card hero-banner mb-4"
-        style={{
-          padding: '24px 28px',
-          borderRadius: '20px',
-          position: 'relative',
-          overflow: 'hidden',
-        }}
-      >
-        <div style={{ position: 'relative', zIndex: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
-              <span className="badge" style={{ background: 'var(--primary-soft)', color: 'var(--primary)', border: '1px solid var(--border)' }}>
-                🟢 Local AI Engine Active
-              </span>
-              <span style={{ fontSize: '0.82rem', color: 'var(--text-3)' }}>📅 {todayStr}</span>
-            </div>
-            <h1 style={{ color: 'var(--text)', fontSize: '24px', fontWeight: 800, letterSpacing: '-0.02em', margin: '4px 0' }}>
-              Selamat datang kembali, {user?.name || 'Notaris & PPAT'}! 👋
-            </h1>
-            <p style={{ color: 'var(--text-2)', fontSize: '0.9rem', margin: 0, maxWidth: '640px' }}>
-              Sistem Manajemen Kantor Notaris & PPAT 100% Offline-First. Seluruh data permohonan akta dan identitas klien tersimpan dengan aman di PC lokal.
-            </p>
-          </div>
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <Button variant="primary" icon="plus" onClick={() => navigate('/cases')}>
-              Permohonan Akta
-            </Button>
-            <Button variant="secondary" icon="userPlus" onClick={() => navigate('/clients')}>
-              Tambah Klien
-            </Button>
-          </div>
+      {/* Welcome block */}
+      <div className="dash-welcome mb-4">
+        <div>
+          <div className="dash-welcome-label">{todayStr}</div>
+          <h1 className="dash-welcome-title">Selamat datang, {user?.name || 'Notaris & PPAT'}</h1>
+          <p className="dash-welcome-sub">Sistem Manajemen Kantor Notaris & PPAT 100% offline. Semua data permohonan akta dan identitas klien tersimpan aman di PC lokal.</p>
+        </div>
+        <div className="dash-welcome-actions">
+          <Button variant="primary" icon="plus" onClick={() => navigate('/cases', { state: { createNew: true } })}>Permohonan Akta</Button>
+          <Button variant="secondary" icon="userPlus" onClick={() => navigate('/clients', { state: { createNew: true } })}>Tambah Klien</Button>
         </div>
       </div>
 
-      {/* Stat Cards Grid */}
+      {/* Statistics - compact, uniform card heights */}
       <div className="stat-grid">
-        <StatCard label="Permohonan / Kasus Aktif" value={(totals.activeCases || 0).toLocaleString()} icon="fileText" sub={`${totals.totalCases || 0} total permohonan`} />
-        <StatCard label="Total Klien Terdaftar" value={(totals.totalClients || 0).toLocaleString()} icon="user" sub="klien di database" />
-        <StatCard label={t('stat.totalDocuments')} value={totals.totalDocuments.toLocaleString()} icon="documents" sub={totals.totalDocuments ? t('stat.sub.totalTruth') : t('stat.sub.totalEmpty')} />
-        {isAdmin && (
-          <StatCard label={t('stat.pendingApprovals')} value={totals.pendingApprovals.toLocaleString()} icon="clock" sub={totals.pendingApprovals ? t('stat.sub.pendingTruth') : t('stat.sub.pendingEmpty')} />
+        <StatCard tone="blue" label="Kasus Aktif" value={(totals.activeCases || 0).toLocaleString()} icon="fileText" sub={`${totals.totalCases || 0} total permohonan`} />
+        <StatCard tone="green" label="Total Klien" value={(totals.totalClients || 0).toLocaleString()} icon="user" sub="klien di database" />
+        <StatCard tone="violet" label="Dokumen" value={totals.totalDocuments.toLocaleString()} icon="documents" sub={totals.totalDocuments ? t('stat.sub.totalTruth') : t('stat.sub.totalEmpty')} />
+        {isAdmin ? (
+          <StatCard tone="amber" label="Menunggu Persetujuan" value={totals.pendingApprovals.toLocaleString()} icon="clock" sub={totals.pendingApprovals ? t('stat.sub.pendingTruth') : t('stat.sub.pendingEmpty')} />
+        ) : (
+          <StatCard tone="green" label="Mesin AI" value="Siap" icon="activity" sub="100% offline" />
         )}
       </div>
 
-      {/* Main Two-Column Layout */}
-      <div className="dash-two dash-grid-wide">
-        <div>
-          {/* Quick Operations Grid */}
-          <SectionHead title="⚡ Akses Cepat Operasional" subtitle="Shortcut aksi utama kantor notaris" />
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', marginBottom: '24px' }}>
-            <div 
-              className="card" 
-              onClick={() => navigate('/cases')}
-              style={{ padding: '16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '14px', transition: 'all 0.2s ease' }}
-            >
-              <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: 'linear-gradient(135deg, #2563eb, #4f46e5)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Icon name="plus" size={20} />
-              </div>
-              <div>
-                <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>Permohonan Baru</div>
-                <div style={{ fontSize: '0.78rem', color: 'var(--text-3)' }}>Buat akta AJB, PT, dll.</div>
-              </div>
-            </div>
+      {/* Quick actions - consistent clickable cards */}
+      <div className="quick-op-grid mb-6">
+        <button type="button" className="quick-op" onClick={() => navigate('/cases', { state: { createNew: true } })} aria-label="Buat permohonan akta baru">
+          <span className="qo-icon tone-blue"><Icon name="plus" size={20} /></span>
+          <span>
+            <span className="quick-op-title">Permohonan Baru</span>
+            <span className="quick-op-desc">Buat akta atau kasus baru</span>
+          </span>
+        </button>
+        <button type="button" className="quick-op" onClick={() => navigate('/clients', { state: { createNew: true } })} aria-label="Tambah klien baru">
+          <span className="qo-icon tone-green"><Icon name="userPlus" size={20} /></span>
+          <span>
+            <span className="quick-op-title">Tambah Klien</span>
+            <span className="quick-op-desc">Input data klien &amp; KTP</span>
+          </span>
+        </button>
+        <button type="button" className="quick-op" onClick={openUpload} aria-label="Unggah dokumen baru">
+          <span className="qo-icon tone-violet"><Icon name="upload" size={20} /></span>
+          <span>
+            <span className="quick-op-title">Unggah Dokumen</span>
+            <span className="quick-op-desc">Upload dan kelola berkas</span>
+          </span>
+        </button>
+        {isAdmin ? (
+          <button type="button" className="quick-op" onClick={() => navigate('/employees')} aria-label="Kelola staff kantor">
+            <span className="qo-icon tone-amber"><Icon name="user" size={20} /></span>
+            <span>
+              <span className="quick-op-title">Kelola Staff</span>
+              <span className="quick-op-desc">Atur pengguna dan akses kantor</span>
+            </span>
+          </button>
+        ) : (
+          <button type="button" className="quick-op" onClick={() => navigate('/inbox')} aria-label="Buka kotak masuk">
+            <span className="qo-icon tone-amber"><Icon name="inbox" size={20} /></span>
+            <span>
+              <span className="quick-op-title">Kotak Masuk</span>
+              <span className="quick-op-desc">Lihat pesan dan pemberitahuan</span>
+            </span>
+          </button>
+        )}
+      </div>
 
-            <div 
-              className="card" 
-              onClick={() => navigate('/clients')}
-              style={{ padding: '16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '14px', transition: 'all 0.2s ease' }}
-            >
-              <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: 'linear-gradient(135deg, #10b981, #059669)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Icon name="userPlus" size={20} />
-              </div>
-              <div>
-                <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>Tambah Klien</div>
-                <div style={{ fontSize: '0.78rem', color: 'var(--text-3)' }}>Input KTP & AI OCR</div>
-              </div>
-            </div>
-
-            <div 
-              className="card" 
-              onClick={openUpload}
-              style={{ padding: '16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '14px', transition: 'all 0.2s ease' }}
-            >
-              <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: 'linear-gradient(135deg, #8b5cf6, #ec4899)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Icon name="upload" size={20} />
-              </div>
-              <div>
-                <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>Unggah Dokumen</div>
-                <div style={{ fontSize: '0.78rem', color: 'var(--text-3)' }}>Upload scan sertifikat</div>
-              </div>
-            </div>
-
-            {isAdmin && (
-              <div 
-                className="card" 
-                onClick={() => navigate('/employees')}
-                style={{ padding: '16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '14px', transition: 'all 0.2s ease' }}
-              >
-                <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Icon name="user" size={20} />
-                </div>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>Kelola Staff</div>
-                  <div style={{ fontSize: '0.78rem', color: 'var(--text-3)' }}>Pengaturan karyawan</div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Recent Active Cases */}
-          <SectionHead title="📋 Permohonan Akta Terbaru" subtitle="Daftar permohonan yang sedang diproses" />
-          <div className="card mb-4">
+      {/* Balanced two-column layout */}
+      <div className="dash-grid-wide">
+        {/* Main column */}
+        <div className="dash-main-col">
+          <Panel
+            title="Permohonan Akta Terbaru"
+            subtitle="Daftar permohonan yang sedang diproses"
+            className="mb-4"
+            actions={<Button variant="ghost" size="sm" onClick={() => navigate('/cases')}>Lihat semua →</Button>}
+          >
             {recentCases.length === 0 ? (
               <EmptyState
                 icon="fileText"
                 title="Belum Ada Permohonan Akta"
                 description="Buat permohonan baru untuk memulai alur pengerjaan akta."
-                action={<Button variant="primary" icon="plus" onClick={() => navigate('/cases')}>Buat Permohonan</Button>}
+                action={<Button variant="primary" icon="plus" onClick={() => navigate('/cases', { state: { createNew: true } })}>Buat Permohonan</Button>}
               />
             ) : (
               <>
-                <div style={{ padding: '8px 0' }}>
-                  {recentCases.map((c) => (
-                    <div 
-                      key={c.id} 
-                      className="submission-row"
-                      onClick={() => navigate('/cases')}
-                      style={{ cursor: 'pointer', padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border)' }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: 'var(--primary-soft)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <Icon name="fileText" size={18} />
-                        </div>
-                        <div>
-                          <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text)' }}>
-                            {c.serviceType} — {getClientName(c.clientId)}
-                          </div>
-                          <div className="sub-meta">
-                            No. Ref: {c.caseNumber} {c.aktaNumber ? `• Akta: ${c.aktaNumber}` : ''}
-                          </div>
-                        </div>
-                      </div>
-                      <div>
-                        {getStatusBadge(c.status)}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="card-footer-link" style={{ padding: '12px 20px', borderTop: '1px solid var(--border)', textAlign: 'right' }}>
-                  <Button variant="ghost" size="sm" onClick={() => navigate('/cases')}>Lihat Semua Permohonan ➔</Button>
+                <div className="table-scroll">
+                  <table className="data-table data-table-simple">
+                    <thead>
+                      <tr>
+                        <th>Permohonan</th>
+                        <th>Klien</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {recentCases.map((c) => (
+                        <tr key={c.id} onClick={() => navigate('/cases')} style={{ cursor: 'pointer' }}>
+                          <td>
+                            <div className="sub-docname">{c.serviceType}</div>
+                            <div className="sub-meta">No. Ref: {c.caseNumber}{c.aktaNumber ? ` • Akta: ${c.aktaNumber}` : ''}</div>
+                          </td>
+                          <td>{getClientName(c.clientId)}</td>
+                          <td>{getStatusBadge(c.status)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </>
             )}
-          </div>
+          </Panel>
 
-          {/* Recent Uploaded Documents */}
-          <SectionHead title={t('dash.recentSubmissions')} subtitle={t('dash.recentSub')} />
-          <div className="card">
+          <Panel
+            title={t('dash.recentSubmissions')}
+            subtitle={t('dash.recentSub')}
+            actions={<Button variant="ghost" size="sm" onClick={() => navigate('/documents')}>{t('dash.viewAll')} →</Button>}
+          >
             {recentDocs.length === 0 ? (
               <EmptyState
                 icon="documents"
@@ -219,102 +174,79 @@ export default function Dashboard() {
                 action={<Button variant="secondary" icon="upload" onClick={openUpload}>{t('action.upload')}</Button>}
               />
             ) : (
-              <>
-                {recentDocs.map((d) => (
-                  <div className="submission-row" key={d.id}>
-                    <div className={`doc-icon ${d.type || 'docx'}`}>
-                      <Icon name={d.type === 'docx' ? 'fileText' : 'file'} size={20} />
-                    </div>
-                    <div className="sub-main">
-                      <div className="sub-docname">{d.title}</div>
-                      <div className="sub-meta">{d.author} • {d.dept} • {d.size}</div>
-                    </div>
-                    <Badge status={d.status} />
+              recentDocs.map((d) => (
+                <div className="submission-row" key={d.id}>
+                  <div className={`doc-icon ${d.type || 'docx'}`}>
+                    <Icon name={d.type === 'docx' ? 'fileText' : 'file'} size={20} />
                   </div>
-                ))}
-                <div className="card-footer-link" style={{ padding: '12px 20px', borderTop: '1px solid var(--border)', textAlign: 'right' }}>
-                  <Button variant="ghost" size="sm" onClick={() => navigate('/documents')}>{t('dash.viewAll')} ➔</Button>
+                  <div className="sub-main">
+                    <div className="sub-docname">{d.title}</div>
+                    <div className="sub-meta">{d.author} • {d.dept} • {d.size}</div>
+                  </div>
+                  <Badge status={d.status} />
                 </div>
-              </>
+              ))
             )}
-          </div>
+          </Panel>
         </div>
 
-        {/* Right Column */}
-        <div>
-          {/* Appointment Calendar Widget */}
-          <SectionHead title="📅 Agenda Penandatanganan Akta" subtitle="Jadwal kehadiran klien TTD" />
-          <div className="card mb-4">
+        {/* Secondary column */}
+        <div className="dash-side-col">
+          <Panel
+            title="Agenda Penandatanganan Akta"
+            subtitle="Jadwal kehadiran klien TTD"
+            className="mb-4"
+          >
             {appointments.length === 0 ? (
-              <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-3)', fontSize: '0.88rem' }}>
-                <span style={{ fontSize: '1.5rem', display: 'block', marginBottom: '6px' }}>📅</span>
-                Belum ada jadwal penandatanganan akta minggu ini.
-              </div>
+              <EmptyState icon="clock" title="Belum Ada Jadwal TTD" description="Belum ada jadwal penandatanganan akta minggu ini." />
             ) : (
-              <div style={{ padding: '12px' }}>
-                {appointments.slice(0, 4).map((apt) => (
-                  <div 
-                    key={apt.id} 
-                    style={{ 
-                      padding: '12px 14px', 
-                      marginBottom: '8px', 
-                      borderRadius: 'var(--radius-sm)', 
-                      background: 'var(--surface-2)', 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'space-between',
-                      border: '1px solid var(--border)' 
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--text)' }}>
-                        {apt.serviceType} — {getClientName(apt.clientId)}
-                      </div>
-                      <div style={{ fontSize: '0.78rem', color: 'var(--text-2)', marginTop: '2px' }}>
-                        📅 {apt.appointmentDate} • ⏰ Jam {apt.appointmentTime || '10:00'}
-                      </div>
+              <div className="dash-schedule">
+                {appointments.map((apt) => (
+                  <div className="dash-schedule-item" key={apt.id}>
+                    <div className="dash-schedule-date">
+                      <span className="dash-schedule-dot" aria-hidden="true" />
+                      <span>
+                        <span className="dash-schedule-title">{apt.serviceType}</span>
+                        <span className="dash-schedule-sub">{getClientName(apt.clientId)} • {apt.appointmentDate} • {apt.appointmentTime || '10:00'}</span>
+                      </span>
                     </div>
-                    <div>
-                      <span className="badge badge-info">{apt.caseNumber}</span>
-                    </div>
+                    <span className="badge info">{apt.caseNumber}</span>
                   </div>
                 ))}
               </div>
             )}
-          </div>
+          </Panel>
 
-          {/* Document Categories Distribution */}
-          <SectionHead title={t('dash.category')} subtitle="Rincian jenis berkas di sistem" />
-          <div className="card mb-4">
+          <Panel
+            title={t('dash.category')}
+            subtitle="Rincian jenis berkas di sistem"
+            className="mb-4"
+          >
             {activeDocs.length === 0 ? (
               <EmptyState icon="chart" title={t('dash.empty.category.title')} description={t('dash.empty.category.desc')} />
             ) : (
-              <div className="card-body category-list">{categoryRows(activeDocs)}</div>
+              <div className="category-list">{categoryRows(activeDocs)}</div>
             )}
-          </div>
+          </Panel>
 
-          {/* Local AI Engine Status Card */}
-          <SectionHead title="🤖 Local Notary AI Status" subtitle="Kecerdasan buatan 100% offline" />
-          <div className="card ai-status-card" style={{ padding: '20px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-              <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'var(--primary-gradient)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem' }}>
-                🤖
-              </div>
+          <Panel title="AI Notaris Lokal" subtitle="Kecerdasan buatan 100% offline">
+            <div className="ai-status-head">
+              <div className="qo-icon tone-blue"><Icon name="activity" size={20} /></div>
               <div>
-                <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>Local Notary Smart Engine</div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--green)', fontWeight: 600 }}>🟢 System Ready & Offline Secured</div>
+                <div className="sub-docname">Mesin AI Notaris Lokal</div>
+                <div className="ai-status-ready">Siap & Aman 100% Offline</div>
               </div>
             </div>
-            <p style={{ fontSize: '0.82rem', color: 'var(--text-2)', lineHeight: 1.4, margin: '0 0 14px 0' }}>
+            <p className="ai-status-desc">
               Sistem AI lokal siap mengekstrak data KTP, menyusun draf pasal akta, dan meninjau risiko hukum 24/7 tanpa butuh internet.
             </p>
-            <Button variant="secondary" size="sm" onClick={() => {
+            <Button variant="secondary" size="sm" icon="activity" onClick={() => {
               const copilotBtn = document.querySelector('.copilot-floating-btn');
               if (copilotBtn) copilotBtn.click();
             }}>
-              Buka AI Copilot ➔
+              Buka AI Copilot
             </Button>
-          </div>
+          </Panel>
         </div>
       </div>
 
@@ -323,13 +255,17 @@ export default function Dashboard() {
   );
 }
 
-function SectionHead({ title, subtitle }) {
+function Panel({ title, subtitle, children, actions, className = '' }) {
   return (
-    <div className="section-header" style={{ margin: '24px 0 14px 0' }}>
-      <div>
-        <h2 style={{ fontSize: '17px', fontWeight: 700, letterSpacing: '-0.01em' }}>{title}</h2>
-        {subtitle && <div className="section-sub" style={{ fontSize: '12.5px', color: 'var(--text-3)' }}>{subtitle}</div>}
+    <div className={`card panel ${className}`}>
+      <div className="panel-head">
+        <div>
+          <div className="panel-title">{title}</div>
+          {subtitle && <div className="panel-sub">{subtitle}</div>}
+        </div>
+        {actions && <div className="panel-actions">{actions}</div>}
       </div>
+      <div className="panel-body">{children}</div>
     </div>
   );
 }
@@ -344,14 +280,13 @@ function categoryRows(documents) {
   return entries.map(([name, count]) => {
     const pct = Math.round((count / max) * 100);
     return (
-      <div className="category-row" key={name} style={{ marginBottom: '10px' }}>
-        <span className="category-name" style={{ fontSize: '13px', fontWeight: 500 }}>{name}</span>
-        <div className="category-track" style={{ height: '8px', borderRadius: '4px', background: 'var(--surface-2)' }}>
-          <div className="category-fill" style={{ width: `${pct}%`, height: '100%', borderRadius: '4px', background: 'var(--primary-gradient)' }} />
+      <div className="category-row" key={name}>
+        <span className="category-name">{name}</span>
+        <div className="category-track">
+          <div className="category-fill" style={{ width: `${pct}%`, background: 'var(--primary)' }} />
         </div>
-        <span className="category-value" style={{ fontSize: '13px', fontWeight: 700 }}>{count}</span>
+        <span className="category-value">{count}</span>
       </div>
     );
   });
 }
-

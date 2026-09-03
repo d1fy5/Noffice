@@ -64,7 +64,7 @@ export default function Login() {
             />
           </div>
           <div className="form-group">
-            <label>Password</label>
+            <label>Kata Sandi</label>
             <input 
               type="password" 
               className="form-control" 
@@ -75,7 +75,7 @@ export default function Login() {
             />
           </div>
           <Button variant="primary" className="btn-full" type="submit" disabled={loading}>
-            {loading ? 'Memeriksa...' : 'Login'}
+            {loading ? 'Memeriksa...' : 'Masuk'}
           </Button>
         </form>
 

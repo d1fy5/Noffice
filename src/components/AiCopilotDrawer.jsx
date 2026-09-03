@@ -88,18 +88,18 @@ export default function AiCopilotDrawer() {
           gap: '10px',
           padding: '12px 20px',
           borderRadius: '50px',
-          background: 'linear-gradient(135deg, #2563eb 0%, #4f46e5 100%)',
+          background: 'var(--primary)',
           color: '#fff',
-          border: '1px solid rgba(255, 255, 255, 0.2)',
-          boxShadow: '0 8px 25px rgba(37, 99, 235, 0.4)',
+          border: '1px solid var(--primary)',
+          boxShadow: 'var(--shadow-md)',
           cursor: 'pointer',
-          fontWeight: 700,
+          fontWeight: 600,
           fontSize: '0.9rem',
           letterSpacing: '-0.01em',
-          transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+          transition: 'background 0.15s',
         }}
       >
-        <span style={{ fontSize: '1.25rem' }}>🤖</span>
+        <Icon name="activity" size={16} />
         <span>Noffice Copilot</span>
         {open && <Icon name="x" size={16} />}
       </button>
@@ -130,39 +130,39 @@ export default function AiCopilotDrawer() {
           <div
             style={{
               padding: '16px 18px',
-              background: 'linear-gradient(135deg, #0b1329 0%, #1e293b 100%)',
-              color: '#fff',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              borderBottom: '1px solid rgba(255,255,255,0.08)',
-            }}
-          >
+            background: 'var(--primary)',
+            color: '#fff',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            borderBottom: '1px solid rgba(255,255,255,0.1)',
+          }}
+        >
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <div style={{
                 width: '34px',
                 height: '34px',
                 borderRadius: '10px',
-                background: 'linear-gradient(135deg, #2563eb 0%, #6366f1 100%)',
+                background: 'rgba(255,255,255,0.12)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontSize: '1.1rem',
-                boxShadow: '0 4px 10px rgba(37,99,235,0.4)',
+                border: '1px solid rgba(255,255,255,0.2)',
               }}>
-                🤖
+                <Icon name="activity" size={18} />
               </div>
               <div>
-                <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>Noffice AI Copilot</div>
-                <div style={{ fontSize: '0.72rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '5px', marginTop: '1px' }}>
-                  <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#10b981', display: 'inline-block', boxShadow: '0 0 6px #10b981' }} />
+                <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>Noffice AI Copilot</div>
+                <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.72)', display: 'flex', alignItems: 'center', gap: '5px', marginTop: '1px' }}>
+                  <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#4ade80', display: 'inline-block' }} />
                   {status?.mode || '100% Offline AI Engine'}
                 </div>
               </div>
             </div>
             <button
               onClick={() => setOpen(false)}
-              style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: '#cbd5e1', borderRadius: '8px', padding: '6px', cursor: 'pointer', display: 'flex' }}
+              style={{ background: 'rgba(255,255,255,0.12)', border: 'none', color: '#e2e8f0', borderRadius: '8px', padding: '6px', cursor: 'pointer', display: 'flex' }}
             >
               <Icon name="x" size={16} />
             </button>
@@ -216,12 +216,12 @@ export default function AiCopilotDrawer() {
                   style={{
                     padding: '10px 15px',
                     borderRadius: m.sender === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-                    background: m.sender === 'user' ? 'var(--primary-gradient)' : 'var(--surface)',
+                    background: m.sender === 'user' ? 'var(--primary)' : 'var(--surface)',
                     color: m.sender === 'user' ? '#ffffff' : 'var(--text)',
                     fontSize: '0.85rem',
                     lineHeight: '1.45',
-                    boxShadow: m.sender === 'user' ? '0 4px 12px rgba(37, 99, 235, 0.25)' : 'var(--shadow-sm)',
-                    border: m.sender === 'user' ? 'none' : '1px solid var(--border)',
+                    boxShadow: 'var(--shadow-sm)',
+                    border: m.sender === 'user' ? '1px solid var(--primary)' : '1px solid var(--border)',
                     whiteSpace: 'pre-line',
                   }}
                 >
@@ -242,7 +242,7 @@ export default function AiCopilotDrawer() {
             ))}
             {loading && (
               <div style={{ alignSelf: 'flex-start', fontSize: '0.8rem', color: 'var(--text-2)', fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ fontSize: '1rem' }}>⚡</span> AI Notaris sedang berpikir...
+                <Icon name="activity" size={14} /> AI Notaris sedang berpikir...
               </div>
             )}
             <div ref={messagesEndRef} />

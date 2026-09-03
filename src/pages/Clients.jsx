@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useMemo, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useStore, useSearch, useToast } from '../store/hooks.js';
 import { useTranslation } from '../store/useTranslation.js';
 import { AiAPI } from '../services/api.js';
@@ -43,6 +43,7 @@ const maskPhone = (p) => {
 
 export default function Clients() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { query } = useSearch();
   const { clients, cases, addClient, updateClient, deleteClient } = useStore();
   const { notify } = useToast();
@@ -107,6 +108,16 @@ export default function Clients() {
     setErrors({});
     setModalOpen(true);
   };
+
+  useEffect(() => {
+    if (location.state?.createNew) {
+      setEditing(null);
+      setForm(EMPTY_FORM);
+      setErrors({});
+      setModalOpen(true);
+      window.history.replaceState({}, '');
+    }
+  }, [location.state]);
 
   const openEdit = (client) => {
     setEditing(client);
@@ -212,7 +223,7 @@ export default function Clients() {
               <tbody>
                 {filtered.map((c) => (
                   <tr key={c.id}>
-                    <td>
+                    <td data-label="Klien">
                       <div className="user-cell" onClick={() => setSelectedClient(c)} style={{ cursor: 'pointer' }}>
                         <Avatar name={c.name} />
                         <div>
@@ -221,32 +232,39 @@ export default function Clients() {
                         </div>
                       </div>
                     </td>
-                    <td>
+                    <td data-label="NIK">
                       <code style={{ fontSize: '0.85rem', fontWeight: 600 }}>{c.nik}</code>
                     </td>
-                    <td>
+                    <td data-label="Kontak">
                       <div className="cell-trunc">{maskPhone(c.phone)}</div>
                       <div className="sub-meta">{c.email || '-'}</div>
                     </td>
-                    <td>
+                    <td data-label="Pekerjaan">
                       <span className="cell-trunc">{c.job || '-'}</span>
                     </td>
-                    <td>{c.createdAt || '-'}</td>
-                    <td>
+                    <td className="cell-date" data-label="Tgl Daftar">{c.createdAt || '-'}</td>
+                    <td data-label="Total Kasus">
                       <span className="badge info">{clientCasesCount(c.id)} Kasus</span>
                     </td>
-                    <td style={{ textAlign: 'right' }}>
+                    <td className="cell-actions" data-label="Aksi" style={{ textAlign: 'right' }}>
                       <div className="btn-group-sm" style={{ justifyContent: 'flex-end' }}>
                         <Button
-                          variant="primary"
+                          variant="secondary"
                           size="sm"
+                          icon="plus"
                           onClick={() => navigate('/cases', { state: { createForClient: c.id } })}
                         >
-                          + Buat Akta
+                          Buat Akta
                         </Button>
-                        <Button variant="ghost" size="sm" icon="eye" onClick={() => setSelectedClient(c)} />
-                        <Button variant="ghost" size="sm" icon="edit" onClick={() => openEdit(c)} />
-                        <Button variant="ghost" size="sm" icon="trash" onClick={() => setConfirmId(c.id)} />
+                        <button className="action-btn" onClick={() => setSelectedClient(c)} aria-label="Lihat detail klien" title="Lihat detail">
+                          <Icon name="eye" size={16} />
+                        </button>
+                        <button className="action-btn" onClick={() => openEdit(c)} aria-label="Edit klien" title="Edit">
+                          <Icon name="edit" size={16} />
+                        </button>
+                        <button className="action-btn danger" onClick={() => setConfirmId(c.id)} aria-label="Hapus klien" title="Hapus">
+                          <Icon name="trash" size={16} />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -275,18 +293,19 @@ export default function Clients() {
         }
       >
         {/* AI Extract KTP / Teks Box */}
-        <div 
-          style={{ 
-            background: 'linear-gradient(135deg, rgba(37,99,235,0.06) 0%, rgba(99,102,241,0.08) 100%)', 
-            borderRadius: '12px', 
-            border: '1px solid rgba(37,99,235,0.25)',
+        <div
+          style={{
+            background: 'var(--info-soft)',
+            borderRadius: 'var(--radius-sm)',
+            border: '1px solid var(--info-border)',
             padding: '16px',
             marginBottom: '20px'
           }}
         >
-          <label style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
-            <span>🤖 AI Data Extractor</span>
-            <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-2)' }}>(Paste teks hasil scan KTP di sini untuk auto-fill form)</span>
+          <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--info)', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+            <Icon name="activity" size={15} />
+            <span>AI Data Extractor</span>
+            <span style={{ fontSize: '0.75rem', fontWeight: 400, color: 'var(--text-2)' }}>(Paste teks hasil scan KTP di sini untuk auto-fill form)</span>
           </label>
           <div style={{ display: 'flex', gap: '10px' }}>
             <input
@@ -296,8 +315,8 @@ export default function Clients() {
               onChange={(e) => setRawText(e.target.value)}
               style={{ flex: 1 }}
             />
-            <Button variant="primary" size="sm" onClick={handleAiExtract} disabled={extracting}>
-              {extracting ? 'Mengestrak...' : '⚡ Ekstrak ke Form'}
+            <Button variant="secondary" size="sm" onClick={handleAiExtract} disabled={extracting}>
+              {extracting ? 'Mengestrak...' : 'Ekstrak ke Form'}
             </Button>
           </div>
         </div>

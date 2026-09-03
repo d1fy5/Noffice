@@ -1,9 +1,11 @@
 export const DEPARTMENTS = [
-  'Engineering',
-  'HR & Talent',
-  'Finance',
-  'Legal & Compliance',
-  'Operations',
+  'Administrasi',
+  'Notaris',
+  'PPAT',
+  'Legal',
+  'Keuangan',
+  'Pelayanan Klien',
+  'Operasional',
 ];
 export const RECIPIENT_STATUSES = ['Approved', 'Pending', 'Rejected'];
 export const EMPLOYEE_STATUSES = ['Active', 'Inactive'];

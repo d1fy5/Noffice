@@ -257,25 +257,25 @@ export default function Documents() {
                 <table className="data-table">
                   <thead>
                     <tr>
-                      <th>Name</th>
-                      <th>Author</th>
-                      <th>Department</th>
-                      <th>Size</th>
-                      <th>Date</th>
-                      <th>Status</th>
-                      <th>Actions</th>
+                      <th>{t('doc.col.name')}</th>
+                      <th>{t('doc.col.author')}</th>
+                      <th>{t('doc.col.dept')}</th>
+                      <th>{t('doc.col.size')}</th>
+                      <th>{t('doc.col.date')}</th>
+                      <th>{t('doc.col.status')}</th>
+                      <th>{t('doc.col.actions')}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filtered.map((d) => (
                       <tr key={d.id}>
-                        <td style={{ fontWeight: 500 }}>{d.title}</td>
-                        <td>{d.author}</td>
-                        <td>{d.dept}</td>
-                        <td>{d.size}</td>
-                        <td>{d.date}</td>
-                        <td><Badge status={d.status} /></td>
-                        <td>
+                        <td data-label={t('doc.col.name')} style={{ fontWeight: 500, overflowWrap: 'anywhere' }}>{d.title}</td>
+                        <td data-label={t('doc.col.author')}>{d.author}</td>
+                        <td data-label={t('doc.col.dept')}>{d.dept}</td>
+                        <td data-label={t('doc.col.size')}>{d.size}</td>
+                        <td className="cell-date" data-label={t('doc.col.date')}>{d.date}</td>
+                        <td data-label={t('doc.col.status')}><Badge status={d.status} /></td>
+                        <td className="cell-actions" data-label={t('doc.col.actions')}>
                           <span className="row-actions">
                             {renderActions(d)}
                           </span>
@@ -300,10 +300,10 @@ export default function Documents() {
           )}
           <dl className="doc-detail-list">
             <div><dt>{t('doc.by')}</dt><dd>{selected.author}</dd></div>
-            <div><dt>Department</dt><dd>{selected.dept}</dd></div>
-            <div><dt>Size</dt><dd>{selected.size}</dd></div>
-            <div><dt>Uploaded</dt><dd>{selected.date}</dd></div>
-            <div className="with-badge"><dt>Status</dt><dd><Badge status={selected.status} /></dd></div>
+            <div><dt>{t('doc.col.dept')}</dt><dd>{selected.dept}</dd></div>
+            <div><dt>{t('doc.col.size')}</dt><dd>{selected.size}</dd></div>
+            <div><dt>{t('doc.uploaded')}</dt><dd>{selected.date}</dd></div>
+            <div className="with-badge"><dt>{t('doc.col.status')}</dt><dd><Badge status={selected.status} /></dd></div>
           </dl>
           <div className="form-group">
             <label className="form-label" htmlFor="doc-status">{t('doc.updateStatus')}</label>

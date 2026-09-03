@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import Icon from './Icon.jsx';
 import Avatar from './Avatar.jsx';
@@ -33,6 +34,19 @@ export default function Sidebar({ open, onClose }) {
 
   const filteredMainNav = mainNav.filter(item => !item.adminOnly || isAdmin);
   const filteredSecondaryNav = secondaryNav.filter(item => !item.adminOnly || isAdmin);
+
+  useEffect(() => {
+    if (!open) return;
+    document.body.classList.add('drawer-open');
+    document.documentElement.style.overflow = 'hidden';
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.body.classList.remove('drawer-open');
+      document.documentElement.style.overflow = '';
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open, onClose]);
 
   return (
     <>

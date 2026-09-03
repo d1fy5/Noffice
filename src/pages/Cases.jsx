@@ -31,6 +31,23 @@ export default function Cases() {
   const [receiptModalOpen, setReceiptModalOpen] = useState(false);
 
   useEffect(() => {
+    if (location.state?.createNew) {
+      if (clients.length === 0) {
+        notify('Silakan tambahkan data Klien terlebih dahulu di menu Klien!', 'warning');
+        return;
+      }
+      setForm({
+        clientId: clients[0]?.id || '',
+        serviceType: 'AJB',
+        assignedTo: user?.name || 'Super Admin / Notaris',
+        estimatedAt: '',
+        notes: '',
+      });
+      setCustomChecklist(NOTARY_SERVICES[0].defaultChecklist);
+      setErrors({});
+      setModalOpen(true);
+      return;
+    }
     if (location.state?.createForClient) {
       const targetClientId = location.state.createForClient;
       setForm((prev) => ({ ...prev, clientId: targetClientId }));
@@ -292,23 +309,23 @@ export default function Cases() {
 
                   return (
                     <tr key={c.id}>
-                      <td>
-                        <div style={{ fontWeight: 600, color: 'var(--text)' }}>{c.caseNumber}</div>
+                      <td data-label="No. Kasus & Layanan">
+                        <div className="case-name" style={{ fontWeight: 600, color: 'var(--text)', overflowWrap: 'anywhere' }}>{c.caseNumber}</div>
                         <div className="sub-meta">{c.serviceType} — {c.notes || 'Tanpa catatan'}</div>
                       </td>
-                      <td>
-                        <div style={{ fontWeight: 500 }}>{getClientName(c.clientId)}</div>
+                      <td data-label="Klien">
+                        <div style={{ fontWeight: 500, overflowWrap: 'anywhere' }}>{getClientName(c.clientId)}</div>
                         <div className="sub-meta">Petugas: {c.assignedTo}</div>
                       </td>
-                      <td>
+                      <td data-label="Nomor Akta Resmi">
                         {c.aktaNumber ? (
-                          <strong style={{ color: 'var(--green)', fontFamily: 'monospace' }}>{c.aktaNumber}</strong>
+                          <strong style={{ color: 'var(--green)', fontFamily: 'monospace', overflowWrap: 'anywhere' }}>{c.aktaNumber}</strong>
                         ) : (
-                          <span className="text-muted" style={{ fontSize: '0.85rem' }}>Belum terbit</span>
+                          <span className="text-muted" style={{ fontSize: '0.85rem', overflowWrap: 'anywhere' }}>Belum terbit</span>
                         )}
                       </td>
-                      <td>
-                        <div style={{ width: '120px' }}>
+                      <td className="cell-progress" data-label="Kemajuan Berkas">
+                        <div style={{ width: '120px', minWidth: '120px', maxWidth: '100%' }}>
                           <div style={{ fontSize: '0.75rem', fontWeight: 600, marginBottom: '2px' }}>
                             {checkedCount}/{checklist.length} Dokumen ({pct}%)
                           </div>
@@ -323,9 +340,9 @@ export default function Cases() {
                           </div>
                         </div>
                       </td>
-                      <td>{getStatusBadge(c.status)}</td>
-                      <td>{c.createdAt}</td>
-                      <td style={{ textAlign: 'right' }}>
+                      <td data-label="Status Workflow">{getStatusBadge(c.status)}</td>
+                      <td className="cell-date" data-label="Tgl Masuk">{c.createdAt}</td>
+                      <td className="cell-actions" data-label="Aksi" style={{ textAlign: 'right' }}>
                         <Button variant="secondary" size="sm" icon="eye" onClick={() => setSelectedCase(c)}>
                           Detail & Checklist
                         </Button>
@@ -455,18 +472,17 @@ export default function Cases() {
           {/* Header Banner Kasus */}
           <div 
             style={{ 
-              background: 'linear-gradient(135deg, var(--surface) 0%, var(--surface-2) 100%)', 
+              background: 'var(--surface-2)', 
               padding: '20px', 
-              borderRadius: '14px', 
-              border: '1px solid var(--border-strong)',
-              marginBottom: '20px',
-              boxShadow: 'var(--shadow-sm)'
+              borderRadius: 'var(--radius-sm)', 
+              border: '1px solid var(--border)',
+              marginBottom: '20px'
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: 'var(--text)' }}>{selectedCase.serviceType}</h3>
+                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 600, color: 'var(--text)' }}>{selectedCase.serviceType}</h3>
                   {getStatusBadge(selectedCase.status)}
                 </div>
                 <div style={{ fontSize: '0.88rem', color: 'var(--text-2)', marginTop: '4px' }}>
@@ -481,15 +497,15 @@ export default function Cases() {
 
               {/* Action Buttons Toolbar */}
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-                <Button variant="secondary" size="sm" onClick={() => setReceiptModalOpen(true)}>
-                  🖨️ Cetak Tanda Terima
+                <Button variant="secondary" size="sm" icon="download" onClick={() => setReceiptModalOpen(true)}>
+                  Cetak Tanda Terima
                 </Button>
-                <Button variant="secondary" size="sm" onClick={() => setDraftModalOpen(true)}>
-                  ⚡ AI Draft Pasal
+                <Button variant="secondary" size="sm" icon="activity" onClick={() => setDraftModalOpen(true)}>
+                  AI Draft Pasal
                 </Button>
                 {!selectedCase.aktaNumber && (
-                  <Button variant="primary" size="sm" onClick={() => handleGenerateAkta(selectedCase.id)}>
-                    ⚡ Generate Akta
+                  <Button variant="primary" size="sm" icon="fileText" onClick={() => handleGenerateAkta(selectedCase.id)}>
+                    Generate Akta
                   </Button>
                 )}
               </div>
@@ -499,7 +515,7 @@ export default function Cases() {
             <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: '1px dashed var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: '0.83rem', color: 'var(--text-2)', fontWeight: 600 }}>Nomor Akta Resmi Notaris:</span>
               {selectedCase.aktaNumber ? (
-                <span style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--green)', fontFamily: 'monospace', letterSpacing: '0.5px' }}>
+                <span style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--green)', fontFamily: 'monospace', letterSpacing: '0.5px' }}>
                   {selectedCase.aktaNumber}
                 </span>
               ) : (
@@ -526,7 +542,7 @@ export default function Cases() {
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text)' }}>📌 Status Workflow Kasus:</span>
+              <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text)' }}>Status Workflow Kasus:</span>
               <span>{getStatusBadge(selectedCase.status)}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, maxWidth: '380px' }}>
@@ -552,11 +568,11 @@ export default function Cases() {
               {/* Checklist Berkas */}
               <div style={{ background: 'var(--surface)', padding: '18px', borderRadius: '12px', border: '1px solid var(--border)', marginBottom: '20px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                  <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700 }}>
-                    📋 Checklist Dokumen Persyaratan
+                  <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600 }}>
+                    Checklist Dokumen Persyaratan
                   </h4>
                   {selectedCase.checklist && (
-                    <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--primary)', background: 'rgba(37,99,235,0.1)', padding: '3px 8px', borderRadius: '99px' }}>
+                    <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--primary)', background: 'var(--primary-soft)', padding: '3px 8px', borderRadius: '99px' }}>
                       {selectedCase.checklist.filter(i => i.isChecked).length} / {selectedCase.checklist.length} Terpenuhi
                     </span>
                   )}
@@ -574,12 +590,12 @@ export default function Cases() {
                           alignItems: 'center',
                           gap: '10px',
                           padding: '10px 14px',
-                          background: item.isChecked ? 'rgba(22,163,74,0.06)' : 'var(--surface-2)',
-                          border: item.isChecked ? '1px solid rgba(22,163,74,0.3)' : '1px solid var(--border)',
+                          background: item.isChecked ? 'var(--green-soft)' : 'var(--surface-2)',
+                          border: item.isChecked ? '1px solid var(--green-border)' : '1px solid var(--border)',
                           borderRadius: '8px',
                           cursor: 'pointer',
                           fontSize: '0.85rem',
-                          transition: 'all 0.15s ease'
+                          transition: 'background 0.15s ease, border-color 0.15s ease'
                         }}
                       >
                         <input
@@ -599,18 +615,19 @@ export default function Cases() {
 
               {/* AI Case Audit Widget */}
               {aiAuditResult && (
-                <div style={{ background: 'linear-gradient(135deg, rgba(37,99,235,0.06), rgba(99,102,241,0.06))', padding: '16px', borderRadius: '12px', border: '1px solid rgba(37,99,235,0.25)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700, color: 'var(--primary)', fontSize: '0.88rem', marginBottom: '8px' }}>
-                    🤖 AI Auditor & Analisis Risiko Notaris ({aiAuditResult.status})
+                <div style={{ background: 'var(--info-soft)', padding: '16px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--info-border)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600, color: 'var(--info)', fontSize: '0.88rem', marginBottom: '8px' }}>
+                    <Icon name="activity" size={15} />
+                    <span>AI Auditor & Analisis Risiko Notaris ({aiAuditResult.status})</span>
                   </div>
                   {aiAuditResult.warnings && aiAuditResult.warnings.map((w, idx) => (
                     <div key={idx} style={{ fontSize: '0.8rem', color: 'var(--red)', marginTop: '4px', display: 'flex', gap: '6px' }}>
-                      <span>⚠️</span> <span>{w}</span>
+                      <Icon name="alert" size={14} /> <span>{w}</span>
                     </div>
                   ))}
                   {aiAuditResult.suggestions && aiAuditResult.suggestions.map((s, idx) => (
-                    <div key={idx} style={{ fontSize: '0.8rem', color: 'var(--primary)', marginTop: '4px', display: 'flex', gap: '6px' }}>
-                      <span>💡</span> <span>{s}</span>
+                    <div key={idx} style={{ fontSize: '0.8rem', color: 'var(--info)', marginTop: '4px', display: 'flex', gap: '6px' }}>
+                      <Icon name="check" size={14} /> <span>{s}</span>
                     </div>
                   ))}
                 </div>
@@ -621,8 +638,8 @@ export default function Cases() {
             <div>
               <div style={{ background: 'var(--surface)', padding: '18px', borderRadius: '12px', border: '1px solid var(--border)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '1px solid var(--border)', paddingBottom: '10px' }}>
-                  <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700 }}>
-                    💰 Biaya Honorarium & 📅 Agenda TTD
+                  <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600 }}>
+                    Biaya Honorarium & Agenda TTD
                   </h4>
                   <span className={`badge ${billingForm.paymentStatus === 'paid' ? 'success' : billingForm.paymentStatus === 'partial' ? 'warning' : 'danger'}`}>
                     {billingForm.paymentStatus === 'paid' ? 'LUNAS' : billingForm.paymentStatus === 'partial' ? 'DP (SEBAGIAN)' : 'BELUM LUNAS'}
@@ -682,7 +699,7 @@ export default function Cases() {
                   </div>
 
                   <Button variant="primary" style={{ width: '100%' }} onClick={handleSaveBilling}>
-                    💾 Simpan Rincian Biaya & Jadwal
+                    Simpan Rincian Biaya & Jadwal
                   </Button>
                 </div>
               </div>

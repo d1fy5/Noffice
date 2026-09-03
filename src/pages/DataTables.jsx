@@ -112,18 +112,18 @@ export default function DataTables() {
                 <tbody>
                   {filtered.map((r) => (
                     <tr key={r.subId}>
-                      <td className="cell-id">{r.id}</td>
-                      <td>
+                      <td className="cell-id" data-label={t('table.col.id')}>{r.id}</td>
+                      <td data-label={t('table.col.employee')}>
                         <div className="employee-cell">
                           <Avatar name={r.name} size="sm" />
                           <div className="emp-name">{r.name}</div>
                         </div>
                       </td>
-                      <td>{r.dept}</td>
-                      <td className="cell-doc">{r.doc}</td>
-                      <td className="cell-date">{r.date}</td>
-                      <td><Badge status={r.status} /></td>
-                      <td>
+                      <td data-label={t('table.col.dept')}>{r.dept}</td>
+                      <td className="cell-doc" data-label={t('table.col.doc')}><span className="cell-trunc">{r.doc}</span></td>
+                      <td className="cell-date" data-label={t('table.col.date')}>{r.date}</td>
+                      <td data-label={t('table.col.status')}><Badge status={r.status} /></td>
+                      <td className="cell-actions" data-label={t('table.col.actions')}>
                         <span className="row-actions">
                           <button className="action-btn" onClick={() => setViewing(r)} aria-label={`${t('action.view')} ${r.id}`}><Icon name="eye" size={16} /></button>
                           <button className="action-btn" onClick={() => setConfirmId(r.subId)} aria-label={`${t('action.delete')} ${r.id}`}><Icon name="trash" size={16} /></button>

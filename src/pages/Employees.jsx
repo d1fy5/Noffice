@@ -268,7 +268,7 @@ export default function Employees() {
                 <tbody>
                   {paged.map((e) => (
                     <tr key={e.id} className={selected.includes(e.id) ? 'selected' : ''}>
-                      <td className="col-check">
+                      <td className="col-check" data-label="">
                         <input
                           type="checkbox"
                           aria-label={`${t('emp.bulkToggle')} ${fullName(e)}`}
@@ -276,7 +276,7 @@ export default function Employees() {
                           onChange={() => toggleSelect(e.id)}
                         />
                       </td>
-                      <td>
+                      <td data-label={t('emp.col.employee')}>
                         <div className="employee-cell">
                           <Avatar name={fullName(e)} size="sm" />
                           <div>
@@ -285,12 +285,12 @@ export default function Employees() {
                           </div>
                         </div>
                       </td>
-                      <td>{e.department}</td>
-                      <td>{e.role}</td>
-                      <td className="cell-email">{e.email}</td>
-                      <td><Badge status={e.status.toLowerCase()} /></td>
-                      <td className="cell-date">{e.dateJoined || '—'}</td>
-                      <td>
+                      <td data-label={t('emp.col.dept')}>{e.department}</td>
+                      <td data-label={t('emp.col.role')}>{e.role}</td>
+                      <td className="cell-email" data-label={t('emp.col.email')}><span className="cell-trunc">{e.email}</span></td>
+                      <td data-label={t('emp.col.status')}><Badge status={e.status.toLowerCase()} /></td>
+                      <td className="cell-date" data-label={t('emp.col.joined')}>{e.dateJoined || '—'}</td>
+                      <td className="cell-actions" data-label={t('emp.col.actions')}>
                         <span className="row-actions">
                           <button className="action-btn" onClick={() => openEdit(e)} aria-label={`${t('action.edit')} ${fullName(e)}`}><Icon name="edit" size={16} /></button>
                           <button className="action-btn" onClick={() => setConfirmId(e.id)} aria-label={`${t('action.delete')} ${fullName(e)}`}><Icon name="trash" size={16} /></button>
@@ -325,7 +325,7 @@ export default function Employees() {
                     </button>
                   )
                 )}
-                <button className="page-btn" disabled={currentPage === pageCount} onClick={() => setPage(currentPage + 1)} aria-label="Next page">→</button>
+                <button className="page-btn" disabled={currentPage === pageCount} onClick={() => setPage(currentPage + 1)} aria-label="Halaman berikutnya">→</button>
               </div>
             </div>
           </>

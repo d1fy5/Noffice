@@ -18,15 +18,14 @@ export default function PrintReceiptModal({ open, onClose, caseData, clientData,
     <Modal
       open={open}
       onClose={onClose}
-      title="🖨️ Cetak Surat Tanda Terima Resmi"
+      title="Cetak Surat Tanda Terima Resmi"
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
             Batal
           </Button>
           <Button variant="primary" icon="download" onClick={handlePrint}>
-            🖨️ Cetak / Simpan ke PDF
-          </Button>
+            Cetak / Simpan ke PDF          </Button>
         </>
       }
     >
