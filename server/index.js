@@ -239,15 +239,44 @@ app.delete('/api/documents/trash/empty', async (req, res) => {
   }
 });
 
+// Update Case Status (dengan pembatasan role karyawan vs admin)
+app.patch('/api/cases/:id/status', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, userRole } = req.body;
+    const VALID_STATUSES = ['kurang', 'lengkap', 'draft', 'ttd', 'selesai', 'ahu_bpn', 'salinan_selesai', 'arsip', 'rejected'];
+    if (!VALID_STATUSES.includes(status)) {
+      return res.status(400).json({ success: false, message: 'Status tidak valid' });
+    }
+    // Karyawan hanya boleh mengubah status kelengkapan berkas awal
+    if (userRole === 'employee' && status !== 'kurang' && status !== 'lengkap') {
+      return res.status(403).json({ success: false, message: 'Karyawan hanya berwenang mengubah status kelengkapan berkas' });
+    }
+    await dbRun('UPDATE cases SET status = ? WHERE id = ?', [status, id]);
+    res.json({ success: true, id, status });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Update Case Details (Billing & Appointment)
 app.put('/api/cases/:id/details', async (req, res) => {
   try {
     const { id } = req.params;
-    const { notaryFee, taxFee, pnbpFee, paymentStatus, appointmentDate, appointmentTime, notes } = req.body;
-    await dbRun(
-      'UPDATE cases SET notaryFee = ?, taxFee = ?, pnbpFee = ?, paymentStatus = ?, appointmentDate = ?, appointmentTime = ?, notes = ? WHERE id = ?',
-      [notaryFee || 0, taxFee || 0, pnbpFee || 0, paymentStatus || 'unpaid', appointmentDate || '', appointmentTime || '', notes || '', id]
-    );
+    const { notaryFee, taxFee, pnbpFee, paymentStatus, appointmentDate, appointmentTime, notes, userRole } = req.body;
+    
+    // Karyawan hanya boleh mengubah jadwal appointment dan catatan, tidak boleh mengubah honorarium/pajak/status bayar
+    if (userRole === 'employee') {
+      await dbRun(
+        'UPDATE cases SET appointmentDate = ?, appointmentTime = ?, notes = ? WHERE id = ?',
+        [appointmentDate || '', appointmentTime || '', notes || '', id]
+      );
+    } else {
+      await dbRun(
+        'UPDATE cases SET notaryFee = ?, taxFee = ?, pnbpFee = ?, paymentStatus = ?, appointmentDate = ?, appointmentTime = ?, notes = ? WHERE id = ?',
+        [notaryFee || 0, taxFee || 0, pnbpFee || 0, paymentStatus || 'unpaid', appointmentDate || '', appointmentTime || '', notes || '', id]
+      );
+    }
     res.json({ success: true, id });
   } catch (error) {
     res.status(500).json({ error: error.message });

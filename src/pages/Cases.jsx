@@ -20,7 +20,7 @@ export default function Cases() {
   const { clients, cases, employees, general, addCase, updateCaseStatus, updateCaseDetails, toggleChecklistItem, generateAktaNumber } = useStore();
   const { notify } = useToast();
   const { t } = useTranslation();
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
 
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterService, setFilterService] = useState('all');
@@ -86,10 +86,26 @@ export default function Cases() {
 
   const handleSaveBilling = async () => {
     if (!selectedCase) return;
-    const res = await updateCaseDetails(selectedCase.id, billingForm);
+    const payload = isAdmin
+      ? { ...billingForm, userRole: user?.role }
+      : {
+          ...billingForm,
+          notaryFee: selectedCase.notaryFee || 0,
+          taxFee: selectedCase.taxFee || 0,
+          pnbpFee: selectedCase.pnbpFee || 0,
+          paymentStatus: selectedCase.paymentStatus || 'unpaid',
+          userRole: user?.role,
+        };
+
+    const res = await updateCaseDetails(selectedCase.id, payload);
     if (res) {
-      notify('Rincian Biaya & Jadwal TTD berhasil diperbarui!', 'success');
-      setSelectedCase({ ...selectedCase, ...billingForm });
+      notify(
+        isAdmin
+          ? 'Rincian Biaya & Jadwal TTD berhasil diperbarui!'
+          : 'Jadwal Agenda TTD berhasil diperbarui (Biaya honorarium & status bayar dikunci untuk Notaris)',
+        'success'
+      );
+      setSelectedCase({ ...selectedCase, ...payload });
     }
   };
 
@@ -173,13 +189,22 @@ export default function Cases() {
     }
   };
 
+  // Status yang boleh diubah karyawan (hanya kelengkapan berkas)
+  const EMPLOYEE_ALLOWED_STATUSES = ['kurang', 'lengkap'];
+
   const handleStatusChange = async (caseId, newStatus) => {
-    const res = await updateCaseStatus(caseId, newStatus);
+    if (!isAdmin && !EMPLOYEE_ALLOWED_STATUSES.includes(newStatus)) {
+      notify('Karyawan hanya berwenang mengubah status Kelengkapan Berkas. Perubahan status lainnya harus dilakukan oleh Notaris / Admin.', 'warning');
+      return;
+    }
+    const res = await updateCaseStatus(caseId, newStatus, user?.role);
     if (res) {
-      notify(`Status permohonan diperbarui ke ${newStatus}`, 'info');
+      notify(`Status permohonan diperbarui ke "${newStatus}"`, 'info');
       if (selectedCase && selectedCase.id === caseId) {
         setSelectedCase({ ...selectedCase, status: newStatus });
       }
+    } else {
+      notify('Gagal memperbarui status. Anda tidak memiliki akses untuk melakukan perubahan ini.', 'error');
     }
   };
 
@@ -195,6 +220,10 @@ export default function Cases() {
   };
 
   const handleGenerateAkta = async (caseId) => {
+    if (!isAdmin) {
+      notify('Hanya Notaris Utama / Super Admin yang berwenang menerbitkan Nomor Akta Resmi.', 'warning');
+      return;
+    }
     const aktaNum = await generateAktaNumber(caseId);
     if (aktaNum) {
       notify(`Nomor Akta Resmi Terbentuk: ${aktaNum}`, 'success');
@@ -546,16 +575,32 @@ export default function Cases() {
               <span>{getStatusBadge(selectedCase.status)}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, maxWidth: '380px' }}>
+              {!isAdmin && (
+                <span style={{ fontSize: '0.75rem', color: 'var(--orange, #f59e0b)', fontWeight: 600, background: 'rgba(245,158,11,0.1)', padding: '3px 8px', borderRadius: '6px', border: '1px solid rgba(245,158,11,0.3)' }}>
+                  🔒 Terbatas: Hanya Kelengkapan Berkas
+                </span>
+              )}
               <select
                 value={selectedCase.status}
                 onChange={(e) => handleStatusChange(selectedCase.id, e.target.value)}
                 style={{ fontWeight: 600, fontSize: '0.85rem' }}
               >
-                {CASE_STATUSES.map((st) => (
-                  <option key={st.id} value={st.id}>
-                    {st.label}
-                  </option>
-                ))}
+                {CASE_STATUSES
+                  .filter((st) => isAdmin || EMPLOYEE_ALLOWED_STATUSES.includes(st.id) || st.id === selectedCase.status)
+                  .map((st) => (
+                    <option
+                      key={st.id}
+                      value={st.id}
+                      disabled={!isAdmin && !EMPLOYEE_ALLOWED_STATUSES.includes(st.id)}
+                      style={{
+                        color: (!isAdmin && !EMPLOYEE_ALLOWED_STATUSES.includes(st.id))
+                          ? 'var(--text-3, #9ca3af)'
+                          : 'inherit'
+                      }}
+                    >
+                      {st.label}{!isAdmin && !EMPLOYEE_ALLOWED_STATUSES.includes(st.id) ? ' 🔒' : ''}
+                    </option>
+                  ))}
               </select>
             </div>
           </div>
@@ -646,31 +691,45 @@ export default function Cases() {
                   </span>
                 </div>
 
+                {/* Banner peringatan untuk karyawan */}
+                {!isAdmin && (
+                  <div style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.35)', borderRadius: '8px', padding: '10px 14px', marginBottom: '14px', fontSize: '0.8rem', color: '#92400e', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '1rem' }}>🔒</span>
+                    <span>Honorarium, Pajak, dan Status Pembayaran hanya dapat diubah oleh <strong>Notaris / Admin</strong>. Anda hanya dapat mengatur Jadwal TTD.</span>
+                  </div>
+                )}
+
                 <div className="form-group">
-                  <label className="form-label">Honorarium Notaris (Rp):</label>
+                  <label className="form-label" style={{ opacity: isAdmin ? 1 : 0.5 }}>Honorarium Notaris (Rp): {!isAdmin && <span style={{ color: '#f59e0b', fontWeight: 700 }}>🔒</span>}</label>
                   <input
                     type="number"
                     value={billingForm.notaryFee}
-                    onChange={(e) => setBillingForm({ ...billingForm, notaryFee: Number(e.target.value) })}
+                    onChange={(e) => isAdmin && setBillingForm({ ...billingForm, notaryFee: Number(e.target.value) })}
                     placeholder="0"
+                    disabled={!isAdmin}
+                    style={{ opacity: isAdmin ? 1 : 0.55, cursor: isAdmin ? 'auto' : 'not-allowed', background: isAdmin ? '' : 'var(--surface-2)' }}
                   />
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Pajak Transaksi (BPHTB/PPH) (Rp):</label>
+                  <label className="form-label" style={{ opacity: isAdmin ? 1 : 0.5 }}>Pajak Transaksi (BPHTB/PPH) (Rp): {!isAdmin && <span style={{ color: '#f59e0b', fontWeight: 700 }}>🔒</span>}</label>
                   <input
                     type="number"
                     value={billingForm.taxFee}
-                    onChange={(e) => setBillingForm({ ...billingForm, taxFee: Number(e.target.value) })}
+                    onChange={(e) => isAdmin && setBillingForm({ ...billingForm, taxFee: Number(e.target.value) })}
                     placeholder="0"
+                    disabled={!isAdmin}
+                    style={{ opacity: isAdmin ? 1 : 0.55, cursor: isAdmin ? 'auto' : 'not-allowed', background: isAdmin ? '' : 'var(--surface-2)' }}
                   />
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Status Pembayaran:</label>
+                  <label className="form-label" style={{ opacity: isAdmin ? 1 : 0.5 }}>Status Pembayaran: {!isAdmin && <span style={{ color: '#f59e0b', fontWeight: 700 }}>🔒</span>}</label>
                   <select
                     value={billingForm.paymentStatus}
-                    onChange={(e) => setBillingForm({ ...billingForm, paymentStatus: e.target.value })}
+                    onChange={(e) => isAdmin && setBillingForm({ ...billingForm, paymentStatus: e.target.value })}
+                    disabled={!isAdmin}
+                    style={{ opacity: isAdmin ? 1 : 0.55, cursor: isAdmin ? 'auto' : 'not-allowed', background: isAdmin ? '' : 'var(--surface-2)' }}
                   >
                     <option value="unpaid">Belum Lunas</option>
                     <option value="partial">DP (Sebagian)</option>
@@ -699,7 +758,7 @@ export default function Cases() {
                   </div>
 
                   <Button variant="primary" style={{ width: '100%' }} onClick={handleSaveBilling}>
-                    Simpan Rincian Biaya & Jadwal
+                    {isAdmin ? 'Simpan Rincian Biaya & Jadwal' : '💾 Simpan Jadwal TTD'}
                   </Button>
                 </div>
               </div>

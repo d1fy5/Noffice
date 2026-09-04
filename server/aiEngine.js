@@ -105,7 +105,7 @@ export async function extractDocumentData(rawText) {
   if (phoneMatch) data.phone = phoneMatch[0];
 
   // Name Extractor
-  const nameLineMatch = rawText.match(/(?:Nama|Name|Atas Nama|Pihak I|Pihak II)\s*[:=]\s*([A-Za-z\s',.]+)/i);
+  const nameLineMatch = rawText.match(/(?:Nama|Name|Atas Nama|Pihak I|Pihak II)\s*[:=]\s*([^\r\n]+)/i);
   if (nameLineMatch) {
     data.name = nameLineMatch[1].trim();
   }
@@ -117,7 +117,7 @@ export async function extractDocumentData(rawText) {
   }
 
   // Job Extractor
-  const jobMatch = rawText.match(/(?:Pekerjaan|Job|Jabatan)\s*[:=]\s*([A-Za-z\s]+)/i);
+  const jobMatch = rawText.match(/(?:Pekerjaan|Job|Jabatan)\s*[:=]\s*([^\r\n]+)/i);
   if (jobMatch) data.job = jobMatch[1].trim();
 
   // Date Extractor

@@ -405,11 +405,14 @@ export function StoreProvider({ children }) {
     }
   }, [cases.length]);
 
-  const updateCaseStatus = useCallback(async (id, status) => {
+  const updateCaseStatus = useCallback(async (id, status, userRole) => {
     try {
-      await CaseAPI.updateStatus(id, status);
-      setCases((prev) => prev.map((c) => (c.id === id ? { ...c, status } : c)));
-      return true;
+      const res = await CaseAPI.updateStatus(id, status, userRole);
+      if (res && res.success) {
+        setCases((prev) => prev.map((c) => (c.id === id ? { ...c, status } : c)));
+        return true;
+      }
+      return false;
     } catch (err) {
       console.error('Failed to update case status', err);
       return false;

@@ -123,11 +123,11 @@ export const CaseAPI = {
     });
     return res.json();
   },
-  updateStatus: async (id, status) => {
+  updateStatus: async (id, status, userRole) => {
     const res = await fetch(`${API_URL}/cases/${id}/status`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status })
+      body: JSON.stringify({ status, userRole })
     });
     return res.json();
   },
