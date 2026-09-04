@@ -223,6 +223,10 @@ app.patch('/api/documents/:id/restore', async (req, res) => {
 app.delete('/api/documents/:id/permanent', async (req, res) => {
   try {
     const { id } = req.params;
+    const { userRole } = req.body || {};
+    if (userRole !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Hanya Admin yang berwenang menghapus dokumen secara permanen' });
+    }
     await dbRun('DELETE FROM documents WHERE id = ?', [id]);
     res.json({ success: true, id });
   } catch (error) {
@@ -232,6 +236,10 @@ app.delete('/api/documents/:id/permanent', async (req, res) => {
 
 app.delete('/api/documents/trash/empty', async (req, res) => {
   try {
+    const { userRole } = req.body || {};
+    if (userRole !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Hanya Admin yang berwenang mengosongkan tempat sampah' });
+    }
     await dbRun('DELETE FROM documents WHERE isTrashed = 1');
     res.json({ success: true });
   } catch (error) {
@@ -248,8 +256,21 @@ app.patch('/api/cases/:id/status', async (req, res) => {
     if (!VALID_STATUSES.includes(status)) {
       return res.status(400).json({ success: false, message: 'Status tidak valid' });
     }
-    // Karyawan hanya boleh mengubah status kelengkapan berkas awal
-    if (userRole === 'employee' && status !== 'kurang' && status !== 'lengkap') {
+
+    // Cek status kasus saat ini di database
+    const existingCase = await dbGet('SELECT status FROM cases WHERE id = ?', [id]);
+    if (!existingCase) {
+      return res.status(404).json({ success: false, message: 'Kasus tidak ditemukan' });
+    }
+
+    // Jika kasus sudah selesai / salinan_selesai / arsip, hanya Notaris/Admin yang boleh mengubah status
+    const FINISHED_STATUSES = ['selesai', 'salinan_selesai', 'arsip'];
+    if (FINISHED_STATUSES.includes(existingCase.status) && userRole !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Permohonan yang telah selesai/diarsip hanya dapat diubah statusnya oleh Notaris / Admin' });
+    }
+
+    // Karyawan (non-admin) hanya boleh mengubah status kelengkapan berkas awal
+    if (userRole !== 'admin' && status !== 'kurang' && status !== 'lengkap') {
       return res.status(403).json({ success: false, message: 'Karyawan hanya berwenang mengubah status kelengkapan berkas' });
     }
     await dbRun('UPDATE cases SET status = ? WHERE id = ?', [status, id]);
@@ -265,8 +286,8 @@ app.put('/api/cases/:id/details', async (req, res) => {
     const { id } = req.params;
     const { notaryFee, taxFee, pnbpFee, paymentStatus, appointmentDate, appointmentTime, notes, userRole } = req.body;
     
-    // Karyawan hanya boleh mengubah jadwal appointment dan catatan, tidak boleh mengubah honorarium/pajak/status bayar
-    if (userRole === 'employee') {
+    // Karyawan (non-admin) hanya boleh mengubah jadwal appointment dan catatan, tidak boleh mengubah honorarium/pajak/status bayar
+    if (userRole !== 'admin') {
       await dbRun(
         'UPDATE cases SET appointmentDate = ?, appointmentTime = ?, notes = ? WHERE id = ?',
         [appointmentDate || '', appointmentTime || '', notes || '', id]
@@ -307,6 +328,12 @@ function toRomanMonth(monthZeroIndexed) {
 app.post('/api/cases/:id/generate-akta', async (req, res) => {
   try {
     const { id } = req.params;
+    const { userRole } = req.body || {};
+
+    if (userRole !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Hanya Notaris / Admin yang berwenang menerbitkan Nomor Akta' });
+    }
+
     const now = new Date();
     const currentYear = now.getFullYear();
     const romanMonth = toRomanMonth(now.getMonth());

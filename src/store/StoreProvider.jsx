@@ -176,20 +176,20 @@ export function StoreProvider({ children }) {
   }, []);
 
   // Permanent delete: really removes the document data from DB.
-  const deleteDocumentPermanently = useCallback(async (id) => {
+  const deleteDocumentPermanently = useCallback(async (id, userRole) => {
     setDocuments((d) => d.filter((doc) => doc.id !== id));
     try {
-      await DocumentAPI.deletePermanently(id);
+      await DocumentAPI.deletePermanently(id, userRole);
     } catch (err) {
       console.error('Failed to permanently delete document', err);
     }
   }, []);
 
   // Empty the Trash: only removes documents that are currently in the Trash in DB.
-  const emptyTrash = useCallback(async () => {
+  const emptyTrash = useCallback(async (userRole) => {
     setDocuments((d) => d.filter((doc) => !doc.isTrashed));
     try {
-      await DocumentAPI.emptyTrash();
+      await DocumentAPI.emptyTrash(userRole);
     } catch (err) {
       console.error('Failed to empty trash', err);
     }
@@ -449,10 +449,10 @@ export function StoreProvider({ children }) {
     }
   }, []);
 
-  const generateAktaNumber = useCallback(async (caseId) => {
+  const generateAktaNumber = useCallback(async (caseId, userRole) => {
     try {
-      const res = await CaseAPI.generateAktaNumber(caseId);
-      if (res.success && res.aktaNumber) {
+      const res = await CaseAPI.generateAktaNumber(caseId, userRole);
+      if (res && res.success && res.aktaNumber) {
         setCases((prev) =>
           prev.map((c) => (c.id === caseId ? { ...c, aktaNumber: res.aktaNumber, status: 'draft' } : c))
         );

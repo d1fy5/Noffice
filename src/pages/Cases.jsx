@@ -191,8 +191,14 @@ export default function Cases() {
 
   // Status yang boleh diubah karyawan (hanya kelengkapan berkas)
   const EMPLOYEE_ALLOWED_STATUSES = ['kurang', 'lengkap'];
+  const FINISHED_STATUSES = ['selesai', 'salinan_selesai', 'arsip'];
 
   const handleStatusChange = async (caseId, newStatus) => {
+    const targetCase = cases.find((c) => c.id === caseId) || selectedCase;
+    if (!isAdmin && targetCase && FINISHED_STATUSES.includes(targetCase.status)) {
+      notify('Permohonan ini telah selesai / diarsip. Hanya Notaris / Admin yang dapat mengubah status kembali.', 'warning');
+      return;
+    }
     if (!isAdmin && !EMPLOYEE_ALLOWED_STATUSES.includes(newStatus)) {
       notify('Karyawan hanya berwenang mengubah status Kelengkapan Berkas. Perubahan status lainnya harus dilakukan oleh Notaris / Admin.', 'warning');
       return;
@@ -224,12 +230,14 @@ export default function Cases() {
       notify('Hanya Notaris Utama / Super Admin yang berwenang menerbitkan Nomor Akta Resmi.', 'warning');
       return;
     }
-    const aktaNum = await generateAktaNumber(caseId);
+    const aktaNum = await generateAktaNumber(caseId, user?.role);
     if (aktaNum) {
       notify(`Nomor Akta Resmi Terbentuk: ${aktaNum}`, 'success');
       if (selectedCase && selectedCase.id === caseId) {
         setSelectedCase({ ...selectedCase, aktaNumber: aktaNum, status: 'draft' });
       }
+    } else {
+      notify('Gagal menerbitkan Nomor Akta. Membutuhkan wewenang Notaris / Admin.', 'error');
     }
   };
 
@@ -577,30 +585,30 @@ export default function Cases() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, maxWidth: '380px' }}>
               {!isAdmin && (
                 <span style={{ fontSize: '0.75rem', color: 'var(--orange, #f59e0b)', fontWeight: 600, background: 'rgba(245,158,11,0.1)', padding: '3px 8px', borderRadius: '6px', border: '1px solid rgba(245,158,11,0.3)' }}>
-                  🔒 Terbatas: Hanya Kelengkapan Berkas
+                  {FINISHED_STATUSES.includes(selectedCase.status) ? '🔒 Dikunci (Selesai/Arsip)' : '🔒 Terbatas: Hanya Kelengkapan Berkas'}
                 </span>
               )}
               <select
                 value={selectedCase.status}
                 onChange={(e) => handleStatusChange(selectedCase.id, e.target.value)}
-                style={{ fontWeight: 600, fontSize: '0.85rem' }}
+                disabled={!isAdmin && FINISHED_STATUSES.includes(selectedCase.status)}
+                style={{ fontWeight: 600, fontSize: '0.85rem', opacity: (!isAdmin && FINISHED_STATUSES.includes(selectedCase.status)) ? 0.6 : 1 }}
               >
                 {CASE_STATUSES
                   .filter((st) => isAdmin || EMPLOYEE_ALLOWED_STATUSES.includes(st.id) || st.id === selectedCase.status)
-                  .map((st) => (
-                    <option
-                      key={st.id}
-                      value={st.id}
-                      disabled={!isAdmin && !EMPLOYEE_ALLOWED_STATUSES.includes(st.id)}
-                      style={{
-                        color: (!isAdmin && !EMPLOYEE_ALLOWED_STATUSES.includes(st.id))
-                          ? 'var(--text-3, #9ca3af)'
-                          : 'inherit'
-                      }}
-                    >
-                      {st.label}{!isAdmin && !EMPLOYEE_ALLOWED_STATUSES.includes(st.id) ? ' 🔒' : ''}
-                    </option>
-                  ))}
+                  .map((st) => {
+                    const isOptionDisabled = !isAdmin && (!EMPLOYEE_ALLOWED_STATUSES.includes(st.id) || FINISHED_STATUSES.includes(selectedCase.status));
+                    return (
+                      <option
+                        key={st.id}
+                        value={st.id}
+                        disabled={isOptionDisabled}
+                        style={{ color: isOptionDisabled ? 'var(--text-3, #9ca3af)' : 'inherit' }}
+                      >
+                        {st.label}{isOptionDisabled ? ' 🔒' : ''}
+                      </option>
+                    );
+                  })}
               </select>
             </div>
           </div>

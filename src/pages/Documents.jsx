@@ -95,13 +95,13 @@ export default function Documents() {
 
   const doPermanentDelete = () => {
     if (!permanentId) return;
-    deleteDocumentPermanently(permanentId);
+    deleteDocumentPermanently(permanentId, user?.role);
     setPermanentId(null);
     notify(t('doc.trash.permanentMsg'));
   };
 
   const doEmptyTrash = () => {
-    emptyTrash();
+    emptyTrash(user?.role);
     setEmptyConfirm(false);
     notify(t('doc.trash.emptyMsg'));
   };
@@ -306,12 +306,18 @@ export default function Documents() {
             <div className="with-badge"><dt>{t('doc.col.status')}</dt><dd><Badge status={selected.status} /></dd></div>
           </dl>
           <div className="form-group">
-            <label className="form-label" htmlFor="doc-status">{t('doc.updateStatus')}</label>
+            <label className="form-label" htmlFor="doc-status">{t('doc.updateStatus')} {!isAdmin && <span style={{ color: '#f59e0b', fontWeight: 700 }}>🔒</span>}</label>
             <select
               className="form-select"
               id="doc-status"
               value={selected.status}
+              disabled={!isAdmin}
+              style={{ opacity: isAdmin ? 1 : 0.6, cursor: isAdmin ? 'auto' : 'not-allowed' }}
               onChange={(e) => {
+                if (!isAdmin) {
+                  notify('Hanya Notaris / Admin yang berwenang mengubah status persetujuan dokumen.', 'warning');
+                  return;
+                }
                 updateDocument(selected.id, { status: e.target.value });
                 notify(t('doc.updateStatus'));
                 setSelected((s) => ({ ...s, status: e.target.value }));

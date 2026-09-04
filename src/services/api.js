@@ -71,12 +71,20 @@ export const DocumentAPI = {
     });
     return res.json();
   },
-  deletePermanently: async (id) => {
-    const res = await fetch(`${API_URL}/documents/${id}/permanent`, { method: 'DELETE' });
+  deletePermanently: async (id, userRole) => {
+    const res = await fetch(`${API_URL}/documents/${id}/permanent`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userRole })
+    });
     return res.json();
   },
-  emptyTrash: async () => {
-    const res = await fetch(`${API_URL}/documents/trash/empty`, { method: 'DELETE' });
+  emptyTrash: async (userRole) => {
+    const res = await fetch(`${API_URL}/documents/trash/empty`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userRole })
+    });
     return res.json();
   }
 };
@@ -147,10 +155,11 @@ export const CaseAPI = {
     });
     return res.json();
   },
-  generateAktaNumber: async (id) => {
+  generateAktaNumber: async (id, userRole) => {
     const res = await fetch(`${API_URL}/cases/${id}/generate-akta`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userRole })
     });
     return res.json();
   }
