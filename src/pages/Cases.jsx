@@ -329,13 +329,13 @@ export default function Cases() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>No. Kasus & Layanan</th>
-                  <th>Klien</th>
-                  <th>Nomor Akta Resmi</th>
-                  <th>Kemajuan Berkas</th>
-                  <th>Status Workflow</th>
-                  <th>Tgl Masuk</th>
-                  <th style={{ textAlign: 'right' }}>Aksi</th>
+              <th>No. Kasus & Layanan</th>
+                   <th>Klien</th>
+                   <th>Nomor Akta Resmi</th>
+                   <th>Kemajuan Berkas</th>
+                   <th>Status Workflow</th>
+                   <th>Tgl Masuk</th>
+                   <th>Aksi</th>
                 </tr>
               </thead>
               <tbody>
@@ -347,22 +347,22 @@ export default function Cases() {
                   return (
                     <tr key={c.id}>
                       <td data-label="No. Kasus & Layanan">
-                        <div className="case-name" style={{ fontWeight: 600, color: 'var(--text)', overflowWrap: 'anywhere' }}>{c.caseNumber}</div>
+                        <div className="case-name" style={{ fontWeight: 600, color: 'var(--text)' }}>{c.caseNumber}</div>
                         <div className="sub-meta">{c.serviceType} — {c.notes || 'Tanpa catatan'}</div>
                       </td>
                       <td data-label="Klien">
-                        <div style={{ fontWeight: 500, overflowWrap: 'anywhere' }}>{getClientName(c.clientId)}</div>
+                        <div style={{ fontWeight: 500 }}>{getClientName(c.clientId)}</div>
                         <div className="sub-meta">Petugas: {c.assignedTo}</div>
                       </td>
                       <td data-label="Nomor Akta Resmi">
                         {c.aktaNumber ? (
-                          <strong style={{ color: 'var(--green)', fontFamily: 'monospace', overflowWrap: 'anywhere' }}>{c.aktaNumber}</strong>
+                          <strong style={{ color: 'var(--green)', fontFamily: 'monospace' }}>{c.aktaNumber}</strong>
                         ) : (
-                          <span className="text-muted" style={{ fontSize: '0.85rem', overflowWrap: 'anywhere' }}>Belum terbit</span>
+                          <span className="text-muted" style={{ fontSize: '0.85rem' }}>Belum terbit</span>
                         )}
                       </td>
                       <td className="cell-progress" data-label="Kemajuan Berkas">
-                        <div style={{ width: '120px', minWidth: '120px', maxWidth: '100%' }}>
+                        <div style={{ minWidth: 0 }}>
                           <div style={{ fontSize: '0.75rem', fontWeight: 600, marginBottom: '2px' }}>
                             {checkedCount}/{checklist.length} Dokumen ({pct}%)
                           </div>

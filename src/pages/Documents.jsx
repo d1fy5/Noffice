@@ -269,7 +269,7 @@ export default function Documents() {
                   <tbody>
                     {filtered.map((d) => (
                       <tr key={d.id}>
-                        <td data-label={t('doc.col.name')} style={{ fontWeight: 500, overflowWrap: 'anywhere' }}>{d.title}</td>
+                        <td data-label={t('doc.col.name')} style={{ fontWeight: 500 }}>{d.title}</td>
                         <td data-label={t('doc.col.author')}>{d.author}</td>
                         <td data-label={t('doc.col.dept')}>{d.dept}</td>
                         <td data-label={t('doc.col.size')}>{d.size}</td>
