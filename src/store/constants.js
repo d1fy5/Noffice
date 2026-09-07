@@ -30,19 +30,6 @@ export const UPLOAD_CATEGORIES = DOC_CATEGORIES.map((c) => c.id);
 // Notary Service Types & Default Document Checklists
 export const NOTARY_SERVICES = [
   {
-    id: 'AJB',
-    name: 'Akta Jual Beli (AJB)',
-    defaultChecklist: [
-      'KTP Penjual & Pembeli (beserta Suami/Istri)',
-      'Kartu Keluarga (KK) Penjual & Pembeli',
-      'Surat Nikah / Akta Cerai',
-      'Sertifikat Asli Tanah (SHM/SHGB)',
-      'PBB 5 Tahun Terakhir & STTS Baru',
-      'Bukti Setor BPHTB & PPH',
-      'Surat Persetujuan Suami/Istri',
-    ]
-  },
-  {
     id: 'AKT-PT',
     name: 'Pendirian PT / CV / Yayasan',
     defaultChecklist: [
@@ -51,17 +38,6 @@ export const NOTARY_SERVICES = [
       'Persetujuan Nama Perusahaan dari Kemenkumham',
       'Surat Keterangan Domisili Usaha',
       'Rincian Modal & Komposisi Saham',
-    ]
-  },
-  {
-    id: 'HIBAH',
-    name: 'Akta Hibah',
-    defaultChecklist: [
-      'KTP Pemberi & Penerima Hibah',
-      'Kartu Keluarga (KK) Kedua Pihak',
-      'Sertifikat Asli Tanah/Bangunan',
-      'Surat Persetujuan Ahli Waris Kasus Hibah',
-      'PBB 5 Tahun Terakhir',
     ]
   },
   {
@@ -93,6 +69,42 @@ export const NOTARY_SERVICES = [
     ]
   },
   {
+    id: 'LAINNYA',
+    name: 'Layanan Notaris Lainnya',
+    defaultChecklist: [
+      'KTP Pemohon',
+      'Kartu Keluarga (KK)',
+      'Dokumen Pendukung Utama',
+    ]
+  }
+];
+
+export const PPAT_SERVICES = [
+  {
+    id: 'AJB',
+    name: 'Akta Jual Beli (AJB)',
+    defaultChecklist: [
+      'KTP Penjual & Pembeli (beserta Suami/Istri)',
+      'Kartu Keluarga (KK) Penjual & Pembeli',
+      'Surat Nikah / Akta Cerai',
+      'Sertifikat Asli Tanah (SHM/SHGB)',
+      'PBB 5 Tahun Terakhir & STTS Baru',
+      'Bukti Setor BPHTB & PPH',
+      'Surat Persetujuan Suami/Istri',
+    ]
+  },
+  {
+    id: 'HIBAH',
+    name: 'Akta Hibah',
+    defaultChecklist: [
+      'KTP Pemberi & Penerima Hibah',
+      'Kartu Keluarga (KK) Kedua Pihak',
+      'Sertifikat Asli Tanah/Bangunan',
+      'Surat Persetujuan Ahli Waris Kasus Hibah',
+      'PBB 5 Tahun Terakhir',
+    ]
+  },
+  {
     id: 'ROYA',
     name: 'Roya / Pelunasan Hak Tanggungan',
     defaultChecklist: [
@@ -103,12 +115,32 @@ export const NOTARY_SERVICES = [
     ]
   },
   {
-    id: 'LAINNYA',
-    name: 'Layanan Notaris Lainnya',
+    id: 'APHT',
+    name: 'Akta Pemberian Hak Tanggungan (APHT)',
     defaultChecklist: [
-      'KTP Pemohon',
-      'Kartu Keluarga (KK)',
-      'Dokumen Pendukung Utama',
+      'KTP Pemberi & Penerima Hak Tanggungan',
+      'Sertifikat Asli Tanah/Bangunan',
+      'Perjanjian Kredit dari Bank',
+      'PBB Terakhir',
+    ]
+  },
+  {
+    id: 'SKMHT',
+    name: 'Surat Kuasa Membebankan Hak Tanggungan (SKMHT)',
+    defaultChecklist: [
+      'KTP Pemberi & Penerima Kuasa',
+      'Sertifikat Asli Tanah/Bangunan',
+      'Perjanjian Kredit dari Bank',
+    ]
+  },
+  {
+    id: 'APHB',
+    name: 'Akta Pembagian Hak Bersama (APHB)',
+    defaultChecklist: [
+      'KTP Para Pihak',
+      'Kartu Keluarga',
+      'Sertifikat Asli',
+      'PBB Terakhir',
     ]
   }
 ];

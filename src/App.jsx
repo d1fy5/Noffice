@@ -7,6 +7,7 @@ import Layout from './components/Layout.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import Clients from './pages/Clients.jsx';
 import Cases from './pages/Cases.jsx';
+import PpatCases from './pages/PpatCases.jsx';
 import Documents from './pages/Documents.jsx';
 import Inbox from './pages/Inbox.jsx';
 import DataTables from './pages/DataTables.jsx';
@@ -53,6 +54,7 @@ export default function App() {
                           <Route path="/dashboard" element={<Dashboard />} />
                           <Route path="/clients" element={<Clients />} />
                           <Route path="/cases" element={<Cases />} />
+                          <Route path="/ppat-cases" element={<PpatCases />} />
                           <Route path="/documents" element={<Documents />} />
                           <Route path="/inbox" element={<Inbox />} />
                           <Route path="/notifications" element={<Notifications />} />

@@ -10,6 +10,7 @@ const mainNav = [
   { to: '/dashboard', icon: 'dashboard', labelKey: 'dashboard' },
   { to: '/clients', icon: 'user', labelKey: 'clients' },
   { to: '/cases', icon: 'fileText', labelKey: 'cases' },
+  { to: '/ppat-cases', icon: 'documents', labelKey: 'ppatCases' },
   { to: '/documents', icon: 'documents', labelKey: 'documents' },
   { to: '/inbox', icon: 'inbox', labelKey: 'inbox' },
   { to: '/data-tables', icon: 'table', labelKey: 'data-tables', adminOnly: true },

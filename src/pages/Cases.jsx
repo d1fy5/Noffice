@@ -38,7 +38,7 @@ export default function Cases() {
       }
       setForm({
         clientId: clients[0]?.id || '',
-        serviceType: 'AJB',
+        serviceType: 'AKT-PT',
         assignedTo: user?.name || 'Super Admin / Notaris',
         estimatedAt: '',
         notes: '',
@@ -112,7 +112,7 @@ export default function Cases() {
   // New Case Form state
   const [form, setForm] = useState({
     clientId: '',
-    serviceType: 'AJB',
+    serviceType: 'AKT-PT',
     assignedTo: user?.name || 'Super Admin / Notaris',
     estimatedAt: '',
     notes: '',
@@ -128,8 +128,10 @@ export default function Cases() {
     return NOTARY_SERVICES.find((s) => s.id === form.serviceType) || NOTARY_SERVICES[0];
   }, [form.serviceType]);
 
+  const myCases = useMemo(() => cases.filter(c => NOTARY_SERVICES.some(s => s.id === c.serviceType)), [cases]);
+
   const filteredCases = useMemo(() => {
-    let rows = cases;
+    let rows = myCases;
     if (filterStatus !== 'all') rows = rows.filter((c) => c.status === filterStatus);
     if (filterService !== 'all') rows = rows.filter((c) => c.serviceType === filterService);
     if (q) {
@@ -151,7 +153,7 @@ export default function Cases() {
     }
     setForm({
       clientId: clients[0]?.id || '',
-      serviceType: 'AJB',
+      serviceType: 'AKT-PT',
       assignedTo: user?.name || 'Super Admin / Notaris',
       estimatedAt: '',
       notes: '',
@@ -266,20 +268,20 @@ export default function Cases() {
       <div className="stat-grid mb-6">
         <div className="stat-card">
           <div className="stat-label">Total Permohonan</div>
-          <div className="stat-value">{cases.length}</div>
+          <div className="stat-value">{myCases.length}</div>
           <div className="stat-sub">seluruh kasus di sistem</div>
         </div>
         <div className="stat-card">
           <div className="stat-label">Kasus Sedang Diproses</div>
           <div className="stat-value">
-            {cases.filter((c) => c.status !== 'selesai' && c.status !== 'arsip' && c.status !== 'rejected').length}
+            {myCases.filter((c) => c.status !== 'selesai' && c.status !== 'arsip' && c.status !== 'rejected').length}
           </div>
           <div className="stat-sub">aktif berjalan</div>
         </div>
         <div className="stat-card">
           <div className="stat-label">Akta Resmi Diterbitkan</div>
           <div className="stat-value">
-            {cases.filter((c) => c.aktaNumber).length}
+            {myCases.filter((c) => c.aktaNumber).length}
           </div>
           <div className="stat-sub">memiliki nomor akta</div>
         </div>
@@ -780,7 +782,7 @@ export default function Cases() {
       <AiDraftGeneratorModal
         open={draftModalOpen}
         onClose={() => setDraftModalOpen(false)}
-        initialService={selectedCase ? selectedCase.serviceType : 'AJB'}
+        initialService={selectedCase ? selectedCase.serviceType : 'AKT-PT'}
       />
 
       {/* Modal Cetak Tanda Terima Berkas Klien */}
