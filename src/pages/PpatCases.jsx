@@ -269,24 +269,30 @@ export default function PpatCases() {
       />
 
       <div className="stat-grid mb-6">
-        <div className="stat-card">
-          <div className="stat-label">Total Permohonan</div>
-          <div className="stat-value">{myCases.length}</div>
-          <div className="stat-sub">seluruh kasus di sistem</div>
+        <div className="stat-card stat-card-h">
+          <div className="stat-value stat-card-h-value">{myCases.length}</div>
+          <div className="stat-card-h-text">
+            <div className="stat-label">Total Permohonan</div>
+            <div className="stat-sub">seluruh kasus di sistem</div>
+          </div>
         </div>
-        <div className="stat-card">
-          <div className="stat-label">Kasus Sedang Diproses</div>
-          <div className="stat-value">
+        <div className="stat-card stat-card-h">
+          <div className="stat-value stat-card-h-value">
             {myCases.filter((c) => c.status !== 'selesai' && c.status !== 'arsip' && c.status !== 'rejected').length}
           </div>
-          <div className="stat-sub">aktif berjalan</div>
+          <div className="stat-card-h-text">
+            <div className="stat-label">Kasus Sedang Diproses</div>
+            <div className="stat-sub">aktif berjalan</div>
+          </div>
         </div>
-        <div className="stat-card">
-          <div className="stat-label">Akta Resmi Diterbitkan</div>
-          <div className="stat-value">
+        <div className="stat-card stat-card-h">
+          <div className="stat-value stat-card-h-value">
             {myCases.filter((c) => c.aktaNumber).length}
           </div>
-          <div className="stat-sub">memiliki nomor akta</div>
+          <div className="stat-card-h-text">
+            <div className="stat-label">Akta Resmi Diterbitkan</div>
+            <div className="stat-sub">memiliki nomor akta</div>
+          </div>
         </div>
       </div>
 
