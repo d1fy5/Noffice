@@ -1,4 +1,5 @@
 import http from 'http';
+import { dbQuery } from './db.js';
 
 // Local Ollama API configuration (default port 11434)
 const OLLAMA_URL = 'http://localhost:11434/api/generate';
@@ -228,6 +229,67 @@ export async function generateCopilotResponse(userMessage, contextData = {}) {
   if (!userMessage || !userMessage.trim()) return 'Silakan ketik pertanyaan Anda.';
 
   const msgLower = userMessage.toLowerCase();
+
+  // Intercept Search Intents (Files, Clients, Cases)
+  // Intercept Search Intents (Files, Clients, Cases)
+  const isAskingHowTo = msgLower.match(/\b(syarat|persyaratan|cara|buat|bikin)\b/i);
+
+  if (msgLower.match(/\b(file|dokumen|berkas|arsip)\b/i) && !isAskingHowTo) {
+    let query = userMessage.replace(/\b(mencari|nyari|cariin|cariiin|carikan|cari|file|dokumen|berkas|arsip|tentang|terkait|yang|sesuai|tolong|ada|dimana|mana|apa|bro|coy)\b/gi, '').trim();
+    query = query.replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim();
+    
+    let docs = [];
+    if (query) {
+      docs = await dbQuery(`SELECT title, category, author FROM documents WHERE title LIKE ? OR description LIKE ? LIMIT 5`, [`%${query}%`, `%${query}%`]);
+    } else {
+      docs = await dbQuery(`SELECT title, category, author FROM documents ORDER BY dateTs DESC LIMIT 5`);
+    }
+
+    if (docs && docs.length > 0) {
+      const docList = docs.map((d, i) => `${i+1}. **${d.title}** (${d.category}) - Oleh: ${d.author}`).join('\n');
+      return `📁 **Hasil Pencarian Dokumen untuk "${query || 'Terbaru'}":**\n${docList}\n\nSilakan cek menu "Dokumen" untuk detail lebih lanjut.`;
+    } else {
+      return `Maaf, saya tidak menemukan dokumen yang relevan dengan kata kunci "${query}".`;
+    }
+  }
+
+  if (msgLower.match(/\b(kasus|permohonan|akta|status)\b/i) && !isAskingHowTo) {
+     let query = userMessage.replace(/\b(mencari|nyari|cariin|cariiin|carikan|cari|status|kasus|permohonan|akta|nomor|nomornya|terkait|tentang|yang|sesuai|tolong|ada|dimana|mana|apa|bro|coy)\b/gi, '').trim();
+     query = query.replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim();
+
+     let cases = [];
+     if (query) {
+       cases = await dbQuery(`SELECT caseNumber, serviceType, status FROM cases WHERE caseNumber LIKE ? OR serviceType LIKE ? LIMIT 5`, [`%${query}%`, `%${query}%`]);
+     } else {
+       cases = await dbQuery(`SELECT caseNumber, serviceType, status FROM cases ORDER BY createdAt DESC LIMIT 5`);
+     }
+
+     if (cases && cases.length > 0) {
+       const caseList = cases.map((c, i) => `${i+1}. **${c.caseNumber}** (${c.serviceType}) - Status: ${c.status.toUpperCase()}`).join('\n');
+       return `📂 **Hasil Pencarian Permohonan untuk "${query || 'Terbaru'}":**\n${caseList}`;
+     } else {
+       return `Maaf, saya tidak menemukan permohonan yang relevan dengan kata kunci "${query}".`;
+     }
+  }
+
+  if (msgLower.match(/\b(klien|client|pemohon|atas nama|namanya|nama|orang|nomor)\b/i) || msgLower.match(/\bada\b/i)) {
+    let query = userMessage.replace(/\b(mencari|nyari|cariin|cariiin|carikan|cari|data|klien|client|pelanggan|pemohon|atas|namanya|nama|orang|nomornya|nomor|hp|telepon|tentang|terkait|yang|sesuai|tolong|ada|dimana|mana|apa|si|bro|coy)\b/gi, '').trim();
+    query = query.replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim();
+
+    // Jika query kosong setelah dihapus stop words, jangan jalankan pencarian (misal cuma ngomong "ada apa")
+    if (query) {
+      let clients = await dbQuery(`SELECT name, nik, phone FROM clients WHERE name LIKE ? OR nik LIKE ? LIMIT 5`, [`%${query}%`, `%${query}%`]);
+      if (clients && clients.length > 0) {
+        const clientList = clients.map((c, i) => `${i+1}. **${c.name}** (NIK: ${c.nik}) - HP: ${c.phone}`).join('\n');
+        return `👤 **Hasil Pencarian Klien untuk "${query}":**\n${clientList}`;
+      } else {
+        // Jangan tampilkan error jika match berasal dari sekadar kata "ada", biarkan fallback ke ollama/default
+        if (msgLower.match(/\b(klien|client|pemohon|atas nama|namanya|nama|orang)\b/i)) {
+          return `Maaf, saya tidak menemukan data klien yang relevan dengan kata kunci "${query}".`;
+        }
+      }
+    }
+  }
 
   // Try Ollama first
   const prompt = `Anda adalah Noffice Copilot, asisten AI lokal kantor notaris Indonesia. Jawab singkat dan profesional pertanyaan berikut:\n${userMessage}`;

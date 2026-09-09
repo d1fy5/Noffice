@@ -5,7 +5,7 @@ import { useTranslation } from '../store/useTranslation.js';
 import { useAuth } from '../store/AuthContext.jsx';
 import { NOTARY_SERVICES, CASE_STATUSES } from '../store/constants.js';
 import { AiAPI } from '../services/api.js';
-import AiDraftGeneratorModal from '../components/AiDraftGeneratorModal.jsx';
+
 import PrintReceiptModal from '../components/PrintReceiptModal.jsx';
 import Button from '../components/Button.jsx';
 import Icon from '../components/Icon.jsx';
@@ -27,7 +27,7 @@ export default function Cases() {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedCase, setSelectedCase] = useState(null);
   const [aiAuditResult, setAiAuditResult] = useState(null);
-  const [draftModalOpen, setDraftModalOpen] = useState(false);
+
   const [receiptModalOpen, setReceiptModalOpen] = useState(false);
 
   useEffect(() => {
@@ -539,9 +539,6 @@ export default function Cases() {
                 <Button variant="secondary" size="sm" icon="download" onClick={() => setReceiptModalOpen(true)}>
                   Cetak Tanda Terima
                 </Button>
-                <Button variant="secondary" size="sm" icon="activity" onClick={() => setDraftModalOpen(true)}>
-                  AI Draft Pasal
-                </Button>
                 {!selectedCase.aktaNumber && (
                   <Button variant="primary" size="sm" icon="fileText" onClick={() => handleGenerateAkta(selectedCase.id)}>
                     Generate Akta
@@ -667,26 +664,6 @@ export default function Cases() {
                   )}
                 </div>
               </div>
-
-              {/* AI Case Audit Widget */}
-              {aiAuditResult && (
-                <div style={{ background: 'var(--info-soft)', padding: '16px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--info-border)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600, color: 'var(--info)', fontSize: '0.88rem', marginBottom: '8px' }}>
-                    <Icon name="activity" size={15} />
-                    <span>AI Auditor & Analisis Risiko Notaris ({aiAuditResult.status})</span>
-                  </div>
-                  {aiAuditResult.warnings && aiAuditResult.warnings.map((w, idx) => (
-                    <div key={idx} style={{ fontSize: '0.8rem', color: 'var(--red)', marginTop: '4px', display: 'flex', gap: '6px' }}>
-                      <Icon name="alert" size={14} /> <span>{w}</span>
-                    </div>
-                  ))}
-                  {aiAuditResult.suggestions && aiAuditResult.suggestions.map((s, idx) => (
-                    <div key={idx} style={{ fontSize: '0.8rem', color: 'var(--info)', marginTop: '4px', display: 'flex', gap: '6px' }}>
-                      <Icon name="check" size={14} /> <span>{s}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
 
             {/* Right Column: Financial Billing & Appointment */}
@@ -694,43 +671,8 @@ export default function Cases() {
               <div style={{ background: 'var(--surface)', padding: '18px', borderRadius: '12px', border: '1px solid var(--border)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '1px solid var(--border)', paddingBottom: '10px' }}>
                   <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600 }}>
-                    Biaya Honorarium & Agenda TTD
+                    Status & Agenda TTD
                   </h4>
-                  <span className={`badge ${billingForm.paymentStatus === 'paid' ? 'success' : billingForm.paymentStatus === 'partial' ? 'warning' : 'danger'}`}>
-                    {billingForm.paymentStatus === 'paid' ? 'LUNAS' : billingForm.paymentStatus === 'partial' ? 'DP (SEBAGIAN)' : 'BELUM LUNAS'}
-                  </span>
-                </div>
-
-                {/* Banner peringatan untuk karyawan */}
-                {!isAdmin && (
-                  <div style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.35)', borderRadius: '8px', padding: '10px 14px', marginBottom: '14px', fontSize: '0.8rem', color: '#92400e', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '1rem' }}>🔒</span>
-                    <span>Honorarium, Pajak, dan Status Pembayaran hanya dapat diubah oleh <strong>Notaris / Admin</strong>. Anda hanya dapat mengatur Jadwal TTD.</span>
-                  </div>
-                )}
-
-                <div className="form-group">
-                  <label className="form-label" style={{ opacity: isAdmin ? 1 : 0.5 }}>Honorarium Notaris (Rp): {!isAdmin && <span style={{ color: '#f59e0b', fontWeight: 700 }}>🔒</span>}</label>
-                  <input
-                    type="number"
-                    value={billingForm.notaryFee}
-                    onChange={(e) => isAdmin && setBillingForm({ ...billingForm, notaryFee: Number(e.target.value) })}
-                    placeholder="0"
-                    disabled={!isAdmin}
-                    style={{ opacity: isAdmin ? 1 : 0.55, cursor: isAdmin ? 'auto' : 'not-allowed', background: isAdmin ? '' : 'var(--surface-2)' }}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label" style={{ opacity: isAdmin ? 1 : 0.5 }}>Pajak Transaksi (BPHTB/PPH) (Rp): {!isAdmin && <span style={{ color: '#f59e0b', fontWeight: 700 }}>🔒</span>}</label>
-                  <input
-                    type="number"
-                    value={billingForm.taxFee}
-                    onChange={(e) => isAdmin && setBillingForm({ ...billingForm, taxFee: Number(e.target.value) })}
-                    placeholder="0"
-                    disabled={!isAdmin}
-                    style={{ opacity: isAdmin ? 1 : 0.55, cursor: isAdmin ? 'auto' : 'not-allowed', background: isAdmin ? '' : 'var(--surface-2)' }}
-                  />
                 </div>
 
                 <div className="form-group">
@@ -768,7 +710,7 @@ export default function Cases() {
                   </div>
 
                   <Button variant="primary" style={{ width: '100%' }} onClick={handleSaveBilling}>
-                    {isAdmin ? 'Simpan Rincian Biaya & Jadwal' : '💾 Simpan Jadwal TTD'}
+                    {isAdmin ? 'Simpan Status & Jadwal' : '💾 Simpan Jadwal TTD'}
                   </Button>
                 </div>
               </div>
@@ -777,13 +719,6 @@ export default function Cases() {
           </div>
         </Modal>
       )}
-
-      {/* Modal Generator Draft Akta AI */}
-      <AiDraftGeneratorModal
-        open={draftModalOpen}
-        onClose={() => setDraftModalOpen(false)}
-        initialService={selectedCase ? selectedCase.serviceType : 'AKT-PT'}
-      />
 
       {/* Modal Cetak Tanda Terima Berkas Klien */}
       {selectedCase && (

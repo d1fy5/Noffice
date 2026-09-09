@@ -55,16 +55,6 @@ export default function Dashboard() {
           <h1 className="dash-welcome-title">Selamat datang, {user?.name || 'Notaris & PPAT'}</h1>
           <p className="dash-welcome-sub">Sistem Manajemen Kantor Notaris & PPAT 100% offline. Semua data permohonan akta dan identitas klien tersimpan aman di PC lokal.</p>
         </div>
-        <div className="dash-welcome-actions">
-          <Button variant="primary" icon="plus" onClick={() => navigate('/cases', { state: { createNew: true } })}>Permohonan Akta</Button>
-          <Button variant="secondary" icon="userPlus" onClick={() => navigate('/clients', { state: { createNew: true } })}>Tambah Klien</Button>
-          <Button variant="secondary" icon="upload" onClick={openUpload}>Upload Dokumen</Button>
-          {isAdmin ? (
-            <Button variant="secondary" icon="employees" onClick={() => navigate('/employees')}>Kelola Staff</Button>
-          ) : (
-            <Button variant="secondary" icon="inbox" onClick={() => navigate('/inbox')}>Kotak Masuk</Button>
-          )}
-        </div>
       </div>
 
       {/* Statistics - compact, uniform card heights */}
@@ -76,6 +66,48 @@ export default function Dashboard() {
           <StatCard tone="amber" label="Menunggu Persetujuan" value={totals.pendingApprovals.toLocaleString()} icon="clock" sub={totals.pendingApprovals ? t('stat.sub.pendingTruth') : t('stat.sub.pendingEmpty')} />
         ) : (
           <StatCard tone="green" label="Mesin AI" value="Siap" icon="activity" sub="100% offline" />
+        )}
+      </div>
+
+      {/* Quick actions - consistent clickable cards */}
+      <div className="quick-op-grid mb-6">
+        <button type="button" className="quick-op" onClick={() => navigate('/cases', { state: { createNew: true } })} aria-label="Buat permohonan akta baru">
+          <span className="qo-icon tone-blue"><Icon name="plus" size={20} /></span>
+          <span>
+            <span className="quick-op-title">Permohonan Baru</span>
+            <span className="quick-op-desc">Buat akta atau kasus baru</span>
+          </span>
+        </button>
+        <button type="button" className="quick-op" onClick={() => navigate('/clients', { state: { createNew: true } })} aria-label="Tambah klien baru">
+          <span className="qo-icon tone-green"><Icon name="userPlus" size={20} /></span>
+          <span>
+            <span className="quick-op-title">Tambah Klien</span>
+            <span className="quick-op-desc">Input data klien &amp; KTP</span>
+          </span>
+        </button>
+        <button type="button" className="quick-op" onClick={openUpload} aria-label="Unggah dokumen baru">
+          <span className="qo-icon tone-violet"><Icon name="upload" size={20} /></span>
+          <span>
+            <span className="quick-op-title">Unggah Dokumen</span>
+            <span className="quick-op-desc">Upload dan kelola berkas</span>
+          </span>
+        </button>
+        {isAdmin ? (
+          <button type="button" className="quick-op" onClick={() => navigate('/employees')} aria-label="Kelola staff kantor">
+            <span className="qo-icon tone-amber"><Icon name="user" size={20} /></span>
+            <span>
+              <span className="quick-op-title">Kelola Staff</span>
+              <span className="quick-op-desc">Atur pengguna dan akses kantor</span>
+            </span>
+          </button>
+        ) : (
+          <button type="button" className="quick-op" onClick={() => navigate('/inbox')} aria-label="Buka kotak masuk">
+            <span className="qo-icon tone-amber"><Icon name="inbox" size={20} /></span>
+            <span>
+              <span className="quick-op-title">Kotak Masuk</span>
+              <span className="quick-op-desc">Lihat pesan dan pemberitahuan</span>
+            </span>
+          </button>
         )}
       </div>
 
@@ -193,24 +225,7 @@ export default function Dashboard() {
             )}
           </Panel>
 
-          <Panel title="AI Notaris Lokal" subtitle="Kecerdasan buatan 100% offline">
-            <div className="ai-status-head">
-              <div className="qo-icon tone-blue"><Icon name="activity" size={20} /></div>
-              <div>
-                <div className="sub-docname">Mesin AI Notaris Lokal</div>
-                <div className="ai-status-ready">Siap & Aman 100% Offline</div>
-              </div>
-            </div>
-            <p className="ai-status-desc">
-              Sistem AI lokal siap mengekstrak data KTP, menyusun draf pasal akta, dan meninjau risiko hukum 24/7 tanpa butuh internet.
-            </p>
-            <Button variant="secondary" size="sm" icon="activity" onClick={() => {
-              const copilotBtn = document.querySelector('.copilot-floating-btn');
-              if (copilotBtn) copilotBtn.click();
-            }}>
-              Buka AI Copilot
-            </Button>
-          </Panel>
+
         </div>
       </div>
 

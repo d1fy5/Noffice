@@ -5,7 +5,7 @@ import { useTranslation } from '../store/useTranslation.js';
 import { useAuth } from '../store/AuthContext.jsx';
 import { PPAT_SERVICES, CASE_STATUSES } from '../store/constants.js';
 import { AiAPI } from '../services/api.js';
-import AiDraftGeneratorModal from '../components/AiDraftGeneratorModal.jsx';
+
 import PrintReceiptModal from '../components/PrintReceiptModal.jsx';
 import Button from '../components/Button.jsx';
 import Icon from '../components/Icon.jsx';
@@ -27,7 +27,7 @@ export default function PpatCases() {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedCase, setSelectedCase] = useState(null);
   const [aiAuditResult, setAiAuditResult] = useState(null);
-  const [draftModalOpen, setDraftModalOpen] = useState(false);
+
   const [receiptModalOpen, setReceiptModalOpen] = useState(false);
 
   useEffect(() => {
@@ -42,6 +42,7 @@ export default function PpatCases() {
         assignedTo: user?.name || 'Super Admin / Notaris',
         estimatedAt: '',
         notes: '',
+        landAddress: '',
       });
       setCustomChecklist(PPAT_SERVICES[0].defaultChecklist);
       setErrors({});
@@ -116,6 +117,7 @@ export default function PpatCases() {
     assignedTo: user?.name || 'Super Admin / Notaris',
     estimatedAt: '',
     notes: '',
+    landAddress: '',
   });
   const [customChecklist, setCustomChecklist] = useState([]);
   const [newItemText, setNewItemText] = useState('');
@@ -157,6 +159,7 @@ export default function PpatCases() {
       assignedTo: user?.name || 'Super Admin / Notaris',
       estimatedAt: '',
       notes: '',
+      landAddress: '',
     });
     setCustomChecklist(PPAT_SERVICES[0].defaultChecklist);
     setErrors({});
@@ -333,6 +336,7 @@ export default function PpatCases() {
                 <tr>
               <th>No. Kasus & Layanan</th>
                    <th>Klien</th>
+                   <th>Alamat Tanah</th>
                    <th>Nomor Akta Resmi</th>
                    <th>Kemajuan Berkas</th>
                    <th>Status Workflow</th>
@@ -355,6 +359,9 @@ export default function PpatCases() {
                       <td data-label="Klien">
                         <div style={{ fontWeight: 500 }}>{getClientName(c.clientId)}</div>
                         <div className="sub-meta">Petugas: {c.assignedTo}</div>
+                      </td>
+                      <td data-label="Alamat Tanah">
+                        <div style={{ fontSize: '0.85rem' }}>{c.landAddress || '-'}</div>
                       </td>
                       <td data-label="Nomor Akta Resmi">
                         {c.aktaNumber ? (
@@ -458,6 +465,14 @@ export default function PpatCases() {
               onChange={(e) => setForm({ ...form, notes: e.target.value })}
             />
           </FormField>
+          <FormField label="Alamat Tanah / Obyek">
+            <textarea
+              rows={2}
+              placeholder="Contoh: Jl. Merdeka No. 123, RT 01 RW 02, Kelurahan X, Kecamatan Y..."
+              value={form.landAddress}
+              onChange={(e) => setForm({ ...form, landAddress: e.target.value })}
+            />
+          </FormField>
         </div>
 
         {/* Checklist Setup */}
@@ -532,15 +547,17 @@ export default function PpatCases() {
                     "{selectedCase.notes}"
                   </div>
                 )}
+                {selectedCase.landAddress && (
+                  <div style={{ fontSize: '0.83rem', color: 'var(--text-3)', marginTop: '4px' }}>
+                    📍 <strong>Alamat Tanah:</strong> {selectedCase.landAddress}
+                  </div>
+                )}
               </div>
 
               {/* Action Buttons Toolbar */}
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
                 <Button variant="secondary" size="sm" icon="download" onClick={() => setReceiptModalOpen(true)}>
                   Cetak Tanda Terima
-                </Button>
-                <Button variant="secondary" size="sm" icon="activity" onClick={() => setDraftModalOpen(true)}>
-                  AI Draft Pasal
                 </Button>
                 {!selectedCase.aktaNumber && (
                   <Button variant="primary" size="sm" icon="fileText" onClick={() => handleGenerateAkta(selectedCase.id)}>
@@ -689,62 +706,13 @@ export default function PpatCases() {
               )}
             </div>
 
-            {/* Right Column: Financial Billing & Appointment */}
+            {/* Right Column: Appointment */}
             <div>
               <div style={{ background: 'var(--surface)', padding: '18px', borderRadius: '12px', border: '1px solid var(--border)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '1px solid var(--border)', paddingBottom: '10px' }}>
                   <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600 }}>
-                    Biaya Honorarium & Agenda TTD
+                    Agenda TTD
                   </h4>
-                  <span className={`badge ${billingForm.paymentStatus === 'paid' ? 'success' : billingForm.paymentStatus === 'partial' ? 'warning' : 'danger'}`}>
-                    {billingForm.paymentStatus === 'paid' ? 'LUNAS' : billingForm.paymentStatus === 'partial' ? 'DP (SEBAGIAN)' : 'BELUM LUNAS'}
-                  </span>
-                </div>
-
-                {/* Banner peringatan untuk karyawan */}
-                {!isAdmin && (
-                  <div style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.35)', borderRadius: '8px', padding: '10px 14px', marginBottom: '14px', fontSize: '0.8rem', color: '#92400e', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '1rem' }}>🔒</span>
-                    <span>Honorarium, Pajak, dan Status Pembayaran hanya dapat diubah oleh <strong>Notaris / Admin</strong>. Anda hanya dapat mengatur Jadwal TTD.</span>
-                  </div>
-                )}
-
-                <div className="form-group">
-                  <label className="form-label" style={{ opacity: isAdmin ? 1 : 0.5 }}>Honorarium Notaris (Rp): {!isAdmin && <span style={{ color: '#f59e0b', fontWeight: 700 }}>🔒</span>}</label>
-                  <input
-                    type="number"
-                    value={billingForm.notaryFee}
-                    onChange={(e) => isAdmin && setBillingForm({ ...billingForm, notaryFee: Number(e.target.value) })}
-                    placeholder="0"
-                    disabled={!isAdmin}
-                    style={{ opacity: isAdmin ? 1 : 0.55, cursor: isAdmin ? 'auto' : 'not-allowed', background: isAdmin ? '' : 'var(--surface-2)' }}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label" style={{ opacity: isAdmin ? 1 : 0.5 }}>Pajak Transaksi (BPHTB/PPH) (Rp): {!isAdmin && <span style={{ color: '#f59e0b', fontWeight: 700 }}>🔒</span>}</label>
-                  <input
-                    type="number"
-                    value={billingForm.taxFee}
-                    onChange={(e) => isAdmin && setBillingForm({ ...billingForm, taxFee: Number(e.target.value) })}
-                    placeholder="0"
-                    disabled={!isAdmin}
-                    style={{ opacity: isAdmin ? 1 : 0.55, cursor: isAdmin ? 'auto' : 'not-allowed', background: isAdmin ? '' : 'var(--surface-2)' }}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label" style={{ opacity: isAdmin ? 1 : 0.5 }}>Status Pembayaran: {!isAdmin && <span style={{ color: '#f59e0b', fontWeight: 700 }}>🔒</span>}</label>
-                  <select
-                    value={billingForm.paymentStatus}
-                    onChange={(e) => isAdmin && setBillingForm({ ...billingForm, paymentStatus: e.target.value })}
-                    disabled={!isAdmin}
-                    style={{ opacity: isAdmin ? 1 : 0.55, cursor: isAdmin ? 'auto' : 'not-allowed', background: isAdmin ? '' : 'var(--surface-2)' }}
-                  >
-                    <option value="unpaid">Belum Lunas</option>
-                    <option value="partial">DP (Sebagian)</option>
-                    <option value="paid">Lunas</option>
-                  </select>
                 </div>
 
                 <div style={{ borderTop: '1px dashed var(--border)', paddingTop: '14px', marginTop: '14px' }}>
@@ -768,7 +736,7 @@ export default function PpatCases() {
                   </div>
 
                   <Button variant="primary" style={{ width: '100%' }} onClick={handleSaveBilling}>
-                    {isAdmin ? 'Simpan Rincian Biaya & Jadwal' : '💾 Simpan Jadwal TTD'}
+                    💾 Simpan Jadwal TTD
                   </Button>
                 </div>
               </div>
@@ -777,13 +745,6 @@ export default function PpatCases() {
           </div>
         </Modal>
       )}
-
-      {/* Modal Generator Draft Akta AI */}
-      <AiDraftGeneratorModal
-        open={draftModalOpen}
-        onClose={() => setDraftModalOpen(false)}
-        initialService={selectedCase ? selectedCase.serviceType : 'AJB'}
-      />
 
       {/* Modal Cetak Tanda Terima Berkas Klien */}
       {selectedCase && (
