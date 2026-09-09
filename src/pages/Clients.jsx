@@ -180,17 +180,21 @@ export default function Clients() {
       />
 
       <div className="stat-grid mb-6">
-        <div className="stat-card">
-          <div className="stat-label">Total Klien Terdaftar</div>
-          <div className="stat-value">{clients.length}</div>
-          <div className="stat-sub">klien di database</div>
+        <div className="stat-card stat-card-h">
+          <div className="stat-value stat-card-h-value">{clients.length}</div>
+          <div className="stat-card-h-text">
+            <div className="stat-label">Total Klien Terdaftar</div>
+            <div className="stat-sub">klien di database</div>
+          </div>
         </div>
-        <div className="stat-card">
-          <div className="stat-label">Klien Aktif Memiliki Kasus</div>
-          <div className="stat-value">
+        <div className="stat-card stat-card-h">
+          <div className="stat-value stat-card-h-value">
             {new Set(cases.map((c) => c.clientId)).size}
           </div>
-          <div className="stat-sub">klien berjalan</div>
+          <div className="stat-card-h-text">
+            <div className="stat-label">Klien Aktif Memiliki Kasus</div>
+            <div className="stat-sub">klien berjalan</div>
+          </div>
         </div>
       </div>
 

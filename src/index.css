@@ -774,6 +774,27 @@ h2 {
   box-shadow: var(--shadow-md);
 }
 
+/* Horizontal stat card (Clients summary) */
+.stat-card.stat-card-h {
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 16px;
+  padding: 14px 18px;
+}
+
+.stat-card-h-value {
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.stat-card-h-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
 .stat-card:active {
   transform: translateY(1px);
 }

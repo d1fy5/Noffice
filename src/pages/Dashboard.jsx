@@ -58,6 +58,12 @@ export default function Dashboard() {
         <div className="dash-welcome-actions">
           <Button variant="primary" icon="plus" onClick={() => navigate('/cases', { state: { createNew: true } })}>Permohonan Akta</Button>
           <Button variant="secondary" icon="userPlus" onClick={() => navigate('/clients', { state: { createNew: true } })}>Tambah Klien</Button>
+          <Button variant="secondary" icon="upload" onClick={openUpload}>Upload Dokumen</Button>
+          {isAdmin ? (
+            <Button variant="secondary" icon="employees" onClick={() => navigate('/employees')}>Kelola Staff</Button>
+          ) : (
+            <Button variant="secondary" icon="inbox" onClick={() => navigate('/inbox')}>Kotak Masuk</Button>
+          )}
         </div>
       </div>
 
@@ -70,48 +76,6 @@ export default function Dashboard() {
           <StatCard tone="amber" label="Menunggu Persetujuan" value={totals.pendingApprovals.toLocaleString()} icon="clock" sub={totals.pendingApprovals ? t('stat.sub.pendingTruth') : t('stat.sub.pendingEmpty')} />
         ) : (
           <StatCard tone="green" label="Mesin AI" value="Siap" icon="activity" sub="100% offline" />
-        )}
-      </div>
-
-      {/* Quick actions - consistent clickable cards */}
-      <div className="quick-op-grid mb-6">
-        <button type="button" className="quick-op" onClick={() => navigate('/cases', { state: { createNew: true } })} aria-label="Buat permohonan akta baru">
-          <span className="qo-icon tone-blue"><Icon name="plus" size={20} /></span>
-          <span>
-            <span className="quick-op-title">Permohonan Baru</span>
-            <span className="quick-op-desc">Buat akta atau kasus baru</span>
-          </span>
-        </button>
-        <button type="button" className="quick-op" onClick={() => navigate('/clients', { state: { createNew: true } })} aria-label="Tambah klien baru">
-          <span className="qo-icon tone-green"><Icon name="userPlus" size={20} /></span>
-          <span>
-            <span className="quick-op-title">Tambah Klien</span>
-            <span className="quick-op-desc">Input data klien &amp; KTP</span>
-          </span>
-        </button>
-        <button type="button" className="quick-op" onClick={openUpload} aria-label="Unggah dokumen baru">
-          <span className="qo-icon tone-violet"><Icon name="upload" size={20} /></span>
-          <span>
-            <span className="quick-op-title">Unggah Dokumen</span>
-            <span className="quick-op-desc">Upload dan kelola berkas</span>
-          </span>
-        </button>
-        {isAdmin ? (
-          <button type="button" className="quick-op" onClick={() => navigate('/employees')} aria-label="Kelola staff kantor">
-            <span className="qo-icon tone-amber"><Icon name="user" size={20} /></span>
-            <span>
-              <span className="quick-op-title">Kelola Staff</span>
-              <span className="quick-op-desc">Atur pengguna dan akses kantor</span>
-            </span>
-          </button>
-        ) : (
-          <button type="button" className="quick-op" onClick={() => navigate('/inbox')} aria-label="Buka kotak masuk">
-            <span className="qo-icon tone-amber"><Icon name="inbox" size={20} /></span>
-            <span>
-              <span className="quick-op-title">Kotak Masuk</span>
-              <span className="quick-op-desc">Lihat pesan dan pemberitahuan</span>
-            </span>
-          </button>
         )}
       </div>
 
