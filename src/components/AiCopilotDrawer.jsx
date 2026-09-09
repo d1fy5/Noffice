@@ -66,9 +66,10 @@ export default function AiCopilotDrawer() {
   };
 
   const quickPrompts = [
-    'Syarat Akta Jual Beli (AJB)',
-    'Syarat Pendirian PT',
-    'Cara Generate Nomor Akta',
+    'Cari Dokumen',
+    'Data Klien',
+    'Status Permohonan',
+    'Syarat Pendirian PT'
   ];
 
   return (

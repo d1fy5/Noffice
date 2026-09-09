@@ -55,10 +55,6 @@ export default function Dashboard() {
           <h1 className="dash-welcome-title">Selamat datang, {user?.name || 'Notaris & PPAT'}</h1>
           <p className="dash-welcome-sub">Sistem Manajemen Kantor Notaris & PPAT 100% offline. Semua data permohonan akta dan identitas klien tersimpan aman di PC lokal.</p>
         </div>
-        <div className="dash-welcome-actions">
-          <Button variant="primary" icon="plus" onClick={() => navigate('/cases', { state: { createNew: true } })}>Permohonan Akta</Button>
-          <Button variant="secondary" icon="userPlus" onClick={() => navigate('/clients', { state: { createNew: true } })}>Tambah Klien</Button>
-        </div>
       </div>
 
       {/* Statistics - compact, uniform card heights */}
@@ -229,24 +225,7 @@ export default function Dashboard() {
             )}
           </Panel>
 
-          <Panel title="AI Notaris Lokal" subtitle="Kecerdasan buatan 100% offline">
-            <div className="ai-status-head">
-              <div className="qo-icon tone-blue"><Icon name="activity" size={20} /></div>
-              <div>
-                <div className="sub-docname">Mesin AI Notaris Lokal</div>
-                <div className="ai-status-ready">Siap & Aman 100% Offline</div>
-              </div>
-            </div>
-            <p className="ai-status-desc">
-              Sistem AI lokal siap mengekstrak data KTP, menyusun draf pasal akta, dan meninjau risiko hukum 24/7 tanpa butuh internet.
-            </p>
-            <Button variant="secondary" size="sm" icon="activity" onClick={() => {
-              const copilotBtn = document.querySelector('.copilot-floating-btn');
-              if (copilotBtn) copilotBtn.click();
-            }}>
-              Buka AI Copilot
-            </Button>
-          </Panel>
+
         </div>
       </div>
 
