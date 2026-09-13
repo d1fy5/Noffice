@@ -91,6 +91,7 @@ function initDb() {
     createdAt TEXT,
     estimatedAt TEXT,
     aktaNumber TEXT,
+    landAddress TEXT,
     notaryFee INTEGER DEFAULT 0,
     taxFee INTEGER DEFAULT 0,
     pnbpFee INTEGER DEFAULT 0,
@@ -114,6 +115,17 @@ function initDb() {
     lastNumber INTEGER
   )`);
 
+  // Tabel Log Riwayat Perubahan Status Kasus
+  db.exec(`CREATE TABLE IF NOT EXISTS case_logs (
+    id TEXT PRIMARY KEY,
+    caseId TEXT NOT NULL,
+    action TEXT NOT NULL,
+    changedBy TEXT NOT NULL,
+    oldStatus TEXT,
+    newStatus TEXT,
+    timestamp TEXT NOT NULL
+  )`);
+
   // Migration safe check for legacy DBs
   try { db.exec(`ALTER TABLE cases ADD COLUMN notaryFee INTEGER DEFAULT 0`); } catch(e) {}
   try { db.exec(`ALTER TABLE cases ADD COLUMN taxFee INTEGER DEFAULT 0`); } catch(e) {}
@@ -121,18 +133,35 @@ function initDb() {
   try { db.exec(`ALTER TABLE cases ADD COLUMN paymentStatus TEXT DEFAULT 'unpaid'`); } catch(e) {}
   try { db.exec(`ALTER TABLE cases ADD COLUMN appointmentDate TEXT`); } catch(e) {}
   try { db.exec(`ALTER TABLE cases ADD COLUMN appointmentTime TEXT`); } catch(e) {}
+  try { db.exec(`ALTER TABLE cases ADD COLUMN landAddress TEXT`); } catch(e) {} // kolom baru
 
   try { db.exec(`ALTER TABLE documents ADD COLUMN isTrashed INTEGER DEFAULT 0`); } catch(e) {}
   try { db.exec(`ALTER TABLE documents ADD COLUMN trashedAt TEXT`); } catch(e) {}
   try { db.exec(`ALTER TABLE documents ADD COLUMN trashedBy TEXT`); } catch(e) {}
+  // Migration untuk case_logs (jika DB lama tidak punya)
+  try { db.exec(`CREATE TABLE IF NOT EXISTS case_logs (id TEXT PRIMARY KEY, caseId TEXT NOT NULL, action TEXT NOT NULL, changedBy TEXT NOT NULL, oldStatus TEXT, newStatus TEXT, timestamp TEXT NOT NULL)`); } catch(e) {}
 
-  // Seed dummy user dengan hashed password jika belum ada admin
+  // Seed 3 akun demo dengan hashed password jika belum ada
   const userCount = db.prepare("SELECT count(*) as count FROM users").get();
   if (userCount && userCount.count === 0) {
     const insertUser = db.prepare("INSERT INTO users (id, email, password, role, name, department) VALUES (?, ?, ?, ?, ?, ?)");
-    insertUser.run('u-1', 'admin@noffice.com', hashPassword('admin'), 'admin', 'Super Admin / Notaris', 'Management');
-    insertUser.run('u-2', 'karyawan@noffice.com', hashPassword('user'), 'employee', 'Karyawan Biasa', 'Operations');
-    console.log('Dummy users with secure password hashes inserted.');
+    // Akun 1: Super Admin / Notaris (admin)
+    insertUser.run('u-1', 'admin@noffice.com', hashPassword('admin123'), 'admin', 'Notaris Utama', 'Management');
+    // Akun 2: Staf Notaris (employee)
+    insertUser.run('u-2', 'dewi@noffice.com', hashPassword('dewi123'), 'employee', 'Dewi Rahayu', 'Notaris');
+    // Akun 3: Staf PPAT (employee)
+    insertUser.run('u-3', 'andi@noffice.com', hashPassword('andi123'), 'employee', 'Andi Prasetyo', 'PPAT');
+    console.log('[DB] 3 demo accounts seeded with hashed passwords.');
+  }
+
+  // Seed employee records (for dropdown staf) jika belum ada
+  const empCount = db.prepare("SELECT count(*) as count FROM employees").get();
+  if (empCount && empCount.count === 0) {
+    const insertEmp = db.prepare("INSERT INTO employees (id, name, email, department, role, status, joinDate) VALUES (?, ?, ?, ?, ?, ?, ?)");
+    insertEmp.run('emp-1', 'Notaris Utama', 'admin@noffice.com', 'Management', 'admin', 'active', '2024-01-01');
+    insertEmp.run('emp-2', 'Dewi Rahayu', 'dewi@noffice.com', 'Notaris', 'employee', 'active', '2024-03-15');
+    insertEmp.run('emp-3', 'Andi Prasetyo', 'andi@noffice.com', 'PPAT', 'employee', 'active', '2024-06-01');
+    console.log('[DB] 3 employee records seeded.');
   }
 
   // Seed dummy clients & cases jika belum ada
@@ -169,37 +198,37 @@ initDb();
 
 // Wrapper untuk Promise (agar kompatibel dengan kode async/await yang sudah ada di server/index.js)
 export const dbQuery = (sql, params = []) => {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     try {
       const stmt = db.prepare(sql);
       const rows = stmt.all(...params);
       resolve(rows);
     } catch (err) {
-      throw err;
+      reject(err);
     }
   });
 };
 
 export const dbRun = (sql, params = []) => {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     try {
       const stmt = db.prepare(sql);
       const result = stmt.run(...params);
       resolve({ id: result.lastInsertRowid, changes: result.changes });
     } catch (err) {
-      throw err;
+      reject(err);
     }
   });
 };
 
 export const dbGet = (sql, params = []) => {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     try {
       const stmt = db.prepare(sql);
       const row = stmt.get(...params);
       resolve(row);
     } catch (err) {
-      throw err;
+      reject(err);
     }
   });
 };

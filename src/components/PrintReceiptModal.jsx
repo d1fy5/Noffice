@@ -3,7 +3,10 @@ import Modal from './Modal.jsx';
 import Button from './Button.jsx';
 
 export default function PrintReceiptModal({ open, onClose, caseData, clientData, generalInfo }) {
+  // Hooks harus selalu dipanggil sebelum any early return (React Rules of Hooks)
   const [receiptType, setReceiptType] = useState('penerimaan'); // 'penerimaan' or 'salinan'
+
+  // Guard check di BAWAH hook — aman untuk React
   if (!caseData || !clientData) return null;
 
   const companyName = generalInfo?.companyName || 'KANTOR NOTARIS & PPAT';
@@ -13,6 +16,7 @@ export default function PrintReceiptModal({ open, onClose, caseData, clientData,
   };
 
   const checklist = caseData.checklist || [];
+
 
   return (
     <Modal

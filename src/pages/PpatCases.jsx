@@ -17,7 +17,7 @@ import PageHeader from '../components/PageHeader.jsx';
 export default function PpatCases() {
   const location = useLocation();
   const { query } = useSearch();
-  const { clients, cases, employees, general, addCase, updateCaseStatus, updateCaseDetails, toggleChecklistItem, generateAktaNumber } = useStore();
+  const { clients, cases, employees, general, addCase, updateCaseStatus, updateCaseDetails, toggleChecklistItem, generateAktaNumber, fetchCaseLogs } = useStore();
   const { notify } = useToast();
   const { t } = useTranslation();
   const { user, isAdmin } = useAuth();
@@ -29,6 +29,8 @@ export default function PpatCases() {
   const [aiAuditResult, setAiAuditResult] = useState(null);
 
   const [receiptModalOpen, setReceiptModalOpen] = useState(false);
+  const [caseLogs, setCaseLogs] = useState([]);
+  const [logsLoading, setLogsLoading] = useState(false);
 
   useEffect(() => {
     if (location.state?.createNew) {
@@ -36,17 +38,7 @@ export default function PpatCases() {
         notify('Silakan tambahkan data Klien terlebih dahulu di menu Klien!', 'warning');
         return;
       }
-      setForm({
-        clientId: clients[0]?.id || '',
-        serviceType: 'AJB',
-        assignedTo: user?.name || 'Super Admin / Notaris',
-        estimatedAt: '',
-        notes: '',
-        landAddress: '',
-      });
-      setCustomChecklist(PPAT_SERVICES[0].defaultChecklist);
-      setErrors({});
-      setModalOpen(true);
+      openNewCase();
       return;
     }
     if (location.state?.createForClient) {
@@ -79,6 +71,13 @@ export default function PpatCases() {
       notes: c.notes || '',
     });
     setAiAuditResult(null);
+    // Load logs saat buka detail
+    setCaseLogs([]);
+    setLogsLoading(true);
+    fetchCaseLogs(c.id).then((logs) => {
+      setCaseLogs(logs);
+      setLogsLoading(false);
+    });
     const client = clients.find((cl) => cl.id === c.clientId);
     AiAPI.auditCase(c, client)
       .then((res) => setAiAuditResult(res))
@@ -87,25 +86,10 @@ export default function PpatCases() {
 
   const handleSaveBilling = async () => {
     if (!selectedCase) return;
-    const payload = isAdmin
-      ? { ...billingForm, userRole: user?.role }
-      : {
-          ...billingForm,
-          notaryFee: selectedCase.notaryFee || 0,
-          taxFee: selectedCase.taxFee || 0,
-          pnbpFee: selectedCase.pnbpFee || 0,
-          paymentStatus: selectedCase.paymentStatus || 'unpaid',
-          userRole: user?.role,
-        };
-
+    const payload = { ...billingForm };
     const res = await updateCaseDetails(selectedCase.id, payload);
     if (res) {
-      notify(
-        isAdmin
-          ? 'Rincian Biaya & Jadwal TTD berhasil diperbarui!'
-          : 'Jadwal Agenda TTD berhasil diperbarui (Biaya honorarium & status bayar dikunci untuk Notaris)',
-        'success'
-      );
+      notify('Rincian Biaya & Jadwal TTD berhasil diperbarui!', 'success');
       setSelectedCase({ ...selectedCase, ...payload });
     }
   };
@@ -114,6 +98,8 @@ export default function PpatCases() {
   const [form, setForm] = useState({
     clientId: '',
     serviceType: 'AJB',
+    caseNumber: '',
+    aktaNumber: '',
     assignedTo: user?.name || 'Super Admin / Notaris',
     estimatedAt: '',
     notes: '',
@@ -156,6 +142,8 @@ export default function PpatCases() {
     setForm({
       clientId: clients[0]?.id || '',
       serviceType: 'AJB',
+      caseNumber: '',
+      aktaNumber: '',
       assignedTo: user?.name || 'Super Admin / Notaris',
       estimatedAt: '',
       notes: '',
@@ -194,28 +182,18 @@ export default function PpatCases() {
     }
   };
 
-  // Status yang boleh diubah karyawan (hanya kelengkapan berkas)
-  const EMPLOYEE_ALLOWED_STATUSES = ['kurang', 'lengkap'];
-  const FINISHED_STATUSES = ['selesai', 'salinan_selesai', 'arsip'];
-
+  // Semua user berwenang mengubah status apapun
   const handleStatusChange = async (caseId, newStatus) => {
-    const targetCase = cases.find((c) => c.id === caseId) || selectedCase;
-    if (!isAdmin && targetCase && FINISHED_STATUSES.includes(targetCase.status)) {
-      notify('Permohonan ini telah selesai / diarsip. Hanya Notaris / Admin yang dapat mengubah status kembali.', 'warning');
-      return;
-    }
-    if (!isAdmin && !EMPLOYEE_ALLOWED_STATUSES.includes(newStatus)) {
-      notify('Karyawan hanya berwenang mengubah status Kelengkapan Berkas. Perubahan status lainnya harus dilakukan oleh Notaris / Admin.', 'warning');
-      return;
-    }
-    const res = await updateCaseStatus(caseId, newStatus, user?.role);
+    const res = await updateCaseStatus(caseId, newStatus, user?.name || 'Pengguna');
     if (res) {
       notify(`Status permohonan diperbarui ke "${newStatus}"`, 'info');
       if (selectedCase && selectedCase.id === caseId) {
-        setSelectedCase({ ...selectedCase, status: newStatus });
+        setSelectedCase((prev) => ({ ...prev, status: newStatus }));
       }
+      // Refresh logs
+      fetchCaseLogs(caseId).then(setCaseLogs);
     } else {
-      notify('Gagal memperbarui status. Anda tidak memiliki akses untuk melakukan perubahan ini.', 'error');
+      notify('Gagal memperbarui status. Coba lagi.', 'error');
     }
   };
 
@@ -395,7 +373,7 @@ export default function PpatCases() {
                       <td data-label="Status Workflow">{getStatusBadge(c.status)}</td>
                       <td className="cell-date" data-label="Tgl Masuk">{c.createdAt}</td>
                       <td className="cell-actions" data-label="Aksi" style={{ textAlign: 'right' }}>
-                        <Button variant="secondary" size="sm" icon="eye" onClick={() => setSelectedCase(c)}>
+                        <Button variant="secondary" size="sm" icon="eye" onClick={() => handleOpenCaseDetail(c)}>
                           Detail & Checklist
                         </Button>
                       </td>
@@ -443,6 +421,22 @@ export default function PpatCases() {
                 </option>
               ))}
             </select>
+          </FormField>
+          <FormField label="No. Kasus" hint="Kosongkan untuk auto-generate">
+            <input
+              type="text"
+              placeholder={`Contoh: PPAT/${new Date().getFullYear()}/01/001`}
+              value={form.caseNumber}
+              onChange={(e) => setForm({ ...form, caseNumber: e.target.value })}
+            />
+          </FormField>
+          <FormField label="No. Akta (Opsional)" hint="Bisa diisi sekarang atau digenerate nanti">
+            <input
+              type="text"
+              placeholder={`Contoh: No. 12/PPAT/${new Date().getFullYear()}`}
+              value={form.aktaNumber}
+              onChange={(e) => setForm({ ...form, aktaNumber: e.target.value })}
+            />
           </FormField>
           <FormField label="Petugas Penanggungjawab">
             <select value={form.assignedTo} onChange={(e) => setForm({ ...form, assignedTo: e.target.value })}>
@@ -608,32 +602,21 @@ export default function PpatCases() {
               <span>{getStatusBadge(selectedCase.status)}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, maxWidth: '380px' }}>
-              {!isAdmin && (
-                <span style={{ fontSize: '0.75rem', color: 'var(--orange, #f59e0b)', fontWeight: 600, background: 'rgba(245,158,11,0.1)', padding: '3px 8px', borderRadius: '6px', border: '1px solid rgba(245,158,11,0.3)' }}>
-                  {FINISHED_STATUSES.includes(selectedCase.status) ? '🔒 Dikunci (Selesai/Arsip)' : '🔒 Terbatas: Hanya Kelengkapan Berkas'}
-                </span>
-              )}
               <select
                 value={selectedCase.status}
                 onChange={(e) => handleStatusChange(selectedCase.id, e.target.value)}
-                disabled={!isAdmin && FINISHED_STATUSES.includes(selectedCase.status)}
-                style={{ fontWeight: 600, fontSize: '0.85rem', opacity: (!isAdmin && FINISHED_STATUSES.includes(selectedCase.status)) ? 0.6 : 1 }}
+                style={{ fontWeight: 600, fontSize: '0.85rem' }}
               >
-                {CASE_STATUSES
-                  .filter((st) => isAdmin || EMPLOYEE_ALLOWED_STATUSES.includes(st.id) || st.id === selectedCase.status)
-                  .map((st) => {
-                    const isOptionDisabled = !isAdmin && (!EMPLOYEE_ALLOWED_STATUSES.includes(st.id) || FINISHED_STATUSES.includes(selectedCase.status));
-                    return (
-                      <option
-                        key={st.id}
-                        value={st.id}
-                        disabled={isOptionDisabled}
-                        style={{ color: isOptionDisabled ? 'var(--text-3, #9ca3af)' : 'inherit' }}
-                      >
-                        {st.label}{isOptionDisabled ? ' 🔒' : ''}
-                      </option>
-                    );
-                  })}
+                {statusGrouped.map(([groupName, statuses]) => (
+                  <optgroup key={groupName} label={groupName}>
+                    {statuses.map(st => (
+                      <option key={st.id} value={st.id}>{st.label}</option>
+                    ))}
+                  </optgroup>
+                ))}
+                {CASE_STATUSES.filter(st => st.group === 'Legacy' && st.id === selectedCase.status).map(st => (
+                  <option key={st.id} value={st.id}>{st.label} (Data Lama)</option>
+                ))}
               </select>
             </div>
           </div>
@@ -712,13 +695,39 @@ export default function PpatCases() {
               )}
             </div>
 
-            {/* Right Column: Appointment */}
+            {/* Right Column: Biaya & Agenda TTD */}
             <div>
               <div style={{ background: 'var(--surface)', padding: '18px', borderRadius: '12px', border: '1px solid var(--border)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '1px solid var(--border)', paddingBottom: '10px' }}>
                   <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600 }}>
-                    Agenda TTD
+                    Biaya &amp; Agenda TTD
                   </h4>
+                </div>
+
+                {isAdmin && (
+                  <div className="form-grid" style={{ marginBottom: '12px' }}>
+                    <div className="form-group">
+                      <label className="form-label">Honorarium Notaris (Rp):</label>
+                      <input type="number" value={billingForm.notaryFee} onChange={(e) => setBillingForm({ ...billingForm, notaryFee: Number(e.target.value) })} style={{ fontFamily: 'monospace' }} />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Biaya Pajak (Rp):</label>
+                      <input type="number" value={billingForm.taxFee} onChange={(e) => setBillingForm({ ...billingForm, taxFee: Number(e.target.value) })} style={{ fontFamily: 'monospace' }} />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">PNBP (Rp):</label>
+                      <input type="number" value={billingForm.pnbpFee} onChange={(e) => setBillingForm({ ...billingForm, pnbpFee: Number(e.target.value) })} style={{ fontFamily: 'monospace' }} />
+                    </div>
+                  </div>
+                )}
+                
+                <div className="form-group">
+                  <label className="form-label">Status Pembayaran:</label>
+                  <select value={billingForm.paymentStatus} onChange={(e) => setBillingForm({ ...billingForm, paymentStatus: e.target.value })}>
+                    <option value="unpaid">Belum Lunas</option>
+                    <option value="partial">DP (Sebagian)</option>
+                    <option value="paid">Lunas</option>
+                  </select>
                 </div>
 
                 <div style={{ borderTop: '1px dashed var(--border)', paddingTop: '14px', marginTop: '14px' }}>
@@ -742,12 +751,49 @@ export default function PpatCases() {
                   </div>
 
                   <Button variant="primary" style={{ width: '100%' }} onClick={handleSaveBilling}>
-                    💾 Simpan Jadwal TTD
+                    💾 Simpan Biaya &amp; Jadwal
                   </Button>
                 </div>
               </div>
             </div>
 
+          </div>
+
+          {/* Panel Riwayat Aktivitas / Log Status */}
+          <div style={{ marginTop: '20px', background: 'var(--surface)', padding: '18px', borderRadius: '12px', border: '1px solid var(--border)' }}>
+            <h4 style={{ margin: '0 0 14px', fontSize: '0.95rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              📋 Riwayat Aktivitas Kasus
+            </h4>
+            {logsLoading ? (
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-3)', fontStyle: 'italic' }}>Memuat riwayat...</div>
+            ) : caseLogs.length === 0 ? (
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-3)', fontStyle: 'italic' }}>Belum ada riwayat perubahan status.</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
+                {caseLogs.map((log, idx) => {
+                  const ts = new Date(log.timestamp);
+                  const dateStr = ts.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+                  const timeStr = ts.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+                  const isLast = idx === caseLogs.length - 1;
+                  return (
+                    <div key={log.id} style={{ display: 'flex', gap: '12px', paddingBottom: isLast ? 0 : '12px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
+                        <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: idx === 0 ? 'var(--primary)' : 'var(--border-strong)', flexShrink: 0, marginTop: '4px' }} />
+                        {!isLast && <div style={{ width: '2px', flex: 1, background: 'var(--border)', minHeight: '20px', marginTop: '4px' }} />}
+                      </div>
+                      <div style={{ flex: 1, paddingBottom: isLast ? 0 : '4px' }}>
+                        <div style={{ fontSize: '0.85rem', color: 'var(--text)', fontWeight: 500, lineHeight: 1.4 }}>
+                          {log.action}
+                        </div>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-3)', marginTop: '3px' }}>
+                          {dateStr} pukul {timeStr} &bull; oleh <strong style={{ color: 'var(--text-2)' }}>{log.changedBy}</strong>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </Modal>
       )}

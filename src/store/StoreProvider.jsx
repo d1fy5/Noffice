@@ -72,7 +72,6 @@ export function StoreProvider({ children }) {
   );
 
   useEffect(() => localStorage.setItem(STORAGE_KEYS.messages, JSON.stringify(messages)), [messages]);
-  useEffect(() => localStorage.setItem(STORAGE_KEYS.messages, JSON.stringify(messages)), [messages]);
   useEffect(() => localStorage.setItem(STORAGE_KEYS.account, JSON.stringify(account)), [account]);
   useEffect(
     () => localStorage.setItem(STORAGE_KEYS.notifications, JSON.stringify(notifications)),
@@ -382,13 +381,17 @@ export function StoreProvider({ children }) {
 
   // Cases Handlers
   const addCase = useCallback(async (data, checklistItems = []) => {
+    const autoNumber = `KASUS/${new Date().getFullYear()}/${(new Date().getMonth() + 1).toString().padStart(2, '0')}/${(cases.length + 1).toString().padStart(3, '0')}`;
     const newCase = {
       id: 'kasus-' + Date.now(),
-      caseNumber: `KASUS/${new Date().getFullYear()}/${(new Date().getMonth() + 1).toString().padStart(2, '0')}/${(cases.length + 1).toString().padStart(3, '0')}`,
-      status: 'pending',
+      status: 'berkas_masuk',
       createdAt: new Date().toISOString().split('T')[0],
       aktaNumber: '',
+      landAddress: '',
       ...data,
+      // Computed fields: override raw data dengan versi yang sudah diproses
+      caseNumber: data.caseNumber?.trim() || autoNumber,
+      aktaNumber: data.aktaNumber?.trim() || '',
       checklist: checklistItems.map((item, idx) => ({
         id: 'chk-' + uid() + idx,
         itemName: typeof item === 'string' ? item : item.itemName,
@@ -405,9 +408,9 @@ export function StoreProvider({ children }) {
     }
   }, [cases.length]);
 
-  const updateCaseStatus = useCallback(async (id, status, userRole) => {
+  const updateCaseStatus = useCallback(async (id, status, changedBy) => {
     try {
-      const res = await CaseAPI.updateStatus(id, status, userRole);
+      const res = await CaseAPI.updateStatus(id, status, changedBy || 'Sistem');
       if (res && res.success) {
         setCases((prev) => prev.map((c) => (c.id === id ? { ...c, status } : c)));
         return true;
@@ -418,6 +421,17 @@ export function StoreProvider({ children }) {
       return false;
     }
   }, []);
+
+  const fetchCaseLogs = useCallback(async (caseId) => {
+    try {
+      const logs = await CaseAPI.getLogs(caseId);
+      return Array.isArray(logs) ? logs : [];
+    } catch (err) {
+      console.error('Failed to fetch case logs', err);
+      return [];
+    }
+  }, []);
+
 
   const updateCaseDetails = useCallback(async (id, details) => {
     try {
@@ -512,6 +526,7 @@ export function StoreProvider({ children }) {
     updateCaseDetails,
     toggleChecklistItem,
     generateAktaNumber,
+    fetchCaseLogs,
     addMessage,
     deleteMessage,
     markNotificationRead,

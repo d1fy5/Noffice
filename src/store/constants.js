@@ -27,36 +27,49 @@ export const DOC_CATEGORIES = [
 // Kept for the Upload modal category dropdown.
 export const UPLOAD_CATEGORIES = DOC_CATEGORIES.map((c) => c.id);
 
-// Notary Service Types & Default Document Checklists
+// Layanan Notaris sesuai flow klien
 export const NOTARY_SERVICES = [
   {
-    id: 'AKT-PT',
-    name: 'Pendirian PT / CV / Yayasan',
+    id: 'PT',
+    name: 'Pendirian PT (Perseroan Terbatas)',
     defaultChecklist: [
-      'KTP Para Pendiri & Pengurus',
+      'KTP Para Pendiri & Pengurus (min. 2 orang)',
       'NPWP Para Pendiri & Pengurus',
-      'Persetujuan Nama Perusahaan dari Kemenkumham',
+      'Persetujuan Nama PT dari Kemenkumham (AHU)',
       'Surat Keterangan Domisili Usaha',
-      'Rincian Modal & Komposisi Saham',
+      'Rincian Modal Dasar & Modal Disetor',
+      'Komposisi Saham & Susunan Direksi / Komisaris',
     ]
   },
   {
-    id: 'WARIS',
-    name: 'Surat Keterangan Waris (SKW)',
+    id: 'YAYASAN',
+    name: 'Pendirian Yayasan',
     defaultChecklist: [
-      'Surat Kematian dari Kelurahan/Rumah Sakit',
-      'KTP & KK Seluruh Ahli Waris',
-      'Surat Nikah Almarhum/Almarhumah',
-      'Silsilah / Bagan Ahli Waris dari Desa/Kelurahan',
+      'KTP Para Pendiri & Pengurus Yayasan',
+      'NPWP Para Pendiri',
+      'Surat Keterangan Domisili Yayasan',
+      'Rincian Tujuan & Program Yayasan',
+      'Bukti Kekayaan Awal Yayasan',
     ]
   },
   {
-    id: 'KUASA',
-    name: 'Surat Kuasa / Akta Kuasa',
+    id: 'PERKUMPULAN',
+    name: 'Pendirian Perkumpulan',
     defaultChecklist: [
-      'KTP Pemberi Kuasa',
-      'KTP Penerima Kuasa',
-      'Dokumen Objek Kuasa (Sertifikat/BPKB/dll)',
+      'KTP Para Pendiri Perkumpulan (min. 3 orang)',
+      'Surat Keterangan Domisili Perkumpulan',
+      'Anggaran Dasar Perkumpulan',
+      'Daftar Susunan Pengurus Perkumpulan',
+    ]
+  },
+  {
+    id: 'CV',
+    name: 'Pendirian CV (Commanditaire Vennootschap)',
+    defaultChecklist: [
+      'KTP Para Sekutu (Aktif & Pasif)',
+      'NPWP Para Sekutu',
+      'Surat Keterangan Domisili Usaha',
+      'Rincian Modal & Jenis Usaha',
     ]
   },
   {
@@ -69,6 +82,55 @@ export const NOTARY_SERVICES = [
     ]
   },
   {
+    id: 'KUASA',
+    name: 'Surat Kuasa / Akta Kuasa',
+    defaultChecklist: [
+      'KTP Pemberi Kuasa',
+      'KTP Penerima Kuasa',
+      'Dokumen Objek Kuasa (Sertifikat / BPKB / dll)',
+    ]
+  },
+  {
+    id: 'SEWA_MENYEWA',
+    name: 'Akta Sewa Menyewa',
+    defaultChecklist: [
+      'KTP Pihak Penyewa & Yang Menyewakan',
+      'Sertifikat / Bukti Kepemilikan Objek Sewa',
+      'IMB / PBG (jika objek berupa bangunan)',
+      'Draft Pokok Perjanjian Sewa',
+    ]
+  },
+  {
+    id: 'FIDUSIA',
+    name: 'Akta Jaminan Fidusia',
+    defaultChecklist: [
+      'KTP Pemberi & Penerima Fidusia',
+      'BPKB / Dokumen Objek Fidusia',
+      'Perjanjian Kredit / Pembiayaan',
+      'Bukti Kepemilikan Objek Fidusia',
+    ]
+  },
+  {
+    id: 'CESSIE',
+    name: 'Akta Cessie (Pengalihan Piutang)',
+    defaultChecklist: [
+      'KTP Cedent (Pengalih) & Cessionaris (Penerima)',
+      'Dokumen Piutang yang Dialihkan',
+      'Perjanjian Kredit Asal',
+      'Bukti Pemberitahuan ke Debitor',
+    ]
+  },
+  {
+    id: 'WARIS',
+    name: 'Surat Keterangan Waris (SKW)',
+    defaultChecklist: [
+      'Surat Kematian dari Kelurahan / Rumah Sakit',
+      'KTP & KK Seluruh Ahli Waris',
+      'Surat Nikah Almarhum / Almarhumah',
+      'Silsilah / Bagan Ahli Waris dari Desa / Kelurahan',
+    ]
+  },
+  {
     id: 'LAINNYA',
     name: 'Layanan Notaris Lainnya',
     defaultChecklist: [
@@ -76,32 +138,47 @@ export const NOTARY_SERVICES = [
       'Kartu Keluarga (KK)',
       'Dokumen Pendukung Utama',
     ]
-  }
+  },
+  // Legacy ID — tetap ada agar data lama di database tidak rusak
+  {
+    id: 'AKT-PT',
+    name: 'Pendirian PT (Data Lama)',
+    defaultChecklist: [
+      'KTP Para Pendiri & Pengurus',
+      'NPWP Para Pendiri & Pengurus',
+      'Persetujuan Nama Perusahaan dari Kemenkumham',
+      'Surat Keterangan Domisili Usaha',
+      'Rincian Modal & Komposisi Saham',
+    ]
+  },
 ];
 
 export const PPAT_SERVICES = [
   {
     id: 'AJB',
-    name: 'Akta Jual Beli (AJB)',
+    name: 'Jual Beli (AJB)',
     defaultChecklist: [
       'KTP Penjual & Pembeli (beserta Suami/Istri)',
       'Kartu Keluarga (KK) Penjual & Pembeli',
       'Surat Nikah / Akta Cerai',
       'Sertifikat Asli Tanah (SHM/SHGB)',
       'PBB 5 Tahun Terakhir & STTS Baru',
-      'Bukti Setor BPHTB & PPH',
+      'Bukti Setor BPHTB (Pembeli) & PPH (Penjual)',
       'Surat Persetujuan Suami/Istri',
+      'CEK PLOT — Cek Lokasi Fisik Tanah',
+      'ZNT — Zona Nilai Tanah',
     ]
   },
   {
     id: 'HIBAH',
-    name: 'Akta Hibah',
+    name: 'Hibah',
     defaultChecklist: [
       'KTP Pemberi & Penerima Hibah',
       'Kartu Keluarga (KK) Kedua Pihak',
       'Sertifikat Asli Tanah/Bangunan',
-      'Surat Persetujuan Ahli Waris Kasus Hibah',
+      'Surat Persetujuan Ahli Waris',
       'PBB 5 Tahun Terakhir',
+      'Bukti Setor BPHTB (jika kena pajak)',
     ]
   },
   {
@@ -122,15 +199,7 @@ export const PPAT_SERVICES = [
       'Sertifikat Asli Tanah/Bangunan',
       'Perjanjian Kredit dari Bank',
       'PBB Terakhir',
-    ]
-  },
-  {
-    id: 'SKMHT',
-    name: 'Surat Kuasa Membebankan Hak Tanggungan (SKMHT)',
-    defaultChecklist: [
-      'KTP Pemberi & Penerima Kuasa',
-      'Sertifikat Asli Tanah/Bangunan',
-      'Perjanjian Kredit dari Bank',
+      'CEK PLOT — Cek Lokasi Fisik Tanah',
     ]
   },
   {
@@ -142,22 +211,93 @@ export const PPAT_SERVICES = [
       'Sertifikat Asli',
       'PBB Terakhir',
     ]
-  }
+  },
+  {
+    id: 'WARIS',
+    name: 'Peralihan Hak Waris (BPN)',
+    defaultChecklist: [
+      'Surat Keterangan Waris (SKW / Akta Waris)',
+      'KTP & KK Seluruh Ahli Waris',
+      'Sertifikat Asli Tanah',
+      'Surat Kematian Pemilik',
+      'PBB Terakhir',
+      'Surat Pernyataan Pembagian Waris',
+    ]
+  },
+  {
+    id: 'PECAH',
+    name: 'Pemecahan Sertifikat (Pecah)',
+    defaultChecklist: [
+      'Sertifikat Asli Tanah yang akan dipecah',
+      'KTP Pemilik Tanah',
+      'Gambar Situasi / Peta Bidang Tanah',
+      'PBB Terakhir',
+      'Izin Pemecahan dari Dinas terkait (jika diperlukan)',
+    ]
+  },
+  {
+    id: 'KONVERSI',
+    name: 'Konversi Hak (Girik/Letter C → SHM)',
+    defaultChecklist: [
+      'Surat Girik / Letter C / Petuk D',
+      'Surat Keterangan Tidak Sengketa dari Desa/Kelurahan',
+      'KTP Pemilik Tanah',
+      'PBB Terakhir',
+      'Gambar Situasi / Peta Bidang Tanah',
+      'Surat Pernyataan Penguasaan Fisik Bidang Tanah',
+    ]
+  },
+  // Legacy
+  {
+    id: 'SKMHT',
+    name: 'Surat Kuasa Membebankan Hak Tanggungan (SKMHT)',
+    defaultChecklist: [
+      'KTP Pemberi & Penerima Kuasa',
+      'Sertifikat Asli Tanah/Bangunan',
+      'Perjanjian Kredit dari Bank',
+    ]
+  },
 ];
 
-// Status workflow permohonan / kasus notaris & PPAT
+// Status workflow permohonan / kasus — mengikuti flow Tahap 1 → 2 → 3 → Selesai
+// Field 'group' digunakan untuk pengelompokan <optgroup> di UI
 export const CASE_STATUSES = [
-  { id: 'pending', label: 'Baru (Pending)', variant: 'pending' },
-  { id: 'review', label: 'Peninjauan Notaris', variant: 'review' },
-  { id: 'kurang', label: 'Berkas Belum Lengkap', variant: 'kurang' },
-  { id: 'lengkap', label: 'Berkas Lengkap', variant: 'lengkap' },
-  { id: 'draft', label: 'Drafting Akta', variant: 'draft' },
-  { id: 'ttd', label: 'Siap TTD (Minuta Akta)', variant: 'ttd' },
-  { id: 'selesai', label: 'Akta Ditandatangani', variant: 'selesai' },
-  { id: 'ahu_bpn', label: 'Pengurusan AHU / BPN', variant: 'ahu_bpn' },
-  { id: 'salinan_selesai', label: 'Salinan Akta Diserahkan', variant: 'salinan_selesai' },
-  { id: 'arsip', label: 'Minuta Tersimpan di Arsip', variant: 'arsip' },
-  { id: 'rejected', label: 'Dibatalkan', variant: 'rejected' },
+  // === TAHAP 1: Penerimaan Berkas & Akta (Semua Layanan) ===
+  { id: 'berkas_masuk', label: 'Berkas Masuk', variant: 'pending', group: 'Tahap 1 — Penerimaan Berkas' },
+  { id: 'draf_akta', label: 'Pembuatan Draf Akta', variant: 'draft', group: 'Tahap 1 — Penerimaan Berkas' },
+  { id: 'ttd', label: 'Penandatanganan Akta', variant: 'ttd', group: 'Tahap 1 — Penerimaan Berkas' },
+
+  // === TAHAP 2: Proses Notaris (PT / Yayasan / Perkumpulan / CV) ===
+  { id: 'proses_npwp', label: 'Pembuatan NPWP', variant: 'review', group: 'Tahap 2 — Proses Notaris (PT/CV)' },
+  { id: 'pendaftaran_ahu', label: 'Pendaftaran AHU Kemenkumham', variant: 'ahu_bpn', group: 'Tahap 2 — Proses Notaris (PT/CV)' },
+  { id: 'siup_nib', label: 'Pembuatan SIUP + NIB', variant: 'ahu_bpn', group: 'Tahap 2 — Proses Notaris (PT/CV)' },
+
+  // === TAHAP 2: Proses PPAT (Jual Beli / Hibah / APHT / APHB) ===
+  { id: 'bphtb', label: 'Pembayaran BPHTB', variant: 'review', group: 'Tahap 2 — Proses PPAT' },
+  { id: 'pph', label: 'Pembayaran PPH', variant: 'review', group: 'Tahap 2 — Proses PPAT' },
+  { id: 'cek_plot', label: 'Cek Plot (Lokasi Fisik)', variant: 'review', group: 'Tahap 2 — Proses PPAT' },
+  { id: 'znt', label: 'ZNT (Zona Nilai Tanah)', variant: 'review', group: 'Tahap 2 — Proses PPAT' },
+
+  // === TAHAP 3: Finalisasi ===
+  { id: 'sk_jadi', label: 'SK Jadi', variant: 'selesai', group: 'Tahap 3 — Finalisasi' },
+  { id: 'akta_jadi', label: 'Akta Jadi', variant: 'selesai', group: 'Tahap 3 — Finalisasi' },
+  { id: 'pendaftaran_bpn', label: 'Pendaftaran BPN', variant: 'ahu_bpn', group: 'Tahap 3 — Finalisasi' },
+
+  // === SELESAI ===
+  { id: 'diambil', label: 'Sudah Diambil Klien', variant: 'arsip', group: 'Selesai' },
+  { id: 'belum_diambil', label: 'Belum Diambil Klien', variant: 'salinan_selesai', group: 'Selesai' },
+  { id: 'rejected', label: 'Dibatalkan', variant: 'rejected', group: 'Selesai' },
+
+  // === LEGACY: Status lama — tetap ada agar data lama di DB tidak tampil error ===
+  { id: 'pending', label: 'Baru (Pending)', variant: 'pending', group: 'Legacy' },
+  { id: 'review', label: 'Peninjauan', variant: 'review', group: 'Legacy' },
+  { id: 'kurang', label: 'Berkas Belum Lengkap', variant: 'kurang', group: 'Legacy' },
+  { id: 'lengkap', label: 'Berkas Lengkap', variant: 'lengkap', group: 'Legacy' },
+  { id: 'draft', label: 'Drafting', variant: 'draft', group: 'Legacy' },
+  { id: 'selesai', label: 'Selesai', variant: 'selesai', group: 'Legacy' },
+  { id: 'ahu_bpn', label: 'AHU / BPN', variant: 'ahu_bpn', group: 'Legacy' },
+  { id: 'salinan_selesai', label: 'Salinan Diserahkan', variant: 'salinan_selesai', group: 'Legacy' },
+  { id: 'arsip', label: 'Arsip', variant: 'arsip', group: 'Legacy' },
 ];
 
 

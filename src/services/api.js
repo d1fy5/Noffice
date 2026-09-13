@@ -131,11 +131,11 @@ export const CaseAPI = {
     });
     return res.json();
   },
-  updateStatus: async (id, status, userRole) => {
+  updateStatus: async (id, status, changedBy) => {
     const res = await fetch(`${API_URL}/cases/${id}/status`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status, userRole })
+      body: JSON.stringify({ status, changedBy })
     });
     return res.json();
   },
@@ -161,6 +161,10 @@ export const CaseAPI = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userRole })
     });
+    return res.json();
+  },
+  getLogs: async (id) => {
+    const res = await fetch(`${API_URL}/cases/${id}/logs`);
     return res.json();
   }
 };

@@ -16,8 +16,8 @@ app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
     const hashed = hashPassword(password);
-    // Support both hashed password and legacy plain text
-    let user = await dbGet('SELECT * FROM users WHERE email = ? AND (password = ? OR password = ?)', [email, hashed, password]);
+    // Hanya menerima password yang sudah di-hash (lebih aman)
+    let user = await dbGet('SELECT * FROM users WHERE email = ? AND password = ?', [email, hashed]);
     
     if (user) {
       const { password, ...safeUser } = user;
@@ -173,10 +173,10 @@ app.get('/api/cases', async (req, res) => {
 
 app.post('/api/cases', async (req, res) => {
   try {
-    const { id, caseNumber, clientId, serviceType, status, assignedTo, notes, createdAt, estimatedAt, checklist } = req.body;
+    const { id, caseNumber, clientId, serviceType, status, assignedTo, notes, createdAt, estimatedAt, checklist, aktaNumber, landAddress } = req.body;
     await dbRun(
-      'INSERT INTO cases (id, caseNumber, clientId, serviceType, status, assignedTo, notes, createdAt, estimatedAt, aktaNumber) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [id, caseNumber, clientId, serviceType, status || 'pending', assignedTo, notes, createdAt || new Date().toISOString().split('T')[0], estimatedAt, '']
+      'INSERT INTO cases (id, caseNumber, clientId, serviceType, status, assignedTo, notes, createdAt, estimatedAt, aktaNumber, landAddress) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [id, caseNumber, clientId, serviceType, status || 'berkas_masuk', assignedTo, notes, createdAt || new Date().toISOString().split('T')[0], estimatedAt, aktaNumber || '', landAddress || '']
     );
 
     // Save checklist items if present
@@ -247,57 +247,75 @@ app.delete('/api/documents/trash/empty', async (req, res) => {
   }
 });
 
-// Update Case Status (dengan pembatasan role karyawan vs admin)
+// Update Case Status — semua user (admin & karyawan) berwenang mengubah status apapun
 app.patch('/api/cases/:id/status', async (req, res) => {
   try {
     const { id } = req.params;
-    const { status, userRole } = req.body;
-    const VALID_STATUSES = ['kurang', 'lengkap', 'draft', 'ttd', 'selesai', 'ahu_bpn', 'salinan_selesai', 'arsip', 'rejected'];
+    const { status, changedBy } = req.body;
+
+    // Daftar semua status valid (termasuk status workflow baru + legacy)
+    const VALID_STATUSES = [
+      // Status baru (flow 3-tahap)
+      'berkas_masuk', 'draf_akta', 'ttd',
+      'proses_npwp', 'pendaftaran_ahu', 'siup_nib',
+      'bphtb', 'pph', 'cek_plot', 'znt',
+      'sk_jadi', 'akta_jadi', 'pendaftaran_bpn',
+      'diambil', 'belum_diambil', 'rejected',
+      // Status lama (backward compat)
+      'kurang', 'lengkap', 'draft', 'selesai', 'ahu_bpn', 'salinan_selesai', 'arsip',
+      'pending', 'review',
+    ];
     if (!VALID_STATUSES.includes(status)) {
       return res.status(400).json({ success: false, message: 'Status tidak valid' });
     }
 
-    // Cek status kasus saat ini di database
-    const existingCase = await dbGet('SELECT status FROM cases WHERE id = ?', [id]);
+    const existingCase = await dbGet('SELECT status, caseNumber FROM cases WHERE id = ?', [id]);
     if (!existingCase) {
       return res.status(404).json({ success: false, message: 'Kasus tidak ditemukan' });
     }
 
-    // Jika kasus sudah selesai / salinan_selesai / arsip, hanya Notaris/Admin yang boleh mengubah status
-    const FINISHED_STATUSES = ['selesai', 'salinan_selesai', 'arsip'];
-    if (FINISHED_STATUSES.includes(existingCase.status) && userRole !== 'admin') {
-      return res.status(403).json({ success: false, message: 'Permohonan yang telah selesai/diarsip hanya dapat diubah statusnya oleh Notaris / Admin' });
-    }
-
-    // Karyawan (non-admin) hanya boleh mengubah status kelengkapan berkas awal
-    if (userRole !== 'admin' && status !== 'kurang' && status !== 'lengkap') {
-      return res.status(403).json({ success: false, message: 'Karyawan hanya berwenang mengubah status kelengkapan berkas' });
-    }
+    const oldStatus = existingCase.status;
     await dbRun('UPDATE cases SET status = ? WHERE id = ?', [status, id]);
-    res.json({ success: true, id, status });
+
+    // Simpan log perubahan status ke tabel case_logs
+    const logId = 'log-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6);
+    const timestamp = new Date().toISOString();
+    const actor = changedBy || 'Sistem';
+    const action = `Status diubah dari "${oldStatus}" menjadi "${status}" oleh ${actor}`;
+    await dbRun(
+      'INSERT INTO case_logs (id, caseId, action, changedBy, oldStatus, newStatus, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [logId, id, action, actor, oldStatus, status, timestamp]
+    );
+
+    res.json({ success: true, id, status, logId });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// Update Case Details (Billing & Appointment)
+// GET Log Riwayat Perubahan Status Kasus
+app.get('/api/cases/:id/logs', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const logs = await dbQuery(
+      'SELECT * FROM case_logs WHERE caseId = ? ORDER BY timestamp DESC',
+      [id]
+    );
+    res.json(logs);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update Case Details (Billing & Appointment) — semua user berwenang
 app.put('/api/cases/:id/details', async (req, res) => {
   try {
     const { id } = req.params;
-    const { notaryFee, taxFee, pnbpFee, paymentStatus, appointmentDate, appointmentTime, notes, userRole } = req.body;
-    
-    // Karyawan (non-admin) hanya boleh mengubah jadwal appointment dan catatan, tidak boleh mengubah honorarium/pajak/status bayar
-    if (userRole !== 'admin') {
-      await dbRun(
-        'UPDATE cases SET appointmentDate = ?, appointmentTime = ?, notes = ? WHERE id = ?',
-        [appointmentDate || '', appointmentTime || '', notes || '', id]
-      );
-    } else {
-      await dbRun(
-        'UPDATE cases SET notaryFee = ?, taxFee = ?, pnbpFee = ?, paymentStatus = ?, appointmentDate = ?, appointmentTime = ?, notes = ? WHERE id = ?',
-        [notaryFee || 0, taxFee || 0, pnbpFee || 0, paymentStatus || 'unpaid', appointmentDate || '', appointmentTime || '', notes || '', id]
-      );
-    }
+    const { notaryFee, taxFee, pnbpFee, paymentStatus, appointmentDate, appointmentTime, notes } = req.body;
+    await dbRun(
+      'UPDATE cases SET notaryFee = ?, taxFee = ?, pnbpFee = ?, paymentStatus = ?, appointmentDate = ?, appointmentTime = ?, notes = ? WHERE id = ?',
+      [notaryFee || 0, taxFee || 0, pnbpFee || 0, paymentStatus || 'unpaid', appointmentDate || '', appointmentTime || '', notes || '', id]
+    );
     res.json({ success: true, id });
   } catch (error) {
     res.status(500).json({ error: error.message });

@@ -47,7 +47,7 @@ export const translations = {
     'topbar.viewPending': 'View pending documents',
 
     // Search
-    search: 'Search documents, employees, messages...',
+    search: 'Search by name, case no., land address, akta no...',
     'search.clear': 'Clear search',
 
     // Breadcrumbs
@@ -380,7 +380,7 @@ export const translations = {
     'topbar.pendingApproval': 'menunggu persetujuan',
     'topbar.viewPending': 'Lihat dokumen tertunda',
 
-    search: 'Cari dokumen, karyawan, pesan...',
+    search: 'Cari nama, No. Kasus, Alamat Tanah, No. Akta...',
     'search.clear': 'Bersihkan pencarian',
 
     'breadcrumb.home': 'Beranda',

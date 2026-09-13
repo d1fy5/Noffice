@@ -71,9 +71,9 @@ export default function Dashboard() {
       <div className="stat-grid">
         <StatCard tone="blue" label="Kasus Aktif" value={(totals.activeCases || 0).toLocaleString()} icon="fileText" sub={`${totals.totalCases || 0} total permohonan`} />
         <StatCard tone="green" label="Total Klien" value={(totals.totalClients || 0).toLocaleString()} icon="user" sub="klien di database" />
-        <StatCard tone="violet" label="Dokumen" value={totals.totalDocuments.toLocaleString()} icon="documents" sub={totals.totalDocuments ? t('stat.sub.totalTruth') : t('stat.sub.totalEmpty')} />
+        <StatCard tone="violet" label="Dokumen" value={(totals.totalDocuments || 0).toLocaleString()} icon="documents" sub={totals.totalDocuments ? t('stat.sub.totalTruth') : t('stat.sub.totalEmpty')} />
         {isAdmin ? (
-          <StatCard tone="amber" label="Menunggu Persetujuan" value={totals.pendingApprovals.toLocaleString()} icon="clock" sub={totals.pendingApprovals ? t('stat.sub.pendingTruth') : t('stat.sub.pendingEmpty')} />
+          <StatCard tone="amber" label="Menunggu Persetujuan" value={(totals.pendingApprovals || 0).toLocaleString()} icon="clock" sub={totals.pendingApprovals ? t('stat.sub.pendingTruth') : t('stat.sub.pendingEmpty')} />
         ) : (
           <StatCard tone="green" label="Mesin AI" value="Siap" icon="activity" sub="100% offline" />
         )}
