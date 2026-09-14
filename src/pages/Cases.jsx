@@ -194,7 +194,8 @@ export default function Cases() {
   };
 
   const handleGenerateAkta = async (caseId) => {
-    const aktaNum = await generateAktaNumber(caseId, user?.role);
+    const serviceType = selectedCase?.serviceType || '';
+    const aktaNum = await generateAktaNumber(caseId, user?.role, serviceType);
     if (aktaNum) {
       notify(`Nomor Akta Resmi Terbentuk: ${aktaNum}`, 'success');
       if (selectedCase && selectedCase.id === caseId) {
@@ -514,13 +515,11 @@ export default function Cases() {
               onChange={(e) => handleStatusChange(selectedCase.id, e.target.value)}
               style={{ fontWeight: 600, fontSize: '0.85rem', minWidth: '220px' }}
             >
-              {statusGrouped.map(([groupName, statuses]) => (
-                <optgroup key={groupName} label={groupName}>
-                  {statuses.map(st => (
-                    <option key={st.id} value={st.id}>{st.label}</option>
-                  ))}
-                </optgroup>
-              ))}
+              {statusGrouped.flatMap(([, statuses]) =>
+                statuses.map(st => (
+                  <option key={st.id} value={st.id}>{st.label}</option>
+                ))
+              )}
               {CASE_STATUSES.filter(st => st.group === 'Legacy' && st.id === selectedCase.status).map(st => (
                 <option key={st.id} value={st.id}>{st.label} (Data Lama)</option>
               ))}

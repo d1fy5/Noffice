@@ -342,11 +342,11 @@ function toRomanMonth(monthZeroIndexed) {
   return roman[monthZeroIndexed] || 'I';
 }
 
-// Generate Nomor Akta Otomatis (No. [Urut]/[Bulan Romawi]/[Tahun])
+// Generate Nomor Akta Otomatis dengan format kustom
 app.post('/api/cases/:id/generate-akta', async (req, res) => {
   try {
     const { id } = req.params;
-    const { userRole } = req.body || {};
+    const { userRole, aktaFormat, serviceType } = req.body || {};
 
     if (userRole !== 'admin') {
       return res.status(403).json({ success: false, message: 'Hanya Notaris / Admin yang berwenang menerbitkan Nomor Akta' });
@@ -355,6 +355,8 @@ app.post('/api/cases/:id/generate-akta', async (req, res) => {
     const now = new Date();
     const currentYear = now.getFullYear();
     const romanMonth = toRomanMonth(now.getMonth());
+    const paddedMonth = String(now.getMonth() + 1).padStart(2, '0');
+    const shortYear = String(currentYear).slice(-2);
 
     // Cek last number di akta_counter
     let row = await dbGet('SELECT lastNumber FROM akta_counter WHERE year = ?', [currentYear]);
@@ -366,7 +368,15 @@ app.post('/api/cases/:id/generate-akta', async (req, res) => {
       await dbRun('INSERT INTO akta_counter (year, lastNumber) VALUES (?, ?)', [currentYear, nextNum]);
     }
 
-    const aktaNumber = `No. ${nextNum}/${romanMonth}/${currentYear}`;
+    // Gunakan format kustom jika ada, fallback ke format default
+    const format = aktaFormat || 'No. {no}/{bulanRomawi}/{tahun}';
+    const aktaNumber = format
+      .replace(/\{no\}/g, nextNum)
+      .replace(/\{bulanRomawi\}/g, romanMonth)
+      .replace(/\{bulan\}/g, paddedMonth)
+      .replace(/\{tahun\}/g, currentYear)
+      .replace(/\{tahunPendek\}/g, shortYear)
+      .replace(/\{jenisAkta\}/g, serviceType || '');
 
     // Update di tabel cases
     await dbRun('UPDATE cases SET aktaNumber = ? WHERE id = ?', [aktaNumber, id]);

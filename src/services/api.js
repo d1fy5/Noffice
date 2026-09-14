@@ -155,11 +155,11 @@ export const CaseAPI = {
     });
     return res.json();
   },
-  generateAktaNumber: async (id, userRole) => {
+  generateAktaNumber: async (id, userRole, aktaFormat, serviceType) => {
     const res = await fetch(`${API_URL}/cases/${id}/generate-akta`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userRole })
+      body: JSON.stringify({ userRole, aktaFormat, serviceType })
     });
     return res.json();
   },

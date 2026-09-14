@@ -203,7 +203,8 @@ export default function PpatCases() {
       notify('Hanya Notaris Utama / Super Admin yang berwenang menerbitkan Nomor Akta Resmi.', 'warning');
       return;
     }
-    const aktaNum = await generateAktaNumber(caseId, user?.role);
+    const serviceType = selectedCase?.serviceType || '';
+    const aktaNum = await generateAktaNumber(caseId, user?.role, serviceType);
     if (aktaNum) {
       notify(`Nomor Akta Resmi Terbentuk: ${aktaNum}`, 'success');
       if (selectedCase && selectedCase.id === caseId) {
@@ -611,13 +612,11 @@ export default function PpatCases() {
                 onChange={(e) => handleStatusChange(selectedCase.id, e.target.value)}
                 style={{ fontWeight: 600, fontSize: '0.85rem' }}
               >
-                {statusGrouped.map(([groupName, statuses]) => (
-                  <optgroup key={groupName} label={groupName}>
-                    {statuses.map(st => (
-                      <option key={st.id} value={st.id}>{st.label}</option>
-                    ))}
-                  </optgroup>
-                ))}
+                {statusGrouped.flatMap(([, statuses]) =>
+                  statuses.map(st => (
+                    <option key={st.id} value={st.id}>{st.label}</option>
+                  ))
+                )}
                 {CASE_STATUSES.filter(st => st.group === 'Legacy' && st.id === selectedCase.status).map(st => (
                   <option key={st.id} value={st.id}>{st.label} (Data Lama)</option>
                 ))}

@@ -10,6 +10,8 @@ export default function PrintReceiptModal({ open, onClose, caseData, clientData,
   if (!caseData || !clientData) return null;
 
   const companyName = generalInfo?.companyName || 'KANTOR NOTARIS & PPAT';
+  const receiptSubtitle = generalInfo?.receiptSubtitle || 'Pejabat Pembuat Akta Tanah (PPAT) & Notaris Resmi';
+  const receiptAddress = generalInfo?.receiptAddress || 'Jln. Utama Perkantoran No. 88 | Telp/WA: (021) 555-8899 | Email: info@noffice-notary.id';
 
   const handlePrint = () => {
     window.print();
@@ -79,10 +81,10 @@ export default function PrintReceiptModal({ open, onClose, caseData, clientData,
             {companyName}
           </h2>
           <div style={{ fontSize: '0.85rem', color: '#475569', marginTop: '2px' }}>
-            Pejabat Pembuat Akta Tanah (PPAT) & Notaris Resmi
+            {receiptSubtitle}
           </div>
           <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
-            Alamat: Jln. Utama Perkantoran No. 88 | Telp/WA: (021) 555-8899 | Email: info@noffice-notary.id
+            {receiptAddress}
           </div>
         </div>
 

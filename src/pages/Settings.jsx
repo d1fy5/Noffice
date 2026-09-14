@@ -38,6 +38,61 @@ function ToggleRow({ label, desc, checked, onChange }) {
   );
 }
 
+function PanduanPengguna() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ border: '1px solid var(--border)', borderRadius: '12px', marginBottom: '18px', overflow: 'hidden' }}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        style={{
+          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '12px 18px', background: 'var(--surface-2)', border: 'none', cursor: 'pointer',
+          fontSize: '0.88rem', fontWeight: 700, color: 'var(--text)',
+        }}
+      >
+        <span>📖 Panduan Penggunaan — Format Akta & Tanda Terima</span>
+        <span style={{ fontSize: '0.75rem', color: 'var(--text-3)', fontWeight: 400, transition: 'transform 0.2s', display: 'inline-block', transform: open ? 'rotate(180deg)' : 'none' }}>▼</span>
+      </button>
+      {open && (
+        <div style={{ padding: '16px 20px', background: 'var(--surface)', fontSize: '0.82rem', color: 'var(--text-2)', lineHeight: 1.7 }}>
+          <h4 style={{ margin: '0 0 10px', color: 'var(--text)', fontSize: '0.88rem' }}>🔢 Cara Mengubah Format Nomor Akta</h4>
+          <ol style={{ paddingLeft: '18px', margin: '0 0 14px' }}>
+            <li>Buka halaman <strong>Settings → General</strong></li>
+            <li>Gulir ke bagian <strong>"Format Nomor Akta"</strong></li>
+            <li>Ketik format yang diinginkan di kotak input, atau klik chip variabel untuk menyisipkan otomatis</li>
+            <li>Preview hasil format akan tampil secara langsung di bawah kotak</li>
+            <li>Klik <strong>Simpan Perubahan</strong> di bagian bawah halaman</li>
+            <li>Format baru berlaku saat berikutnya klik tombol <strong>"Generate No. Akta"</strong> di halaman Kasus</li>
+          </ol>
+          <div style={{ background: 'var(--surface-2)', borderRadius: '8px', padding: '10px 14px', marginBottom: '14px', fontFamily: 'monospace', fontSize: '0.8rem' }}>
+            <div style={{ marginBottom: '4px', fontWeight: 700, color: 'var(--text)' }}>Contoh Format:</div>
+            <div>No. {'{no}'}/{'{bulanRomawi}'}/{'{tahun}'} &nbsp;→&nbsp; <strong>No. 5/IX/2026</strong></div>
+            <div>AKT-{'{no}'}/{'{tahun}'}/{'{bulanRomawi}'} &nbsp;→&nbsp; <strong>AKT-5/2026/IX</strong></div>
+            <div>{'{no}'}/{'{jenisAkta}'}/{'{tahun}'} &nbsp;→&nbsp; <strong>5/PT/2026</strong></div>
+            <div>{'{no}'}/{'{bulan}'}/{'{tahunPendek}'} &nbsp;→&nbsp; <strong>5/09/26</strong></div>
+          </div>
+          <div style={{ background: 'var(--warning-soft,#fef9c3)', border: '1px solid var(--warning-border,#fde68a)', borderRadius: '8px', padding: '8px 14px', marginBottom: '14px', color: '#92400e', fontSize: '0.78rem' }}>
+            ⚠️ <strong>Penting:</strong> Pastikan format mengandung variabel <code>{'{no}'}</code> agar nomor urut akta tidak berulang. Nomor urut dihitung otomatis per tahun.
+          </div>
+          <h4 style={{ margin: '0 0 10px', color: 'var(--text)', fontSize: '0.88rem' }}>🖨️ Cara Mengubah Template Tanda Terima</h4>
+          <ol style={{ paddingLeft: '18px', margin: '0 0 14px' }}>
+            <li>Masih di <strong>Settings → General</strong>, gulir ke bagian <strong>"Template Tanda Terima"</strong></li>
+            <li>Ubah <strong>Subtitle Kop Surat</strong> — contoh: <em>"Notaris & PPAT Kota Semarang"</em></li>
+            <li>Ubah <strong>Alamat & Kontak Kantor</strong> — contoh: <em>"Jln. Diponegoro No. 10 | Telp: 024-555xxxx"</em></li>
+            <li>Preview kop surat akan berubah secara langsung di bawah form</li>
+            <li>Klik <strong>Simpan Perubahan</strong></li>
+            <li>Perubahan langsung berlaku saat cetak Tanda Terima di halaman Kasus</li>
+          </ol>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-3)', borderTop: '1px solid var(--border)', paddingTop: '10px', marginTop: '4px' }}>
+            💡 <strong>Tips:</strong> Nama Kantor di kop surat diambil dari field <em>"Nama Perusahaan"</em> di atas. Ubah di sana untuk mengganti nama kantor pada tanda terima.
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Settings() {
   const { t } = useTranslation();
   const {
@@ -244,6 +299,113 @@ export default function Settings() {
                   {DATE_FORMATS.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
                 </select>
               </FormField>
+
+              {/* ── Card: Format Nomor Akta ── */}
+              <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: '12px', padding: '18px 20px', marginBottom: '18px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                  <span style={{ fontSize: '1.1rem' }}>🔢</span>
+                  <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text)' }}>Format Nomor Akta</span>
+                </div>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-2)', margin: '0 0 14px', lineHeight: 1.5 }}>
+                  Tentukan template penomoran akta. Gunakan variabel di bawah untuk menyesuaikan format sesuai kebutuhan kantor.
+                </p>
+                {/* Chip variabel */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px' }}>
+                  {['{no}', '{bulanRomawi}', '{bulan}', '{tahun}', '{tahunPendek}', '{jenisAkta}'].map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => setGenForm((f) => ({ ...f, aktaFormat: (f.aktaFormat || '') + v }))}
+                      title={`Klik untuk sisipkan ${v}`}
+                      style={{
+                        padding: '3px 10px', fontSize: '0.75rem', fontWeight: 600, fontFamily: 'monospace',
+                        background: 'var(--primary-soft)', color: 'var(--primary)', border: '1px solid var(--primary)',
+                        borderRadius: '99px', cursor: 'pointer', transition: 'opacity 0.15s',
+                      }}
+                    >
+                      {v}
+                    </button>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <input
+                    className="form-input"
+                    id="gen-akta-format"
+                    value={genForm.aktaFormat || 'No. {no}/{bulanRomawi}/{tahun}'}
+                    onChange={(e) => setGenForm({ ...genForm, aktaFormat: e.target.value })}
+                    placeholder="No. {no}/{bulanRomawi}/{tahun}"
+                    style={{ fontFamily: 'monospace', fontSize: '0.9rem', flex: 1 }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setGenForm((f) => ({ ...f, aktaFormat: 'No. {no}/{bulanRomawi}/{tahun}' }))}
+                    style={{ padding: '8px 12px', fontSize: '0.75rem', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', cursor: 'pointer', color: 'var(--text-2)', whiteSpace: 'nowrap' }}
+                    title="Reset ke format default"
+                  >
+                    Reset
+                  </button>
+                </div>
+                {/* Live Preview */}
+                <div style={{ marginTop: '10px', padding: '8px 14px', background: 'var(--surface)', borderRadius: '8px', border: '1px dashed var(--border-strong)', fontSize: '0.82rem', color: 'var(--text-2)' }}>
+                  <span style={{ fontWeight: 600 }}>Preview: </span>
+                  <span style={{ fontFamily: 'monospace', color: 'var(--primary)', fontWeight: 700 }}>
+                    {(genForm.aktaFormat || 'No. {no}/{bulanRomawi}/{tahun}')
+                      .replace(/\{no\}/g, '5')
+                      .replace(/\{bulanRomawi\}/g, ['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'][new Date().getMonth()])
+                      .replace(/\{bulan\}/g, String(new Date().getMonth() + 1).padStart(2, '0'))
+                      .replace(/\{tahun\}/g, new Date().getFullYear())
+                      .replace(/\{tahunPendek\}/g, String(new Date().getFullYear()).slice(-2))
+                      .replace(/\{jenisAkta\}/g, 'PT')}
+                  </span>
+                </div>
+                <div style={{ marginTop: '8px', fontSize: '0.75rem', color: 'var(--text-3)', lineHeight: 1.5 }}>
+                  <strong>Keterangan variabel:</strong> {'{no}'} = nomor urut · {'{bulanRomawi}'} = bulan romawi (I–XII) · {'{bulan}'} = bulan angka (01–12) · {'{tahun}'} = tahun 4 digit · {'{tahunPendek}'} = tahun 2 digit · {'{jenisAkta}'} = jenis akta (PT, CV, dll)
+                </div>
+              </div>
+
+              {/* ── Card: Template Tanda Terima ── */}
+              <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: '12px', padding: '18px 20px', marginBottom: '18px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                  <span style={{ fontSize: '1.1rem' }}>🖨️</span>
+                  <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text)' }}>Template Tanda Terima</span>
+                </div>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-2)', margin: '0 0 14px', lineHeight: 1.5 }}>
+                  Kustomisasi kop surat yang muncul pada cetak Tanda Terima Berkas & Penyerahan Salinan Akta.
+                </p>
+                <FormField label="Subtitle Kop Surat" htmlFor="gen-receipt-subtitle">
+                  <input
+                    className="form-input"
+                    id="gen-receipt-subtitle"
+                    value={genForm.receiptSubtitle || ''}
+                    onChange={(e) => setGenForm({ ...genForm, receiptSubtitle: e.target.value })}
+                    placeholder="Pejabat Pembuat Akta Tanah (PPAT) & Notaris Resmi"
+                  />
+                </FormField>
+                <FormField label="Alamat & Kontak Kantor" htmlFor="gen-receipt-address">
+                  <input
+                    className="form-input"
+                    id="gen-receipt-address"
+                    value={genForm.receiptAddress || ''}
+                    onChange={(e) => setGenForm({ ...genForm, receiptAddress: e.target.value })}
+                    placeholder="Jln. Utama No. 88 | Telp: (021) 555-8899 | Email: info@kantor.id"
+                  />
+                </FormField>
+                {/* Live Preview Mini Kop */}
+                <div style={{ marginTop: '4px', padding: '14px 16px', background: '#fff', border: '1px solid #cbd5e1', borderRadius: '8px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px', color: '#0f172a', borderBottom: '2px solid #0f172a', paddingBottom: '8px', marginBottom: '6px' }}>
+                    {genForm.companyName || 'NAMA KANTOR'}
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: '#475569' }}>
+                    {genForm.receiptSubtitle || 'Pejabat Pembuat Akta Tanah (PPAT) & Notaris Resmi'}
+                  </div>
+                  <div style={{ fontSize: '0.68rem', color: '#64748b', marginTop: '2px' }}>
+                    {genForm.receiptAddress || 'Alamat kantor belum diisi'}
+                  </div>
+                </div>
+              </div>
+
+              {/* ── Panel Panduan Pengguna ── */}
+              <PanduanPengguna />
 
               <div className="settings-head" style={{ marginBottom: 12 }}>
                 <h2>{t('settings.general.storage')}</h2>

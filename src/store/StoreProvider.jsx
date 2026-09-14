@@ -68,6 +68,11 @@ export function StoreProvider({ children }) {
       timezone: 'Asia/Jakarta',
       dateFormat: 'DD/MM/YYYY',
       storageLimitGB: 50,
+      // Kustomisasi Nomor Akta
+      aktaFormat: 'No. {no}/{bulanRomawi}/{tahun}',
+      // Kustomisasi Tanda Terima
+      receiptSubtitle: 'Pejabat Pembuat Akta Tanah (PPAT) & Notaris Resmi',
+      receiptAddress: 'Jln. Utama Perkantoran No. 88 | Telp/WA: (021) 555-8899 | Email: info@noffice-notary.id',
     })
   );
 
@@ -463,9 +468,10 @@ export function StoreProvider({ children }) {
     }
   }, []);
 
-  const generateAktaNumber = useCallback(async (caseId, userRole) => {
+  const generateAktaNumber = useCallback(async (caseId, userRole, serviceType) => {
     try {
-      const res = await CaseAPI.generateAktaNumber(caseId, userRole);
+      const aktaFormat = general?.aktaFormat || 'No. {no}/{bulanRomawi}/{tahun}';
+      const res = await CaseAPI.generateAktaNumber(caseId, userRole, aktaFormat, serviceType);
       if (res && res.success && res.aktaNumber) {
         setCases((prev) =>
           prev.map((c) => (c.id === caseId ? { ...c, aktaNumber: res.aktaNumber, status: 'draft' } : c))
@@ -477,7 +483,7 @@ export function StoreProvider({ children }) {
       console.error('Failed to generate akta number', err);
       return null;
     }
-  }, []);
+  }, [general]);
 
   const totals = useMemo(() => {
     const active = documents.filter((d) => !d.isTrashed);
