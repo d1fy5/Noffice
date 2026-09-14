@@ -26,7 +26,6 @@ export default function Cases() {
   const [filterService, setFilterService] = useState('all');
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedCase, setSelectedCase] = useState(null);
-  const [aiAuditResult, setAiAuditResult] = useState(null);
   const [receiptModalOpen, setReceiptModalOpen] = useState(false);
   const [caseLogs, setCaseLogs] = useState([]);
   const [logsLoading, setLogsLoading] = useState(false);
@@ -74,25 +73,17 @@ export default function Cases() {
     setSelectedCase(c);
     setCaseLogs([]);
     setBillingForm({
-      notaryFee: c.notaryFee || 0,
-      taxFee: c.taxFee || 0,
-      pnbpFee: c.pnbpFee || 0,
       paymentStatus: c.paymentStatus || 'unpaid',
       appointmentDate: c.appointmentDate || '',
       appointmentTime: c.appointmentTime || '',
       notes: c.notes || '',
     });
-    setAiAuditResult(null);
     // Load logs
     setLogsLoading(true);
     fetchCaseLogs(c.id).then((logs) => {
       setCaseLogs(logs);
       setLogsLoading(false);
     });
-    const client = clients.find((cl) => cl.id === c.clientId);
-    AiAPI.auditCase(c, client)
-      .then((res) => setAiAuditResult(res))
-      .catch(() => {});
   };
 
   const handleSaveBilling = async () => {
@@ -225,9 +216,22 @@ export default function Cases() {
   };
 
   const statusGrouped = useMemo(() => {
+    if (!selectedCase) return [];
+    
+    // Kasus kompleks yang membutuhkan Tahap 2 (NPWP, AHU, NIB) dan Tahap 3 (SK Jadi)
+    const isComplexNotary = ['PT', 'CV', 'YAYASAN', 'PERKUMPULAN', 'AKT-PT'].includes(selectedCase.serviceType);
+
     return Object.entries(
       CASE_STATUSES
         .filter(st => st.group !== 'Legacy')
+        .filter(st => st.group !== 'Tahap 2 — Proses PPAT') // Notaris tidak butuh proses PPAT
+        .filter(st => st.id !== 'pendaftaran_bpn') // Pendaftaran BPN khusus PPAT
+        .filter(st => {
+           if (st.group === 'Tahap 2 — Proses Notaris (PT/CV)') return isComplexNotary;
+           if (st.id === 'sk_jadi') return isComplexNotary;
+           if (st.id === 'akta_jadi') return !isComplexNotary;
+           return true;
+        })
         .reduce((acc, st) => {
           const g = st.group || 'Lainnya';
           if (!acc[g]) acc[g] = [];
@@ -235,7 +239,7 @@ export default function Cases() {
           return acc;
         }, {})
     );
-  }, []);
+  }, [selectedCase]);
 
   return (
     <>
@@ -553,35 +557,11 @@ export default function Cases() {
                   }
                 </div>
               </div>
-              {aiAuditResult && (
-                <div style={{ background: 'var(--surface)', padding: '18px', borderRadius: '12px', border: '1px solid var(--border)' }}>
-                  <h4 style={{ margin: '0 0 10px', fontSize: '0.95rem', fontWeight: 600 }}>{'\u{1F916}'} AI Audit Kasus</h4>
-                  <div style={{ fontSize: '0.85rem', color: 'var(--text-2)', lineHeight: 1.6 }}>
-                    {typeof aiAuditResult === 'string' ? aiAuditResult : JSON.stringify(aiAuditResult)}
-                  </div>
-                </div>
-              )}
             </div>
 
             <div>
               <div style={{ background: 'var(--surface)', padding: '18px', borderRadius: '12px', border: '1px solid var(--border)' }}>
                 <h4 style={{ margin: '0 0 14px', fontSize: '0.95rem', fontWeight: 600, borderBottom: '1px solid var(--border)', paddingBottom: '10px' }}>Biaya &amp; Agenda TTD</h4>
-                {isAdmin && (
-                  <div className="form-grid" style={{ marginBottom: '12px' }}>
-                    <div className="form-group">
-                      <label className="form-label">Honorarium Notaris (Rp):</label>
-                      <input type="number" value={billingForm.notaryFee} onChange={(e) => setBillingForm({ ...billingForm, notaryFee: Number(e.target.value) })} style={{ fontFamily: 'monospace' }} />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">Biaya Pajak (Rp):</label>
-                      <input type="number" value={billingForm.taxFee} onChange={(e) => setBillingForm({ ...billingForm, taxFee: Number(e.target.value) })} style={{ fontFamily: 'monospace' }} />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">PNBP (Rp):</label>
-                      <input type="number" value={billingForm.pnbpFee} onChange={(e) => setBillingForm({ ...billingForm, pnbpFee: Number(e.target.value) })} style={{ fontFamily: 'monospace' }} />
-                    </div>
-                  </div>
-                )}
                 <div className="form-group">
                   <label className="form-label">Status Pembayaran:</label>
                   <select value={billingForm.paymentStatus} onChange={(e) => setBillingForm({ ...billingForm, paymentStatus: e.target.value })}>

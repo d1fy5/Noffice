@@ -26,7 +26,6 @@ export default function PpatCases() {
   const [filterService, setFilterService] = useState('all');
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedCase, setSelectedCase] = useState(null);
-  const [aiAuditResult, setAiAuditResult] = useState(null);
 
   const [receiptModalOpen, setReceiptModalOpen] = useState(false);
   const [caseLogs, setCaseLogs] = useState([]);
@@ -50,9 +49,6 @@ export default function PpatCases() {
 
   // Billing & Appointment local edit state
   const [billingForm, setBillingForm] = useState({
-    notaryFee: 0,
-    taxFee: 0,
-    pnbpFee: 0,
     paymentStatus: 'unpaid',
     appointmentDate: '',
     appointmentTime: '',
@@ -62,15 +58,11 @@ export default function PpatCases() {
   const handleOpenCaseDetail = (c) => {
     setSelectedCase(c);
     setBillingForm({
-      notaryFee: c.notaryFee || 0,
-      taxFee: c.taxFee || 0,
-      pnbpFee: c.pnbpFee || 0,
       paymentStatus: c.paymentStatus || 'unpaid',
       appointmentDate: c.appointmentDate || '',
       appointmentTime: c.appointmentTime || '',
       notes: c.notes || '',
     });
-    setAiAuditResult(null);
     // Load logs saat buka detail
     setCaseLogs([]);
     setLogsLoading(true);
@@ -78,10 +70,6 @@ export default function PpatCases() {
       setCaseLogs(logs);
       setLogsLoading(false);
     });
-    const client = clients.find((cl) => cl.id === c.clientId);
-    AiAPI.auditCase(c, client)
-      .then((res) => setAiAuditResult(res))
-      .catch(() => {});
   };
 
   const handleSaveBilling = async () => {
@@ -128,7 +116,9 @@ export default function PpatCases() {
           (c.caseNumber || '').toLowerCase().includes(q) ||
           (c.aktaNumber || '').toLowerCase().includes(q) ||
           (c.notes || '').toLowerCase().includes(q) ||
-          (c.serviceType || '').toLowerCase().includes(q)
+          (c.serviceType || '').toLowerCase().includes(q) ||
+          (c.landAddress || '').toLowerCase().includes(q) ||
+          (c.assignedTo || '').toLowerCase().includes(q)
       );
     }
     return rows;
@@ -233,6 +223,20 @@ export default function PpatCases() {
     const s = CASE_STATUSES.find((item) => item.id === st) || CASE_STATUSES[0];
     return <span className={`badge status-badge ${s.variant}`}>{s.label}</span>;
   };
+
+  // Grouped status untuk optgroup dropdown
+  const statusGrouped = useMemo(() => {
+    const groups = {};
+    CASE_STATUSES
+      .filter(st => st.group !== 'Tahap 2 — Proses Notaris (PT/CV)') // PPAT tidak butuh tahap notaris
+      .filter(st => st.id !== 'sk_jadi' && st.id !== 'akta_jadi') // PPAT Tahap 3 hanya Pendaftaran BPN
+      .forEach((st) => {
+        if (!st.group || st.group === 'Legacy') return;
+        if (!groups[st.group]) groups[st.group] = [];
+        groups[st.group].push(st);
+      });
+    return Object.entries(groups);
+  }, []);
 
   return (
     <>
@@ -674,25 +678,6 @@ export default function PpatCases() {
                 </div>
               </div>
 
-              {/* AI Case Audit Widget */}
-              {aiAuditResult && (
-                <div style={{ background: 'var(--info-soft)', padding: '16px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--info-border)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600, color: 'var(--info)', fontSize: '0.88rem', marginBottom: '8px' }}>
-                    <Icon name="activity" size={15} />
-                    <span>AI Auditor & Analisis Risiko Notaris ({aiAuditResult.status})</span>
-                  </div>
-                  {aiAuditResult.warnings && aiAuditResult.warnings.map((w, idx) => (
-                    <div key={idx} style={{ fontSize: '0.8rem', color: 'var(--red)', marginTop: '4px', display: 'flex', gap: '6px' }}>
-                      <Icon name="alert" size={14} /> <span>{w}</span>
-                    </div>
-                  ))}
-                  {aiAuditResult.suggestions && aiAuditResult.suggestions.map((s, idx) => (
-                    <div key={idx} style={{ fontSize: '0.8rem', color: 'var(--info)', marginTop: '4px', display: 'flex', gap: '6px' }}>
-                      <Icon name="check" size={14} /> <span>{s}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
 
             {/* Right Column: Biaya & Agenda TTD */}
@@ -704,23 +689,8 @@ export default function PpatCases() {
                   </h4>
                 </div>
 
-                {isAdmin && (
-                  <div className="form-grid" style={{ marginBottom: '12px' }}>
-                    <div className="form-group">
-                      <label className="form-label">Honorarium Notaris (Rp):</label>
-                      <input type="number" value={billingForm.notaryFee} onChange={(e) => setBillingForm({ ...billingForm, notaryFee: Number(e.target.value) })} style={{ fontFamily: 'monospace' }} />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">Biaya Pajak (Rp):</label>
-                      <input type="number" value={billingForm.taxFee} onChange={(e) => setBillingForm({ ...billingForm, taxFee: Number(e.target.value) })} style={{ fontFamily: 'monospace' }} />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">PNBP (Rp):</label>
-                      <input type="number" value={billingForm.pnbpFee} onChange={(e) => setBillingForm({ ...billingForm, pnbpFee: Number(e.target.value) })} style={{ fontFamily: 'monospace' }} />
-                    </div>
-                  </div>
-                )}
                 
+
                 <div className="form-group">
                   <label className="form-label">Status Pembayaran:</label>
                   <select value={billingForm.paymentStatus} onChange={(e) => setBillingForm({ ...billingForm, paymentStatus: e.target.value })}>
