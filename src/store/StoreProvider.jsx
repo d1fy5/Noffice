@@ -20,10 +20,10 @@ export function StoreProvider({ children }) {
         const emps = await EmployeeAPI.getAll();
         const cls = await ClientAPI.getAll();
         const cs = await CaseAPI.getAll();
-        setDocuments(docs || []);
-        setEmployees(emps || []);
-        setClients(cls || []);
-        setCases(cs || []);
+        setDocuments(Array.isArray(docs) ? docs : []);
+        setEmployees(Array.isArray(emps) ? emps : []);
+        setClients(Array.isArray(cls) ? cls : []);
+        setCases(Array.isArray(cs) ? cs : []);
       } catch (err) {
         console.error("Failed to fetch data from backend", err);
       }
@@ -100,6 +100,20 @@ export function StoreProvider({ children }) {
       const item = items[idx];
       const f = item.file;
       const name = (item.name && item.name.trim()) || f.name;
+
+      let fileData = null;
+      if (f && typeof FileReader !== 'undefined') {
+        try {
+          fileData = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(f);
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = (err) => reject(err);
+          });
+        } catch (e) {
+          console.error('Failed to read file as Base64', e);
+        }
+      }
       
       const doc = {
         id: uid() + idx,
@@ -121,10 +135,18 @@ export function StoreProvider({ children }) {
         isTrashed: false,
         trashedAt: null,
         trashedBy: null,
+        fileData,
+        originalFilename: f.name,
+        mimeType: f.type || 'application/octet-stream',
       };
       
       try {
-        await DocumentAPI.create(doc);
+        const res = await DocumentAPI.create(doc);
+        if (res && res.storedFilename) {
+          doc.storedFilename = res.storedFilename;
+        }
+        // Jangan simpan base64 string raksasa di state React setelah terkirim ke server
+        delete doc.fileData;
         created.push(doc);
       } catch (err) {
         console.error("Failed to create document", err);
@@ -328,7 +350,7 @@ export function StoreProvider({ children }) {
   // Submissions derived from documents (trashed documents are excluded).
   const submissions = useMemo(
     () =>
-      documents
+      (Array.isArray(documents) ? documents : [])
         .filter((d) => !d.isTrashed)
         .map((d, i) => ({
           id: `SUB-${(1082 - i + 10000) % 10000}`,
@@ -391,7 +413,6 @@ export function StoreProvider({ children }) {
       id: 'kasus-' + Date.now(),
       status: 'berkas_masuk',
       createdAt: new Date().toISOString().split('T')[0],
-      aktaNumber: '',
       landAddress: '',
       ...data,
       // Computed fields: override raw data dengan versi yang sudah diproses
@@ -486,16 +507,20 @@ export function StoreProvider({ children }) {
   }, [general]);
 
   const totals = useMemo(() => {
-    const active = documents.filter((d) => !d.isTrashed);
+    const docList = Array.isArray(documents) ? documents : [];
+    const empList = Array.isArray(employees) ? employees : [];
+    const clientList = Array.isArray(clients) ? clients : [];
+    const caseList = Array.isArray(cases) ? cases : [];
+    const active = docList.filter((d) => !d.isTrashed);
     return {
       totalDocuments: active.length,
       pendingApprovals: active.filter((d) => d.status === 'pending').length,
-      activeEmployees: employees.filter((e) => (e.status || '').toLowerCase() === 'active').length,
+      activeEmployees: empList.filter((e) => (e.status || '').toLowerCase() === 'active').length,
       storageBytes: active.reduce((s, d) => s + (d.sizeBytes || 0), 0),
       reports: active.length,
-      totalClients: clients.length,
-      totalCases: cases.length,
-      activeCases: cases.filter((c) => c.status !== 'selesai' && c.status !== 'arsip' && c.status !== 'rejected').length,
+      totalClients: clientList.length,
+      totalCases: caseList.length,
+      activeCases: caseList.filter((c) => c.status !== 'selesai' && c.status !== 'arsip' && c.status !== 'rejected').length,
     };
   }, [documents, employees, clients, cases]);
 

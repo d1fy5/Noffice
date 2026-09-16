@@ -12,6 +12,7 @@ import EmptyState from '../components/EmptyState.jsx';
 import UploadModal from '../components/UploadModal.jsx';
 import Breadcrumb from '../components/Breadcrumb.jsx';
 import PageHeader from '../components/PageHeader.jsx';
+import { DocumentAPI } from '../services/api.js';
 
 const CATEGORY_IDS = DOC_CATEGORIES.map((c) => c.id);
 
@@ -329,7 +330,21 @@ export default function Documents() {
             </select>
           </div>
           <div className="modal-actions">
-            <Button variant="secondary" icon="download" onClick={() => notify(t('action.download') + ' (demo)')}>{t('action.download')}</Button>
+            <Button
+              variant="secondary"
+              icon="download"
+              onClick={() => {
+                if (!selected?.storedFilename) {
+                  notify('File fisik belum diunggah untuk dokumen ini (metadata demo)', 'warning');
+                  return;
+                }
+                const url = DocumentAPI.getDownloadUrl(selected.id);
+                window.open(url, '_blank');
+                notify(`${t('action.download')}: ${selected.title}`);
+              }}
+            >
+              {t('action.download')}
+            </Button>
             <Button variant="ghost" icon="trash" onClick={() => confirmDelete(selected)}>{t('action.delete')}</Button>
             {isAdmin && selected.status === 'pending' && (
               <>

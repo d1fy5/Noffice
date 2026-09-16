@@ -66,10 +66,15 @@ export default function AiCopilotDrawer() {
   };
 
   const quickPrompts = [
-    'Cari Dokumen',
-    'Data Klien',
-    'Status Permohonan',
-    'Syarat Pendirian PT'
+    '📋 Rekap Kantor',
+    '📄 Cari Dokumen',
+    '👤 Data Klien',
+    '🏢 Syarat PT',
+    '📜 Syarat AJB',
+    '🎁 Syarat Hibah',
+    '🧮 Hitung BPHTB',
+    '⚡ Generate Akta',
+    '💾 Backup DB',
   ];
 
   return (

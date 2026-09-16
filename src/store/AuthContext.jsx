@@ -36,6 +36,7 @@ export function AuthProvider({ children }) {
 
   const logout = () => {
     setUser(null);
+    localStorage.removeItem('noffice_auth_token');
   };
 
   return (

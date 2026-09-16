@@ -49,6 +49,9 @@ export default function PpatCases() {
 
   // Billing & Appointment local edit state
   const [billingForm, setBillingForm] = useState({
+    notaryFee: 0,
+    taxFee: 0,
+    pnbpFee: 0,
     paymentStatus: 'unpaid',
     appointmentDate: '',
     appointmentTime: '',
@@ -58,6 +61,9 @@ export default function PpatCases() {
   const handleOpenCaseDetail = (c) => {
     setSelectedCase(c);
     setBillingForm({
+      notaryFee: c.notaryFee || 0,
+      taxFee: c.taxFee || 0,
+      pnbpFee: c.pnbpFee || 0,
       paymentStatus: c.paymentStatus || 'unpaid',
       appointmentDate: c.appointmentDate || '',
       appointmentTime: c.appointmentTime || '',

@@ -81,8 +81,9 @@ export default function Login() {
 
         <div className="login-hint">
           <p><strong>Demo Akun:</strong></p>
-          <p>Admin: admin@noffice.com / admin</p>
-          <p>Karyawan: karyawan@noffice.com / user</p>
+          <p>Admin Notaris: admin@noffice.com / admin123</p>
+          <p>Staf Notaris: dewi@noffice.com / dewi123</p>
+          <p>Staf PPAT: andi@noffice.com / andi123</p>
         </div>
       </div>
     </div>

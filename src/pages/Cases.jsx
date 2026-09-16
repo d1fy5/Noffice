@@ -73,6 +73,9 @@ export default function Cases() {
     setSelectedCase(c);
     setCaseLogs([]);
     setBillingForm({
+      notaryFee: c.notaryFee || 0,
+      taxFee: c.taxFee || 0,
+      pnbpFee: c.pnbpFee || 0,
       paymentStatus: c.paymentStatus || 'unpaid',
       appointmentDate: c.appointmentDate || '',
       appointmentTime: c.appointmentTime || '',
