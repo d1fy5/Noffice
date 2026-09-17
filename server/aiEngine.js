@@ -1,5 +1,9 @@
 import http from 'http';
-import { dbQuery, dbGet } from './db.js';
+import { buildDataIntent, getContext, saveContext, clearContext } from './database/aiDatabaseContext.js';
+import { executeDataQuery, DbUnavailableError, SchemaMissingError, PermissionDeniedError } from './database/queryService.js';
+import { TABLE_META, getDomainSummary, CASE_PAGES, CASE_CATEGORIES } from './database/schemaInspector.js';
+import { buildEntityPlan, executeEntityPlan } from './database/entitySearch.js';
+import { getAppAnswer } from './database/appKnowledge.js';
 
 // Local Ollama API configuration (default port 11434)
 const OLLAMA_URL = 'http://localhost:11434/api/generate';
@@ -188,7 +192,7 @@ Para Pihak dengan ini menerangkan bahwa Almarhum/Almarhumah merupakan pemilik sa
 PASAL 2 — PEMBAGIAN HAK WARIS
 Para ahli waris bersepakat membagi dan membaliknamakan harta peninggalan tersebut sesuai dengan ketentuan Hukum Waris yang berlaku di Indonesia secara musyawarah dan mufakat.`;
   } else if (stUpper === 'APHT' || stUpper === 'SKMHT' || stUpper.includes('TANGGUNGAN')) {
-    clauseText = `PASAL 1 — PEMBEBANAN HAK TANGGUNAN
+    clauseText = `PASAL 1 — PEMBEBANAN HAK TANGGUNGAN
 PIHAK PERTAMA dengan ini membebankan Hak Tanggungan atas Objek berupa ${objek} guna menjamin pelunasan utang/kredit PIHAK KEDUA (${pihak2}) pada Bank/Kreditur sesuai Perjanjian Kredit.
 
 PASAL 2 — JANJI-JANJI HAK TANGGUNGAN
@@ -258,114 +262,302 @@ export async function auditCaseData(caseData, clientData) {
 }
 
 // 4. Smart Offline NLP Intent & Knowledge Engine for Noffice Copilot
-export async function generateCopilotResponse(userMessage, contextData = {}) {
-  if (!userMessage || !userMessage.trim()) return 'Silakan ketik pertanyaan Anda.';
+// --------------------------------------------------------------------------
+// DB-AWARE COPILOT
+//   - Classifies the user message as GENERAL / DATABASE_QUERY / UNKNOWN.
+//   - DATABASE_QUERY intents are answered with REAL data read from the
+//     local SQLite database via the safe read-only queryService.
+//   - Everything stays 100% offline; Ollama is still optional for GENERAL.
+// --------------------------------------------------------------------------
 
-  const rawMsg = userMessage.trim();
-  const msgLower = rawMsg.toLowerCase();
+const AI_DEBUG = process.env.AI_DEBUG === '1' || process.env.NODE_ENV !== 'production';
+function aiLog(...args) {
+  if (AI_DEBUG) console.log('[AI]', ...args);
+}
 
-  // ----------------------------------------------------------------------
-  // A. INTENT DYNAMIC SEARCH IN SQLite DATABASE (Real-time DB query)
-  // ----------------------------------------------------------------------
-  const isAskingHowTo = msgLower.match(/\b(syarat|persyaratan|cara|buat|bikin|bagaimana|gimana|alur|apa itu|maksud)\b/i);
+function cap(s) {
+  if (!s) return s;
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
 
-  // 1. Search Files / Documents
-  if (msgLower.match(/\b(file|dokumen|berkas|arsip)\b/i) && !isAskingHowTo) {
-    let query = rawMsg.replace(/\b(mencari|nyari|cariin|cariiin|carikan|cari|file|dokumen|berkas|arsip|tentang|terkait|yang|sesuai|tolong|ada|dimana|mana|apa|bro|coy|dong)\b/gi, '').trim();
-    query = query.replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim();
+function fmtNum(n) {
+  return Number(n || 0).toLocaleString('id-ID');
+}
 
-    let docs = [];
-    if (query) {
-      docs = await dbQuery(`SELECT title, category, author FROM documents WHERE title LIKE ? OR description LIKE ? LIMIT 5`, [`%${query}%`, `%${query}%`]);
-    } else {
-      docs = await dbQuery(`SELECT title, category, author FROM documents ORDER BY dateTs DESC LIMIT 5`);
+function maskNik(nik) {
+  if (!nik) return '-';
+  const s = String(nik);
+  if (s.length <= 4) return s;
+  return '••••••••' + s.slice(-4);
+}
+
+function groupLabelOf(entity, field) {
+  const map = {
+    employees: { department: 'divisi', role: 'peran/jabatan', status: 'status' },
+    clients: { job: 'pekerjaan' },
+    documents: { category: 'kategori', dept: 'departemen', status: 'status' },
+    cases: { serviceType: 'jenis layanan', status: 'status', assignedTo: 'penanggung jawab' },
+  };
+  return (map[entity] && map[entity][field]) || TABLE_META[entity]?.groupCols?.[field] || 'kategori';
+}
+
+function fieldLabelOf(entity, col) {
+  return TABLE_META[entity]?.fieldLabels?.[col]
+    || col.charAt(0).toUpperCase() + col.slice(1);
+}
+
+// Generic row renderer driven by the plan's requested fields.
+function fmtRow(entity, r, fields, isAdmin) {
+  const meta = TABLE_META[entity];
+  const idt = (meta.identityCols || [])[0];
+  const bold = r[idt] != null && r[idt] !== '' ? String(r[idt])
+    : Object.values(r).find((v) => v != null && v !== '') ?? '-';
+  const rest = (fields || []).filter((f) => f !== idt).map((f) => {
+    if (r[f] === undefined || r[f] === null || r[f] === '') return null;
+    let v = r[f];
+    if (entity === 'clients' && f === 'nik' && !isAdmin) v = maskNik(v);
+    return `${fieldLabelOf(entity, f)}: ${v}`;
+  }).filter(Boolean);
+  return `• **${bold}**${rest.length ? ` — ${rest.join(' | ')}` : ''}`;
+}
+
+function fmtCount(plan, rows) {
+  const n = Number(rows[0]?.total ?? 0);
+  const m = TABLE_META[plan.entity];
+  const desc = plan.humanFilters && plan.humanFilters.length ? ` ${plan.humanFilters.join(' & ')}` : '';
+  if (n === 0) {
+    return `Tidak ada ${m.plural}${desc} di database Noffice.`;
+  }
+  return `${m.icon} Saat ini ada **${fmtNum(n)} ${m.plural}**${desc} di database Noffice.`;
+}
+
+function fmtGroup(plan, rows) {
+  const m = TABLE_META[plan.entity];
+  const gLabel = groupLabelOf(plan.entity, plan.groupBy);
+  if (!rows.length) {
+    const fv = (plan.filters || []).find((f) => f.column === plan.groupBy);
+    const scope = fv ? ` pada ${gLabel} **"${cap(String(fv.display || fv.value))}"**` : '';
+    return `Tidak ada ${m.plural}${scope} di database Noffice.`;
+  }
+  const lines = rows.map((r) => `• **${cap(String(r.label || 'Lainnya'))}:** ${fmtNum(r.total)}`).join('\n');
+  return `Berikut rincian ${m.plural} berdasarkan ${gLabel}:\n${lines}`;
+}
+
+function fmtList(plan, rows, isAdmin) {
+  const m = TABLE_META[plan.entity];
+  if (!rows.length) {
+    const human = plan.humanFilters && plan.humanFilters.length ? ` ${plan.humanFilters.join(' & ')}` : '';
+    const isNameFilter = (plan.filters || []).some((f) => f.op === 'like' && (m.identityCols || []).includes(f.column));
+    if (isNameFilter) {
+      const fv = (plan.filters || []).find((f) => f.op === 'like');
+      return `Tidak ada ${m.plural} yang namanya cocok dengan "${cap(String(fv.display || fv.value))}" di database Noffice. Tolong pastikan nama/nilai tersebut benar.`;
     }
+    return `Tidak ada ${m.plural}${human} di database Noffice.`;
+  }
+  const fields = (plan.fields && plan.fields.length) ? plan.fields : (m.cols?.admin || []);
+  const header = (plan.metric === 'search' && plan.keyword)
+    ? `Hasil pencarian "${cap(plan.keyword)}" untuk ${m.plural}:`
+    : `Berikut ${m.plural} dari database Noffice:`;
+  const lines = rows.map((r) => fmtRow(plan.entity, r, fields, isAdmin)).join('\n');
+  const more = rows.length >= (plan.limit || 8) && (plan.limit || 8) > 1 ? '\n\n…beberapa hasil ditampilkan.' : '';
+  return `${m.icon} ${header}\n${lines}${more}`;
+}
 
-    if (docs && docs.length > 0) {
-      const docList = docs.map((d, i) => `${i+1}. 📄 **${d.title}** (${d.category}) — Oleh: ${d.author}`).join('\n');
-      return `📁 **Hasil Pencarian Dokumen untuk "${query || 'Terbaru'}":**\n${docList}\n\n*Silakan cek menu **Dokumen** di sidebar untuk membuka atau mengunduh.*`;
-    } else {
-      return `Maaf, saya tidak menemukan dokumen yang relevan dengan kata kunci "${query}".`;
-    }
+function formatDbAnswer(plan, result, role) {
+  const isAdmin = role === 'admin';
+  const rows = result.rows || [];
+
+  if (plan.metric === 'recap') {
+    const d = result.data || {};
+    return `📊 **Rekap Operasional Kantor Notaris & PPAT (Noffice):**
+• 📂 **Total Kasus/Permohonan:** ${fmtNum(d.cases)} kasus (${fmtNum(d.casesActive)} sedang dalam proses)
+• 👤 **Total Klien Terdaftar:** ${fmtNum(d.clients)} klien
+• 📄 **Dokumen Aktif:** ${fmtNum(d.documents)} dokumen
+• 👥 **Staf Aktif:** ${fmtNum(d.employees)} karyawan
+
+*Seluruh angka merupakan data nyata dari database lokal Noffice Anda.*`;
   }
 
-  // 2. Search Cases / Akta / Permohonan
-  if (msgLower.match(/\b(kasus|permohonan|akta|status permohonan)\b/i) && !isAskingHowTo) {
-    let query = rawMsg.replace(/\b(mencari|nyari|cariin|cariiin|carikan|cari|status|kasus|permohonan|akta|nomor|nomornya|terkait|tentang|yang|sesuai|tolong|ada|dimana|mana|apa|bro|coy|dong)\b/gi, '').trim();
-    query = query.replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim();
+  if (plan.metric === 'fees') {
+    const d = rows[0] || {};
+    return `💰 **Ringkasan Keuangan dari Kasus/Permohonan:**
+• **Notary Fee (total):** Rp ${fmtNum(d.notaryFee)}
+• **Biaya Pajak (total):** Rp ${fmtNum(d.taxFee)}
+• **PNBP BPN (total):** Rp ${fmtNum(d.pnbpFee)}
+• **Jumlah kasus:** ${fmtNum(d.total)}${plan.payment ? ` (sudah dibayar/lunas)` : ''}
 
-    let cases = [];
-    if (query) {
-      cases = await dbQuery(`SELECT caseNumber, serviceType, status, aktaNumber FROM cases WHERE caseNumber LIKE ? OR serviceType LIKE ? OR aktaNumber LIKE ? LIMIT 5`, [`%${query}%`, `%${query}%`, `%${query}%`]);
-    } else {
-      cases = await dbQuery(`SELECT caseNumber, serviceType, status, aktaNumber FROM cases ORDER BY createdAt DESC LIMIT 5`);
-    }
-
-    if (cases && cases.length > 0) {
-      const caseList = cases.map((c, i) => `${i+1}. 📂 **${c.caseNumber}** (${c.serviceType}) — Status: \`${c.status.toUpperCase()}\`${c.aktaNumber ? ` | Akta: ${c.aktaNumber}` : ''}`).join('\n');
-      return `📋 **Hasil Pencarian Permohonan untuk "${query || 'Terbaru'}":**\n${caseList}\n\n*Buka menu **Permohonan Notaris** atau **Kasus PPAT** untuk melihat detail lengkap.*`;
-    } else {
-      return `Maaf, saya tidak menemukan permohonan yang sesuai dengan kata kunci "${query}".`;
-    }
+*Data keuangan hanya dapat diakses oleh Admin/Notaris Utama.*`;
   }
 
-  // 3. Search Clients / Klien / NIK / Phone
-  if ((msgLower.match(/\b(klien|client|pemohon|pelanggan|nik)\b/i) || msgLower.includes('nama klien')) && !isAskingHowTo) {
-    let query = rawMsg.replace(/\b(mencari|nyari|cariin|cariiin|carikan|cari|data|klien|client|pelanggan|pemohon|atas|namanya|nama|orang|nomornya|nomor|hp|telepon|tentang|terkait|yang|sesuai|tolong|ada|dimana|mana|apa|si|bro|coy|dong)\b/gi, '').trim();
-    query = query.replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim();
+  if (plan.metric === 'count') return fmtCount(plan, rows);
+  if (plan.metric === 'group') return fmtGroup(plan, rows);
 
-    if (query) {
-      let clients = await dbQuery(`SELECT name, nik, phone, address FROM clients WHERE name LIKE ? OR nik LIKE ? OR phone LIKE ? LIMIT 5`, [`%${query}%`, `%${query}%`, `%${query}%`]);
-      if (clients && clients.length > 0) {
-        const clientList = clients.map((c, i) => `${i+1}. 👤 **${c.name}** (NIK: \`${c.nik}\`) — No HP: ${c.phone}`).join('\n');
-        return `👤 **Hasil Pencarian Klien untuk "${query}":**\n${clientList}\n\n*Buka menu **Klien Notaris** di sidebar untuk mengedit data.*`;
-      } else {
-        return `Maaf, saya tidak menemukan data klien yang sesuai dengan kata kunci "${query}".`;
-      }
+  if (plan.metric === 'issued') {
+    // ISSUED_DEEDS — "akta resmi diterbitkan" scoped to the resolved (or
+    // explicit) notaris/PPAT category. Worded so the entity is never ambiguous.
+    const n = Number(rows[0]?.total ?? 0);
+    const cats = plan.caseCategories || [];
+    let label = '';
+    if (cats.length === 2) label = 'Notaris & PPAT';
+    else if (cats[0] === 'notary') label = 'Notaris';
+    else if (cats[0] === 'ppat') label = 'PPAT';
+    return fmtIssuedDeeds(n, label);
+  }
+
+  return fmtList(plan, rows, isAdmin);
+}
+
+function fmtDomain(role) {
+  const list = getDomainSummary(role);
+  if (!list.length) return 'Saya tidak dapat mengakses data apa pun untuk akun Anda.';
+  const lines = list.map((s) => `• ${s.icon} **${s.label}** — ${s.plural}${s.relations ? ' (terhubung dengan tabel terkait)' : ''}`);
+  return `🗄️ **Data yang tersedia untuk akun Anda di sistem Noffice:**
+${lines.join('\n')}
+
+Semua data diambil langsung dari database lokal (100% offline). Sebutkan apa yang ingin Anda ketahui, misalnya *"berapa jumlah karyawan?"* atau *"dokumen apa yang paling baru?"*.`;
+}
+
+// ----------------------------------------------------------------------
+// GENERIC ENTITY SEARCH formatter — answers for "apakah ada Daffa?",
+// "cari Daffa", "kasus Daffa apa saja?", "siapa petugas yang menangani
+// kasus X?", "kasus nomor 012 punya siapa?" — from the LIVE local DB.
+// ----------------------------------------------------------------------
+function statusLabel(s) {
+  if (!s) return '';
+  return String(s).split('_').filter(Boolean).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+
+function fmtEntityAnswer(plan, result, role) {
+  const term = plan.term;
+  const isAdmin = role === 'admin';
+  const catNote = plan.category === 'notary' ? ' Notaris' : plan.category === 'ppat' ? ' PPAT' : '';
+
+  // NOT FOUND — an entity question whose term exists in the question but
+  // matched nothing in the DB (never "tidak paham").
+  if (!result.foundAny) {
+    return `🔍 **Saya tidak menemukan data bernama/bernomor "${term}" pada data Noffice yang dapat Anda akses.**\nKlien, karyawan, dokumen, dan nomor kasus/akta dicari langsung di database; pastikan nama atau nomornya sudah benar.`;
+  }
+
+  if (plan.qtype === 'exists') {
+    // When the question names a specific entity ("ada client X?"), absence on
+    // THAT entity is a NOT FOUND even if the term coincidentally matches
+    // something elsewhere ("dokumen yang berisi kata 'test'").
+    const focusSet = { clients: result.clients, employees: result.employees, documents: result.documents, cases: result.cases }[plan.focus];
+    if (focusSet !== undefined && !focusSet.length) {
+      const focusLabel = { clients: 'klien', employees: 'karyawan', documents: 'dokumen', cases: 'kasus' }[plan.focus];
+      return `🔍 **Saya tidak menemukan ${focusLabel} bernama/bernomor "${term}" pada data Noffice yang dapat Anda akses.**\nPastikan nama/nomornya benar — data klien, karyawan, dokumen, dan kasus dicari langsung dari database.`;
+    }
+    const bits = [];
+    if (result.clients.length) bits.push(`👤 klien **${result.clients.map((c) => c.name).join(', ')}**`);
+    if (result.cases.length) bits.push(`📂 **${result.cases.length} kasus/permohonan${catNote}**`);
+    if (result.employees.length) bits.push(`👥 karyawan **${result.employees.map((e) => e.name).join(', ')}**`);
+    if (result.documents.length) bits.push(`📄 **${result.documents.length} dokumen**`);
+    const head = result.clients.length
+      ? `✅ Ya, **${result.clients[0].name}** ditemukan`
+      : `✅ Ya, saya menemukan **"${term}"**`;
+    return `${head} pada data Noffice:\n${bits.map((b) => `• ${b}`).join('\n')}`;
+  }
+
+  if (plan.qtype === 'count') {
+    const scope = plan.category ? `kasus ${catNote.trim()}` : 'kasus';
+    let out = result.cases.length
+      ? `📊 Terdapat **${result.cases.length} ${scope}** yang terkait dengan **"${term}"** di database Noffice.`
+      : `📊 Tidak ada ${scope} yang terkait dengan **"${term}"** di database Noffice.`;
+    if (result.documents.length) out += `\nSelain itu ada ${result.documents.length} dokumen yang juga terkait.`;
+    return out;
+  }
+
+  if (plan.qtype === 'status') {
+    if (!result.cases.length) return `📊 Tidak ada kasus **"${term}${catNote}"** di database Noffice.`;
+    const set = [...new Set(result.cases.filter((c) => c.status).map((c) => c.status))];
+    if (!set.length) return `📊 Status kasus **"${term}"${catNote}** belum tercatat.`;
+    return `📊 **Status kasus untuk "${term}"${catNote}:**\n${set.map((s) => `• ${statusLabel(s)}`).join('\n')}`;
+  }
+
+  if (plan.qtype === 'akta') {
+    const aks = [...new Set(result.cases.map((c) => c.aktaNumber).filter(Boolean))];
+    if (!aks.length) return `📜 **Belum ada nomor akta yang diterbitkan untuk kasus "${term}${catNote}".**`;
+    return `📜 **Nomor akta untuk kasus "${term}"${catNote}:**\n${aks.map((a) => `• ${a}`).join('\n')}`;
+  }
+
+  if (plan.qtype === 'officer' || plan.focus === 'officer') {
+    if (!result.officers.length) return `👤 Saya tidak menemukan petugas yang menangani **"${term}${catNote}"**.`;
+    return `👤 **Petugas yang menangani kasus "${term}"${catNote}:** ${result.officers.join(', ')}`;
+  }
+
+  if (plan.qtype === 'documents') {
+    if (!result.documents.length) return `📄 Tidak ada dokumen terkait **"${term}"**.`;
+    return `📄 **Dokumen terkait "${term}":**\n${result.documents.map((d) => `• 📄 **${d.title}**${d.author ? ` (penulis: ${d.author})` : ''}${d.category ? ` — ${d.category}` : ''}`).join('\n')}`;
+  }
+
+  // default "raw" — show profiles + related cases/documents
+  const lines = [];
+  for (const c of result.clients) {
+    const bits = [];
+    if (c.nik) bits.push(`NIK ${isAdmin ? c.nik : maskNik(c.nik)}`);
+    if (c.job) bits.push(`Pekerjaan: ${c.job}`);
+    if (c.phone) bits.push(`Telp: ${c.phone}`);
+    if (c.email) bits.push(`Email: ${c.email}`);
+    if (c.address) bits.push(`Alamat: ${c.address}`);
+    lines.push(`• 👤 **${c.name}**${bits.length ? ` — ${bits.join(' | ')}` : ''}`);
+  }
+  for (const e of result.employees) {
+    const bits = [];
+    if (e.department) bits.push(`Divisi: ${e.department}`);
+    if (e.role) bits.push(`Peran: ${e.role}`);
+    if (e.status) bits.push(statusLabel(e.status));
+    lines.push(`• 👥 **${e.name}**${bits.length ? ` — ${bits.join(' | ')}` : ''}`);
+  }
+  if (result.cases.length) {
+    lines.push('', `📂 **Kasus terkait${catNote}:**`);
+    const max = Math.min(result.cases.length, 15);
+    for (const c of result.cases.slice(0, max)) {
+      const bit = [];
+      if (c.caseNumber) bit.push(`**${c.caseNumber}**`);
+      if (c.serviceType) bit.push(c.serviceType);
+      if (c.status) bit.push(statusLabel(c.status));
+      if (c.aktaNumber) bit.push(`akta ${c.aktaNumber}`);
+      lines.push(`• ${bit.join(' — ')}`);
+    }
+    if (result.cases.length > max) lines.push(`…${result.cases.length - max} kasus lainnya.`);
+  }
+  if (result.documents.length) {
+    lines.push('', '📄 **Dokumen terkait:**');
+    for (const d of result.documents.slice(0, 10)) {
+      lines.push(`• 📄 **${d.title}**${d.author ? ` (${d.author})` : ''}`);
     }
   }
+  if (!lines.length) return `🔍 Saya tidak menemukan rincian data **"${term}"**.`;
+  return `🔍 **Hasil pencarian "${term}":**\n${lines.join('\n')}`;
+}
 
-  // 4. Search Employees / Staf / Tim Kantor
-  if (msgLower.match(/\b(staf|karyawan|employee|pegawai|tim|staf aktif)\b/i) && !isAskingHowTo) {
-    let emps = await dbQuery(`SELECT name, role, department, email FROM employees WHERE status = 'active' LIMIT 10`);
-    if (emps && emps.length > 0) {
-      const empList = emps.map((e, i) => `${i+1}. 💼 **${e.name}** (${e.department || 'Kantor'}) — Role: \`${e.role}\` | Email: ${e.email}`).join('\n');
-      return `👥 **Daftar Staf/Karyawan Aktif Kantor:**\n${empList}`;
-    }
+// Structured naming for the debug log (Entity / Source). Uses the resolved
+// notaris/PPAT category — from the question words or the current page.
+function entityDebugName(intent, page) {
+  const cats = intent.caseCategories || [];
+  if (intent.entity === 'cases') {
+    if (cats.length === 2) return { entity: 'NOTARY_CASE + PPAT_CASE', source: 'NotaryCaseService + PPATCaseService' };
+    const resolved = cats[0] || CASE_PAGES[page]?.category;
+    if (resolved === 'notary') return { entity: 'NOTARY_CASE', source: 'NotaryCaseService' };
+    if (resolved === 'ppat') return { entity: 'PPAT_CASE', source: 'PPATCaseService' };
+    return { entity: 'CASE', source: 'CaseService' };
   }
+  return { entity: String(intent.entity || '-').toUpperCase(), source: TABLE_META[intent.entity]?.label || '-' };
+}
 
-  // 5. Query Office Statistics & Summaries
-  if (msgLower.match(/\b(rekap|statistik|ringkasan|total|laporan|jumlah kasus|jumlah klien)\b/i)) {
-    try {
-      const caseCount = await dbGet(`SELECT count(*) as count FROM cases`);
-      const clientCount = await dbGet(`SELECT count(*) as count FROM clients`);
-      const docCount = await dbGet(`SELECT count(*) as count FROM documents WHERE isTrashed = 0`);
-      const empCount = await dbGet(`SELECT count(*) as count FROM employees WHERE status = 'active'`);
-      return `📊 **Rekap Operasional Kantor Notaris & PPAT (Noffice):**
-• 📂 **Total Kasus/Permohonan:** ${caseCount?.count || 0} Kasus
-• 👤 **Total Klien Terdaftar:** ${clientCount?.count || 0} Klien
-• 📄 **Total Dokumen Aktif:** ${docCount?.count || 0} File
-• 👥 **Staf Aktif:** ${empCount?.count || 0} Karyawan
-
-*Semua data tersimpan aman di SQLite lokal Anda.*`;
-    } catch {
-      // Fallthrough
-    }
+function fmtIssuedDeeds(n, label) {
+  const num = fmtNum(n);
+  if (n === 0) {
+    return `📜 **Belum ada akta resmi yang diterbitkan${label ? ` untuk permohonan ${label}` : ''} di database Noffice.**`;
   }
+  return `📜 **Saat ini terdapat ${num} akta resmi${label ? ` ${label}` : ''} yang telah diterbitkan.**`;
+}
 
-  // ----------------------------------------------------------------------
-  // B. TRY OLLAMA FIRST IF INSTALLED & RUNNING
-  // ----------------------------------------------------------------------
-  const prompt = `Anda adalah Noffice Copilot, asisten AI lokal Notaris & PPAT Indonesia yang cerdas dan ramah. Jawab singkat dan tepat pertanyaan berikut:\n${rawMsg}`;
-  const ollamaResult = await queryOllama(prompt);
-  if (ollamaResult && ollamaResult.trim()) {
-    return ollamaResult;
-  }
+function fmtIssuedBoth(notary, ppat) {
+  return `📜 **Saat ini terdapat ${fmtNum(notary)} akta resmi Notaris dan ${fmtNum(ppat)} akta resmi PPAT yang telah diterbitkan.**`;
+}
 
-  // ----------------------------------------------------------------------
-  // C. HIGH INTENSITY OFFLINE LEGAL & OPERATIONAL KNOWLEDGE BASE
-  // ----------------------------------------------------------------------
-
+function generalKnowledgeBase(rawMsg, msgLower) {
   // 1. Akta Jual Beli (AJB)
   if (msgLower.match(/\b(ajb|jual beli|tanah|bangunan|rumah)\b/i)) {
     return `📋 **Persyaratan Akta Jual Beli (AJB) PPAT:**
@@ -500,14 +692,176 @@ Saya dilatih untuk membantu operasional kantor Anda tanpa perlu koneksi internet
 *Apa yang bisa saya bantu sekarang?*`;
   }
 
-  // 15. Default Smart Fallback
-  return `🤖 **Noffice Copilot (Asisten Notaris & PPAT Offline):**
+  return null;
+}
 
-Saya mengerti Anda menanyakan tentang **"${rawMsg}"**. Berikut beberapa hal yang dapat Anda telusuri:
-• 📋 **Persyaratan Dokumen:** Ketik *"Syarat AJB"*, *"Syarat PT"*, *"Syarat Waris"*, atau *"Syarat Hibah"*.
-• 📂 **Pencarian Data:** Ketik *"Dokumen"*, *"Klien"*, atau *"Status Permohonan"*.
-• ⚡ **Fitur Sistem:** Ketik *"Nomor Akta"*, *"Backup Database"*, atau *"Ekstrak KTP"*.
-• 🧮 **Pajak:** Ketik *"Hitung Pajak BPHTB"*.
+export async function generateCopilotResponse(userMessage, contextData = {}, sessionInfo = {}) {
+  if (!userMessage || !userMessage.trim()) {
+    return { reply: 'Silakan ketik pertanyaan Anda.', intent: 'UNKNOWN' };
+  }
 
-*Tips: Semua fitur AI ini berjalan 100% lokal & offline di komputer Anda.*`;
+  const rawMsg = userMessage.trim();
+  const msgLower = rawMsg.toLowerCase();
+  const role = sessionInfo?.role || 'admin';
+  const token = sessionInfo?.token || 'anon';
+
+  // How-to / legal-knowledge questions must NOT hit the database.
+  const isAskingHowTo = msgLower.match(/\b(syarat|persyaratan|cara|buat|bikin|bagaimana|gimana|alur|apa itu|maksud|rumus)\b/i);
+  const isGreeting = msgLower.match(/\b(halo|hai|pagi|siang|malam|hi|hello|bro|sis|perkenalkan|terima kasih|makasih|thanks)\b/i);
+
+  // ----------------------------------------------------------------------
+  // APPLICATION PATH — explains the app itself ("apa fungsi halaman X?",
+  // "apa bedanya Notary Cases vs PPAT Cases?", "halaman ini data apa?",
+  // "alur status kasus"). Runs before the DB & general paths (also for
+  // how-to questions) but ONLY when a page/module intent is detected.
+  // ----------------------------------------------------------------------
+  if (!isGreeting) {
+    const appAnswer = getAppAnswer(rawMsg, contextData && contextData.page ? contextData.page : null);
+    if (appAnswer) {
+      aiLog(`Question: ${rawMsg}`);
+      aiLog(`Intent: APPLICATION | Page: ${(contextData && contextData.page) || 'none'}`);
+      aiLog(`Final response: ${appAnswer.split('\n')[0]}...`);
+      return { reply: appAnswer, intent: 'APPLICATION' };
+    }
+  }
+
+  // ----------------------------------------------------------------------
+  // DB-AWARE PATH — answer from real local data (runs before Ollama so the
+  // response is always grounded in actual database contents).
+  // ----------------------------------------------------------------------
+  if (!isAskingHowTo && !isGreeting) {
+    const page = contextData && contextData.page ? contextData.page : null;
+    const pageCtx = page ? CASE_PAGES[page] : null;
+    aiLog(`Question: ${rawMsg}`);
+    aiLog(`Page Context: ${pageCtx ? `${page} (${pageCtx.label})` : 'none'}`);
+
+    // 1) GENERIC ENTITY SEARCH first — any real name / case number / akta
+    //    number / document title / officer found in the LOCAL vocabulary
+    //    ("cari Daffa", "apakah ada TEST AI?", "kasus 007 punya siapa?").
+    const entPlan = buildEntityPlan(msgLower, { role, context: getContext(token), page });
+    if (entPlan) {
+      const result = executeEntityPlan(entPlan);
+      aiLog(`Entity: ENTITY_SEARCH (${entPlan.focus.toUpperCase()})`);
+      aiLog(`Metric: ${result.foundAny ? 'ENTITY_FOUND' : 'ENTITY_NOT_FOUND'}`);
+      aiLog(`Source: GenericEntitySearchService`);
+      aiLog(`Search term: "${entPlan.term}" (${entPlan.via}) | matched=${entPlan.matchedCount} | focus=${entPlan.focus} | qtype=${entPlan.qtype}`);
+      saveContext(token, { metric: 'entity', entity: 'entity', term: entPlan.term, focus: entPlan.focus, qtype: entPlan.qtype });
+      const reply = fmtEntityAnswer(entPlan, result, role);
+      aiLog(`Final response: ${reply.split('\n')[0]}...`);
+      return { reply, intent: 'DATABASE_QUERY', meta: { table: 'entity-search', count: entPlan.matchedCount } };
+    }
+
+    const intent = buildDataIntent(msgLower, { role, context: getContext(token), page });
+    if (intent) {
+      if (intent.metric === 'domain') {
+        aiLog(`Intent: SCHEMA_DOMAIN | Relevant tables: ${getDomainSummary(role).map((d) => d.label).join(', ')}`);
+        return { reply: fmtDomain(role), intent: 'DATABASE_QUERY', meta: { table: 'schema' } };
+      }
+      if (intent.metric === 'unsupported') {
+        aiLog(`Intent: UNSUPPORTED_CONCEPT | concept "${intent.concept}"`);
+        if (intent.concept === 'notifikasi') {
+          return {
+            reply: '🔔 **Data notifikasi belum tersedia di database Noffice.** Notifikasi disimpan di perangkat/browser masing-masing pengguna (local storage) — bukan di database pusat — sehingga jumlahnya tidak bisa saya baca dari sini.',
+            intent: 'DATABASE_QUERY',
+            meta: { table: null },
+          };
+        }
+        return { reply: `Data tersebut (${intent.concept}) belum tersedia di database Noffice. Saya hanya dapat membaca data sesuai tabel yang ada di sistem Anda.`, intent: 'DATABASE_QUERY', meta: { table: null } };
+      }
+
+      const debug = entityDebugName(intent, page);
+      aiLog(`Entity: ${debug.entity}`);
+      aiLog(`Metric: ${intent.metric === 'issued' ? 'ISSUED_DEEDS' : String(intent.metric || '-').toUpperCase()}`);
+      aiLog(`Source: ${debug.source}`);
+
+      const tTable = intent.entity || '-';
+      aiLog(`Intent/entity detection: table="${tTable}"${intent.score ? ` score=${intent.score}` : ''}${intent.follow ? ' (follow-up)' : ''}`);
+      aiLog(`Query plan: entity=${tTable} metric=${intent.metric} fields=${(intent.fields || []).join(',')} filters=${JSON.stringify(intent.filters || [])} groupBy=${intent.groupBy || '-'} orderBy=${JSON.stringify(intent.orderBy || null)} limit=${intent.limit || '-'}`);
+      try {
+        const t0 = Date.now();
+        let result;
+        if (intent.metric === 'issued' && !(intent.caseCategories || []).length) {
+          // "berapa akta resmi diterbitkan?" WITHOUT page context and without
+          // naming notaris/PPAT — answer BOTH explicitly instead of guessing.
+          aiLog('Source: NotaryCaseService + PPATCaseService (ambiguous, no page context)');
+          const rNotary = executeDataQuery(buildDataIntent('berapa akta resmi diterbitkan notaris?', { role, context: null }));
+          const rPpat = executeDataQuery(buildDataIntent('berapa akta resmi diterbitkan ppat?', { role, context: null }));
+          const nNotary = Number(rNotary.rows[0]?.total ?? 0);
+          const nPpat = Number(rPpat.rows[0]?.total ?? 0);
+          aiLog(`Validated SQL: ${rNotary.loggedSql}`);
+          aiLog(`Validated SQL: ${rPpat.loggedSql}`);
+          aiLog(`Count: notary=${nNotary} ppat=${nPpat}`);
+          clearContext(token);
+          const reply = fmtIssuedBoth(nNotary, nPpat);
+          aiLog(`Final response: ${reply.split('\n')[0]}...`);
+          return { reply, intent: 'DATABASE_QUERY', meta: { table: 'cases', count: nNotary + nPpat } };
+        }
+        result = executeDataQuery(intent);
+        const isNum = intent.metric === 'count' || intent.metric === 'issued';
+        const count = isNum ? Number(result.rows[0]?.total ?? 0) : Array.isArray(result.rows) ? result.rows.length : undefined;
+        aiLog(`Validated SQL: ${result.loggedSql}`);
+        aiLog(`Rows returned: ${Array.isArray(result.rows) ? result.rows.length : 0} (${Date.now() - t0} ms)`);
+        if (count !== undefined) aiLog(`Count: ${count}`);
+
+        if (intent.metric === 'recap') clearContext(token);
+        else saveContext(token, intent);
+
+        const reply = formatDbAnswer(intent, result, role);
+        aiLog(`Final response: ${reply.split('\n')[0]}...`);
+        return {
+          reply,
+          intent: 'DATABASE_QUERY',
+          meta: { table: result.table, count },
+        };
+      } catch (err) {
+        if (err instanceof PermissionDeniedError) {
+          aiLog('Permission denied:', err.message);
+          return { reply: 'Maaf, Anda tidak memiliki izin untuk melihat data tersebut. Hubungi Admin/Notaris Utama.', intent: 'DATABASE_QUERY' };
+        }
+        if (err instanceof DbUnavailableError) {
+          aiLog('DB unavailable:', err.message);
+          return { reply: 'Saya tidak dapat mengakses data Noffice saat ini karena database tidak tersedia. Silakan coba lagi nanti.', intent: 'DATABASE_QUERY' };
+        }
+        if (err instanceof SchemaMissingError) {
+          aiLog('Schema missing:', err.message);
+          return { reply: 'Data tersebut belum tersedia di database Noffice. Saya hanya dapat membaca data kasus/permohonan, klien, dokumen, dan karyawan yang tersimpan di sistem.', intent: 'DATABASE_QUERY' };
+        }
+        aiLog('Unhandled DB error:', err.message);
+        return { reply: 'Maaf, saya tidak berhasil memproses pertanyaan data Anda. Coba gunakan kata kunci lain seperti jumlah, daftar, atau cari.', intent: 'DATABASE_QUERY' };
+      }
+    }
+  }
+
+  // ----------------------------------------------------------------------
+  // GENERAL PATH — optional local Ollama, then the offline knowledge base.
+  // ----------------------------------------------------------------------
+  aiLog(`Intent: GENERAL (${rawMsg})`);
+  const prompt = `Anda adalah Noffice Copilot, asisten AI lokal Notaris & PPAT Indonesia yang cerdas dan ramah. Jawab singkat dan tepat pertanyaan berikut:\n${rawMsg}`;
+  const ollamaResult = await queryOllama(prompt);
+  if (ollamaResult && ollamaResult.trim()) {
+    return { reply: ollamaResult, intent: 'GENERAL' };
+  }
+
+  const kb = generalKnowledgeBase(rawMsg, msgLower);
+  if (kb) return { reply: kb, intent: 'GENERAL' };
+
+  // ----------------------------------------------------------------------
+  // UNKNOWN INTENT — ask to clarify (only reached when the question is
+  // neither a data question, nor a legal/knowledge question).
+  // ----------------------------------------------------------------------
+  aiLog('Intent: UNKNOWN');
+  return {
+    reply: `🤖 **Noffice Copilot (Asisten Notaris & PPAT Offline):**
+
+Saya belum dapat memahami pertanyaan "**${rawMsg}**". Bisa diperjelas maksudnya?
+
+Saya bisa membantu:
+• 📊 **Rekap Kantor** — ringkasan data nyata dari database lokal.
+• 🗄️ **Data aplikasi** — ketik pertanyaan bebas seperti *"berapa jumlah karyawan?"*, *"siapa saja yang bekerja di Engineering?"*, *"dokumen apa yang paling baru?"*, atau *"berapa kasus yang sedang diproses?"*.
+• 📋 **Persyaratan Hukum** — *"syarat AJB"*, *"syarat PT"*, *"syarat Hibah"*.
+• 🧮 **Pajak** — *"hitung pajak BPHTB"*.
+
+*Semua jawaban data diambil langsung dari database SQLite lokal Noffice Anda (100% offline).*`,
+    intent: 'UNKNOWN',
+  };
 }

@@ -510,8 +510,15 @@ app.post('/api/ai/audit-case', requireAuth, async (req, res) => {
 app.post('/api/ai/chat', requireAuth, async (req, res) => {
   try {
     const { message, contextData } = req.body;
-    const reply = await generateCopilotResponse(message, contextData);
-    res.json({ success: true, reply });
+    const result = await generateCopilotResponse(message, contextData, {
+      role: req.sessionUser?.userRole || 'employee',
+      userId: req.sessionUser?.userId,
+      token: req.sessionUser?.token,
+    });
+    const reply = typeof result === 'string' ? result : result.reply;
+    const intent = typeof result === 'object' ? result.intent : undefined;
+    const meta = typeof result === 'object' ? result.meta : undefined;
+    res.json({ success: true, reply, intent, meta });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

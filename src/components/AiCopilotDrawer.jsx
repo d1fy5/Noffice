@@ -1,9 +1,27 @@
 import { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { AiAPI } from '../services/api.js';
 import Icon from './Icon.jsx';
 import Button from './Button.jsx';
 
+// Frontend route -> page context handed to the AI so the assistant can
+// scope answers to the page being viewed AND answer APP questions
+// ("apa fungsi halaman ini?") for every module.
+const PAGE_BY_PATHNAME = {
+  '/cases': 'notary-cases',
+  '/ppat-cases': 'ppat-cases',
+  '/clients': 'clients',
+  '/documents': 'documents',
+  '/employees': 'employees',
+  '/dashboard': 'dashboard',
+  '/notifications': 'notifications',
+  '/settings': 'settings',
+  '/inbox': 'inbox',
+  '/data-tables': 'data-tables',
+};
+
 export default function AiCopilotDrawer() {
+  const location = useLocation();
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState(null);
   const [messages, setMessages] = useState([
@@ -15,6 +33,7 @@ export default function AiCopilotDrawer() {
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loadingMsg, setLoadingMsg] = useState('AI Notaris sedang berpikir...');
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
@@ -29,6 +48,8 @@ export default function AiCopilotDrawer() {
     }
   }, [messages, open]);
 
+  const DATA_KEYWORDS = /\b(rekap|statistik|ringkasan|laporan|total|dokumen|berkas|arsip|klien|client|kasus|permohonan|akta|status|staf|karyawan|pegawai|cari|daftar|siapa|berapa|jumlah|divisi|departemen)\b/i;
+
   const handleSend = async (customMsg = null) => {
     const textToSend = customMsg || input;
     if (!textToSend || !textToSend.trim() || loading) return;
@@ -42,9 +63,11 @@ export default function AiCopilotDrawer() {
     setMessages((prev) => [...prev, userMsg]);
     if (!customMsg) setInput('');
     setLoading(true);
+    setLoadingMsg(DATA_KEYWORDS.test(textToSend) ? 'Memeriksa data Noffice...' : 'AI Notaris sedang berpikir...');
 
     try {
-      const res = await AiAPI.chat(textToSend);
+      const currentPage = PAGE_BY_PATHNAME[location.pathname] || null;
+      const res = await AiAPI.chat(textToSend, currentPage ? { page: currentPage } : undefined);
       const aiMsg = {
         sender: 'ai',
         text: res.reply || 'Maaf, terjadi kendala saat memproses jawaban.',
@@ -248,7 +271,7 @@ export default function AiCopilotDrawer() {
             ))}
             {loading && (
               <div style={{ alignSelf: 'flex-start', fontSize: '0.8rem', color: 'var(--text-2)', fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Icon name="activity" size={14} /> AI Notaris sedang berpikir...
+                <Icon name="activity" size={14} /> {loadingMsg}
               </div>
             )}
             <div ref={messagesEndRef} />

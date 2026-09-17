@@ -1,0 +1,143 @@
+Connected to SQLite database.
+====================================================
+ Noffice Backend Server Running Successfully!
+ - Akses Lokal:   http://localhost:3001
+ - Akses LAN Wi-Fi: http://10.212.65.46:3001
+====================================================
+[AI] Intent: DATABASE_QUERY | Entity: summary | Metric: recap | Group: - | Key: - | Status: - | Role: admin
+[AI] Query: SELECT COUNT(*) FROM cases / cases(active) / clients / documents(active) / employees(active)
+[AI] Rows returned: 0 (4 ms)
+[AI] Intent: DATABASE_QUERY | Entity: cases | Metric: count | Group: - | Key: - | Status: - | Role: admin
+[AI] Query: SELECT COUNT(*) AS total FROM cases  | params: []
+[AI] Rows returned: 1 (1 ms)
+[AI] Intent: DATABASE_QUERY | Entity: documents | Metric: search | Group: - | Key: akta | Status: - | Role: admin
+[AI] Query: SELECT title, description, category, author, status, date, type, dept FROM documents WHERE isTrashed = 0 AND (title LIKE ? OR description LIKE ? OR category LIKE ? OR author LIKE ?) ORDER BY dateTs DESC LIMIT ? | params: ["%akta%","%akta%","%akta%","%akta%",8]
+[AI] Rows returned: 1 (1 ms)
+[AI] Intent: DATABASE_QUERY | Entity: cases | Metric: fees | Group: - | Key: - | Status: - | Role: admin
+[AI] Query: SELECT COALESCE(SUM(notaryFee),0) AS notaryFee, COALESCE(SUM(taxFee),0) AS taxFee, COALESCE(SUM(pnbpFee),0) AS pnbpFee, COUNT(*) AS total FROM cases  | params: []
+[AI] Rows returned: 1 (0 ms)
+[AI] Intent: DATABASE_QUERY | Entity: cases | Metric: fees | Group: - | Key: - | Status: - | Role: employee
+[AI] Permission denied: only admin may read financial data
+[AI] Intent: DATABASE_QUERY | Entity: clients | Metric: search | Group: - | Key: siti | Status: - | Role: admin
+[AI] Query: SELECT name, nik, birthdate, address, phone, email, job, createdAt FROM clients  WHERE (name LIKE ? OR nik LIKE ? OR phone LIKE ? OR email LIKE ?) ORDER BY createdAt DESC LIMIT ? | params: ["%siti%","%siti%","%siti%","%siti%",8]
+[AI] Rows returned: 0 (0 ms)
+[AI] Intent: DATABASE_QUERY | Entity: employees | Metric: group | Group: department | Key: - | Status: - | Role: admin
+[AI] Query: SELECT department AS label, COUNT(*) AS total FROM employees  GROUP BY department ORDER BY total DESC LIMIT 50 | params: [] | groupField: department
+[AI] Rows returned: 3 (1 ms)
+[AI] Intent: DATABASE_QUERY | Entity: employees | Metric: group | Group: department | Key: engineering | Status: - | Role: admin
+[AI] Query: SELECT department AS label, COUNT(*) AS total FROM employees  GROUP BY department ORDER BY total DESC LIMIT 50 | params: [] | groupField: department
+[AI] Rows returned: 0 (0 ms)
+[AI] Intent: GENERAL (Who are you?)
+[AI] Intent: UNKNOWN
+[AI] Intent: DATABASE_QUERY | Entity: summary | Metric: recap | Group: - | Key: - | Status: - | Role: admin
+[AI] Query: SELECT COUNT(*) FROM cases / cases(active) / clients / documents(active) / employees(active)
+[AI] Rows returned: 0 (2 ms)
+[AI] Intent: DATABASE_QUERY | Entity: summary | Metric: recap | Group: - | Key: - | Status: - | Role: admin
+[AI] Query: SELECT COUNT(*) FROM cases / cases(active) / clients / documents(active) / employees(active)
+[AI] Rows returned: 0 (1 ms)
+[AI] Intent: DATABASE_QUERY | Entity: summary | Metric: recap | Group: - | Key: - | Status: - | Role: admin
+[AI] Query: SELECT COUNT(*) FROM cases / cases(active) / clients / documents(active) / employees(active)
+[AI] Rows returned: 0 (1 ms)
+[AI] Intent: DATABASE_QUERY | Entity: cases | Metric: count | Group: - | Key: - | Status: - | Role: admin
+[AI] Query: SELECT COUNT(*) AS total FROM cases  | params: []
+[AI] Rows returned: 1 (1 ms)
+[AI] Intent: GENERAL (Syarat PT)
+[AI] Intent: DATABASE_QUERY | Entity: employees | Metric: group | Group: department | Key: - | Status: - | Role: admin
+[AI] Query: SELECT department AS label, COUNT(*) AS total FROM employees  GROUP BY department ORDER BY total DESC LIMIT 50 | params: [] | groupField: department
+[AI] Rows returned: 3 (1 ms)
+[AI] Intent: DATABASE_QUERY | Entity: employees | Metric: group | Group: department | Key: engineering | Status: - | Role: admin
+[AI] Query: SELECT department AS label, COUNT(*) AS total FROM employees  GROUP BY department ORDER BY total DESC LIMIT 50 | params: [] | groupField: department
+[AI] Rows returned: 0 (1 ms)
+[AI] Intent: DATABASE_QUERY | Entity: summary | Metric: recap | Group: - | Key: - | Status: - | Role: admin
+[AI] Query: SELECT COUNT(*) FROM cases / cases(active) / clients / documents(active) / employees(active)
+[AI] Rows returned: 0 (2 ms)
+[AI] Intent: DATABASE_QUERY | Entity: cases | Metric: count | Group: - | Key: - | Status: - | Role: admin
+[AI] Query: SELECT COUNT(*) AS total FROM cases  | params: []
+[AI] Rows returned: 1 (1 ms)
+[AI] Intent: GENERAL (Syarat PT)
+[AI] Intent: DATABASE_QUERY | Entity: employees | Metric: group | Group: department | Key: - | Status: - | Role: admin
+[AI] Query: SELECT department AS label, COUNT(*) AS total FROM employees  GROUP BY department ORDER BY total DESC LIMIT 50 | params: [] | groupField: department
+[AI] Rows returned: 3 (0 ms)
+[AI] Intent: DATABASE_QUERY | Entity: employees | Metric: group | Group: department | Key: engineering | Status: - | Role: admin
+[AI] Query: SELECT department AS label, COUNT(*) AS total FROM employees  GROUP BY department ORDER BY total DESC LIMIT 50 | params: [] | groupField: department
+[AI] Rows returned: 0 (0 ms)
+[AI] Intent: DATABASE_QUERY | Entity: summary | Metric: recap | Group: - | Key: - | Status: - | Role: admin
+[AI] Query: SELECT COUNT(*) FROM cases / cases(active) / clients / documents(active) / employees(active)
+[AI] Rows returned: 0 (1 ms)
+[AI] Intent: DATABASE_QUERY | Entity: cases | Metric: count | Group: - | Key: - | Status: - | Role: admin
+[AI] Query: SELECT COUNT(*) AS total FROM cases  | params: []
+[AI] Rows returned: 1 (0 ms)
+[AI] Intent: GENERAL (Syarat PT)
+[AI] Intent: DATABASE_QUERY | Entity: employees | Metric: group | Group: department | Key: - | Status: - | Role: admin
+[AI] Query: SELECT department AS label, COUNT(*) AS total FROM employees  GROUP BY department ORDER BY total DESC LIMIT 50 | params: [] | groupField: department
+[AI] Rows returned: 3 (0 ms)
+[AI] Intent: DATABASE_QUERY | Entity: employees | Metric: group | Group: department | Key: engineering | Status: - | Role: admin
+[AI] Query: SELECT department AS label, COUNT(*) AS total FROM employees  GROUP BY department ORDER BY total DESC LIMIT 50 | params: [] | groupField: department
+[AI] Rows returned: 0 (1 ms)
+[AI] Intent: DATABASE_QUERY | Entity: summary | Metric: recap | Group: - | Key: - | Status: - | Role: admin
+[AI] Query: SELECT COUNT(*) FROM cases / cases(active) / clients / documents(active) / employees(active)
+[AI] Rows returned: 0 (1 ms)
+[AI] Intent: DATABASE_QUERY | Entity: cases | Metric: count | Group: - | Key: - | Status: - | Role: admin
+[AI] Query: SELECT COUNT(*) AS total FROM cases  | params: []
+[AI] Rows returned: 1 (1 ms)
+[AI] Intent: GENERAL (Syarat PT)
+[AI] Intent: DATABASE_QUERY | Entity: employees | Metric: group | Group: department | Key: - | Status: - | Role: admin
+[AI] Query: SELECT department AS label, COUNT(*) AS total FROM employees  GROUP BY department ORDER BY total DESC LIMIT 50 | params: [] | groupField: department
+[AI] Rows returned: 3 (1 ms)
+[AI] Intent: DATABASE_QUERY | Entity: employees | Metric: group | Group: department | Key: engineering | Status: - | Role: admin
+[AI] Query: SELECT department AS label, COUNT(*) AS total FROM employees  GROUP BY department ORDER BY total DESC LIMIT 50 | params: [] | groupField: department
+[AI] Rows returned: 0 (0 ms)
+[AI] Intent: DATABASE_QUERY | Entity: summary | Metric: recap | Group: - | Key: - | Status: - | Role: admin
+[AI] Query: SELECT COUNT(*) FROM cases / cases(active) / clients / documents(active) / employees(active)
+[AI] Rows returned: 0 (1 ms)
+[AI] Intent: DATABASE_QUERY | Entity: documents | Metric: list | Group: - | Key: - | Status: - | Role: admin
+[AI] Query: SELECT title, description, category, author, status, date, type, dept FROM documents WHERE isTrashed = 0 ORDER BY dateTs DESC LIMIT ? | params: [8]
+[AI] Rows returned: 4 (0 ms)
+[AI] Intent: DATABASE_QUERY | Entity: documents | Metric: list | Group: - | Key: - | Status: - | Role: admin
+[AI] Query: SELECT title, description, category, author, status, date, type, dept FROM documents WHERE isTrashed = 0 ORDER BY dateTs DESC LIMIT ? | params: [8]
+[AI] Rows returned: 4 (2 ms)
+[AI] Intent: DATABASE_QUERY | Entity: documents | Metric: list | Group: - | Key: - | Status: - | Role: admin
+[AI] Query: SELECT title, description, category, author, status, date, type, dept FROM documents WHERE isTrashed = 0 ORDER BY dateTs DESC LIMIT ? | params: [8]
+[AI] Rows returned: 4 (1 ms)
+[AI] Intent: DATABASE_QUERY | Entity: documents | Metric: list | Group: - | Key: - | Status: - | Role: admin
+[AI] Query: SELECT title, description, category, author, status, date, type, dept FROM documents WHERE isTrashed = 0 ORDER BY dateTs DESC LIMIT ? | params: [8]
+[AI] Rows returned: 4 (2 ms)
+[AI] Intent: DATABASE_QUERY | Entity: employees | Metric: list | Group: - | Key: - | Status: - | Role: admin
+[AI] Query: SELECT name, email, department, role, status, joinDate FROM employees  ORDER BY joinDate DESC LIMIT ? | params: [8]
+[AI] Rows returned: 3 (3 ms)
+[AI] Intent: DATABASE_QUERY | Entity: documents | Metric: count | Group: - | Key: - | Status: - | Role: admin
+[AI] Query: SELECT COUNT(*) AS total FROM documents WHERE isTrashed = 0 | params: []
+[AI] Rows returned: 1 (2 ms)
+[AI] Intent: DATABASE_QUERY | Entity: clients | Metric: count | Group: - | Key: - | Status: - | Role: admin
+[AI] Query: SELECT COUNT(*) AS total FROM clients  | params: []
+[AI] Rows returned: 1 (2 ms)
+[AI] Intent: GENERAL (halo)
+[AI] Intent: GENERAL (ada berapa dokument terbaru)
+[AI] Intent: UNKNOWN
+[AI] Intent: GENERAL (Pertanyaan tentang data yang memang tidak tersedia)
+[AI] Intent: UNKNOWN
+[AI] Intent: DATABASE_QUERY | Entity: summary | Metric: recap | Group: - | Key: - | Status: - | Role: admin
+[AI] Query: SELECT COUNT(*) FROM cases / cases(active) / clients / documents(active) / employees(active)
+[AI] Rows returned: 0 (2 ms)
+[AI] Intent: DATABASE_QUERY | Entity: cases | Metric: count | Group: - | Key: - | Status: - | Role: admin
+[AI] Query: SELECT COUNT(*) AS total FROM cases  | params: []
+[AI] Rows returned: 1 (1 ms)
+[AI] Intent: DATABASE_QUERY | Entity: documents | Metric: search | Group: - | Key: akta | Status: - | Role: admin
+[AI] Query: SELECT title, description, category, author, status, date, type, dept FROM documents WHERE isTrashed = 0 AND (title LIKE ? OR description LIKE ? OR category LIKE ? OR author LIKE ?) ORDER BY dateTs DESC LIMIT ? | params: ["%akta%","%akta%","%akta%","%akta%",8]
+[AI] Rows returned: 1 (0 ms)
+[AI] Intent: DATABASE_QUERY | Entity: cases | Metric: fees | Group: - | Key: - | Status: - | Role: admin
+[AI] Query: SELECT COALESCE(SUM(notaryFee),0) AS notaryFee, COALESCE(SUM(taxFee),0) AS taxFee, COALESCE(SUM(pnbpFee),0) AS pnbpFee, COUNT(*) AS total FROM cases  | params: []
+[AI] Rows returned: 1 (0 ms)
+[AI] Intent: DATABASE_QUERY | Entity: cases | Metric: fees | Group: - | Key: - | Status: - | Role: employee
+[AI] Permission denied: only admin may read financial data
+[AI] Intent: DATABASE_QUERY | Entity: clients | Metric: search | Group: - | Key: siti | Status: - | Role: admin
+[AI] Query: SELECT name, nik, birthdate, address, phone, email, job, createdAt FROM clients  WHERE (name LIKE ? OR nik LIKE ? OR phone LIKE ? OR email LIKE ?) ORDER BY createdAt DESC LIMIT ? | params: ["%siti%","%siti%","%siti%","%siti%",8]
+[AI] Rows returned: 0 (0 ms)
+[AI] Intent: DATABASE_QUERY | Entity: employees | Metric: group | Group: department | Key: - | Status: - | Role: admin
+[AI] Query: SELECT department AS label, COUNT(*) AS total FROM employees  GROUP BY department ORDER BY total DESC LIMIT 50 | params: [] | groupField: department
+[AI] Rows returned: 3 (0 ms)
+[AI] Intent: DATABASE_QUERY | Entity: employees | Metric: group | Group: department | Key: engineering | Status: - | Role: admin
+[AI] Query: SELECT department AS label, COUNT(*) AS total FROM employees  GROUP BY department ORDER BY total DESC LIMIT 50 | params: [] | groupField: department
+[AI] Rows returned: 0 (1 ms)
+[AI] Intent: GENERAL (Who are you?)
+[AI] Intent: UNKNOWN
