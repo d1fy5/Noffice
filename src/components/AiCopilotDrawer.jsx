@@ -27,7 +27,7 @@ export default function AiCopilotDrawer() {
   const [messages, setMessages] = useState([
     {
       sender: 'ai',
-      text: 'Halo! Saya Noffice Copilot — Asisten AI Notaris Lokal Anda (100% Offline). Ada yang bisa saya bantu terkait permohonan akta, syarat berkas, atau operasional kantor?',
+      text: 'Halo! Saya Noffice Copilot, Asisten AI Notaris Lokal Anda (100% Offline). Ada yang bisa saya bantu terkait permohonan akta, syarat berkas, atau operasional kantor?',
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     },
   ]);
@@ -52,7 +52,7 @@ export default function AiCopilotDrawer() {
 
   // Defense-in-depth: never render raw markdown symbols ("**") even if a
   // future source slips past the server-side sanitizer.
-  const cleanText = (t) => String(t || '').replace(/\*\*/g, '').replace(/\*+/g, '');
+  const cleanText = (t) => String(t || '').replace(/\*\*/g, '').replace(/\*+/g, '').replace(/—/g, '-');
 
   const handleSend = async (customMsg = null) => {
     const textToSend = customMsg || input;

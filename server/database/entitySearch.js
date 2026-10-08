@@ -43,7 +43,8 @@ let vocabCache = { rows: null, ts: 0 };
 // STOP words — question scaffolding that must never become the search term.
 const STOP = new Set(
   ['berapa', 'jumlah', 'total', 'sebanyak', 'count', 'banyak', 'ada', 'nggak', 'gak', 'apakah', 'apaa', 'apasih',
-    'masih', 'sudah', 'belum', 'sedang', 'akan', 'mau', 'ingin', 'tolong', 'mohon', 'silakan', 'silahkan',
+    'masih', 'sudah', 'belum', 'sedang', 'akan', 'mau', 'ingin', 'pengen', 'pingin', 'pengin',
+    'pengennya', 'pengennya', 'tolong', 'mohon', 'silakan', 'silahkan',
     'cari', 'mencari', 'cariin', 'carikan', 'find', 'mau', 'cek', 'data', 'info', 'informasi', 'tentang',
     'terkait', 'untuk', 'saya', 'kamu', 'anda', 'dia', 'ini', 'itu', 'yang', 'dengan', 'dari', 'di', 'pada',
     'halaman', 'page', 'hal', 'tampil', 'tampilkan', 'lihat', 'show', 'daftar', 'list', 'sebutkan', 'siapa',
@@ -240,7 +241,8 @@ function extractTerm(msg, vocab) {
 // numbers "007/012" matter, handled separately) so salary/year questions
 // like "gaji di atas 10 juta" never become a name search for "10".
   const tokens = msg.replace(/[^\w\s]/g, ' ').split(/\s+/).filter(Boolean);
-  const terms = tokens.filter((t) => t.length >= 4 && !STOP.has(t) && !/^\d+$/.test(t));
+  const JUNK = new Set(['emang', 'memang', 'isinnya', 'isinya', 'sih', 'dong', 'apasih', 'meliputi', 'mencakup', 'mengenai', 'tentangnya', 'sistem', 'aplikasi', 'aplikasinya', 'datanya', 'sini', 'saja', 'misalnya', 'contohnya', 'sebenarnya', 'artinya', 'intinya', 'kayanya', 'kayatnya', 'bukannya', 'enggak', 'ngga', 'gini', 'gitu', 'begini', 'begitu', 'bantuin', 'jelasin', 'tunjukin', 'kasih', 'tolongin', 'minta', 'butuh', 'butuhnya', 'perlu', 'perlunya', 'mau', 'lihatnya', 'lengkapnya', 'saja', 'apa2', 'dll', 'dsb']);
+  const terms = tokens.filter((t) => t.length >= 4 && !STOP.has(t) && !JUNK.has(t) && !/^\d+$/.test(t));
   if (terms.length) {
     const scored = terms.map((t) => ({ t, score: matchTerm(t, vocab).reduce((s, f) => s + (f.kind.startsWith('client') || f.kind.startsWith('employee') ? 3 : 1), 0) }));
     scored.sort((a, b) => b.score - a.score);

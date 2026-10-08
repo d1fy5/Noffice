@@ -37,6 +37,13 @@ const INFORMAL = {
   kalo: 'kalau', kalau: 'kalau', cman: 'cuma', cuma: 'cuma', cm: 'cuma',
   bgt: 'sangat', banget: 'sangat', bget: 'sangat',
   dpt: 'dapat', mo: 'mau', pengen: 'mau', pingin: 'mau',
+  nambah: 'tambah', nambahin: 'tambah', tambahin: 'tambah', tambahnya: 'tambah',
+  ngedit: 'edit', ngeditin: 'edit', editin: 'edit',
+  ngapus: 'hapus', ngapusin: 'hapus', hapusin: 'hapus',
+  ngubah: 'ubah', ngubahin: 'ubah', ngubaha: 'ubah',
+  masukin: 'masuk', masukinnya: 'masuk', masukan: 'masuk', inputin: 'input',
+  nyimpen: 'simpan', nyimpenin: 'simpan', simpen: 'simpan',
+  tanggalin: 'tanggal', ngefilter: 'filter', keurus: 'urus',
   telp: 'telepon', tlpn: 'telepon',
   sama: 'dengan', sm: 'dengan',
   buat: 'untuk', bikin: 'buat',
@@ -45,6 +52,11 @@ const INFORMAL = {
   tanya: 'tanya',
   gantiin: 'ganti', gantikan: 'ganti', ngganti: 'ganti', ngubah: 'ubah', ngatur: 'atur',
   foto: 'gambar', fotonya: 'gambar',
+  ngelola: 'kelola', kelolain: 'kelola', dikelolain: 'kelola',
+  ngurusin: 'urus', ngurus: 'urus', ngaturin: 'atur',
+  dta: 'data', data2: 'data', data2nya: 'data', datanya: 'data',
+  gimana2: 'bagaimana', gimana2nya: 'bagaimana',
+  'adaa': 'ada', 'adaaapa': 'ada',
 };
 
 // Indonesian affixes, largest-first. Both morphological (standard) and
@@ -262,6 +274,54 @@ export const FIELDS = {
   statistics: ['statistik', 'rekap', 'total', 'jumlah', 'berapa', 'count', 'dashboard', 'persentase', 'rata'],
   data_domain: ['klien', 'client', 'customer', 'nasabah', 'kasus', 'permohonan', 'perkara', 'agenda', 'jadwal', 'karyawan', 'staff', 'staf', 'pegawai', 'divisi', 'akta', 'dokumen'],
 
+  // ----- INFORMATION / CATALOG request --------------------------------
+  // "data yang ada apa aja", "aplikasi ini isinya apa?", "bisa ngelola data
+  // apa saja?", "selain klien ada apalagi?" — user wants to ENUMERATE what
+  // data/info the app holds. Answered from the REAL schema/menu structure
+  // (getDomainSummary), never a canned list. Meaning-level so ANY wording
+  // ("kayak apa saja yang tersedia", "meliputi apa saja cakupannya") hits.
+  // Guards live in route(): a specific data object (klien/kasus/...) or a
+  // statistic ("berapa...") always beats this, so real data questions stay
+  // real.
+  catalog: [
+    'apa aja', 'apa saja', 'apasaja', 'apa yang ada', 'apa yang tersedia',
+    'apa yang bisa', 'apa yang dapat', 'ada apa', 'ada apa aja', 'ada apa saja',
+    'ada data apa', 'data apa', 'datanya apa', 'data yang ada',
+    'informasi apa', 'info apa', 'apa informasi', 'tersedia', 'tersedia di',
+    'meliputi apa', 'mencakup apa', 'isinya apa', 'isi apa', 'isi', 'konten',
+    'cakupan', 'macam', 'jenis data', 'jenis informasi', 'kelola', 'dikelola',
+    'mengelola', 'ngelola', 'bisa apa', 'bisa lihat', 'bisa akses', 'bisa baca', 'bisa kelola',
+    'punya data', 'punya apa', 'simpan apa', 'menyimpan apa', 'di sini',
+    'sistem', 'aplikasi', 'selain', 'apalagi', 'yang lain', 'ada lagi',
+    'apa lagi', 'semua data', 'fitur', 'kumpulan data', 'kumpulan', 'gambaran',
+    'gambaran data', 'diketahui', 'isinya', 'isikan', 'kayak apa', 'rupanya',
+    'seperti apa', 'yang dimiliki', 'dimiliki', 'tersimpan', 'tersimpan di',
+    'jangkauan', 'cakupan', 'dibuka', 'bisa dibuka', 'yang harus diketahui',
+  ],
+
+  // ----- DATA ACTIONS (CRUD how-to) — meaning-level, NOT keyword lists. ----
+  // These let the app answer "cara tambahin data", "masukin klien gimana",
+  // "cara edit data", "hapus data dari mana" WITHOUT any sentence template:
+  // the ACTION verb (add/edit/delete/find/view/save) + the OBJECT the user
+  // talks about are both scored semantically, then combined by getCrudHelp().
+  data_act_add: ['tambah', 'memasukkan', 'masuk', 'input', 'entri', 'insert', 'create', 'add', 'buat', 'bikin', 'daftar', 'register', 'naikkan'],
+  data_act_edit: ['edit', 'ubah', 'ganti', 'update', 'perbarui', 'modify', 'change', 'koreksi', 'sunting'],
+  data_act_delete: ['hapus', 'menghapus', 'hilang', 'buang', 'delete', 'remove'],
+  data_act_find: ['cari', 'temukan', 'find', 'lookup', 'search'],
+  data_act_view: ['lihat', 'tampil', 'check', 'cek', 'periksa', 'tampilkan'],
+  data_act_save: ['simpan', 'keep', 'save', 'store'],
+  data_act_filter: ['seleksi', 'filter', 'pilah', 'saring', 'sortir'],
+
+  // ----- DATA OBJECTS — what the user is talking about manipulating. ----
+  // Used together with data_act_* to build CRUD navigation answers without
+  // sentence templates ("tambahin klien baru" => add + obj_klien).
+  obj_klien: ['klien', 'client', 'customer', 'nasabah', 'orang', 'nemu', 'pihak', 'relasi', 'pelanggan'],
+  obj_karyawan: ['karyawan', 'pegawai', 'staff', 'staf', 'pekerja', 'divisi', 'employee'],
+  obj_kasus: ['kasus', 'permohonan', 'perkara', 'perjanjian', 'case'],
+  obj_akta: ['akta', 'no akta', 'nomor akta', 'deed'],
+  obj_pengguna: ['pengguna', 'user', 'akun', 'anggota'],
+  obj_data: ['data', 'data-data', 'info', 'informasi', 'record', 'entri', 'catatan'],
+
   // ----- Troubleshooting / problems -----
   problem: ['tidak bisa', 'nggak bisa', 'gak bisa', 'gagal', 'error', 'salah', 'masalah', 'kenapa', 'gimana itu', 'bermasalah', 'rusak', 'blank', 'kosong', 'nggak keaccept', 'gak keaccept', 'tidak keaccept', 'keaccept', 'nggak jalan', 'gak jalan', 'tidak jalan', 'nggak muncul', 'gak muncul', 'tidak muncul', 'nggak nyimpen', 'tidak nyimpen', 'nggak kepake'],
   howto: ['cara', 'bagaimana', 'gimana', 'langkah', 'proses', 'tutorial', 'panduan', 'cara pakai'],
@@ -371,6 +431,7 @@ export const ROUTE_LABELS = {
   statistics: 'STATISTICS',
   followup: 'CONTEXT_FOLLOWUP',
   clarification: 'CLARIFICATION',
+  information: 'INFORMATION_REQUEST',
   unknown: 'UNKNOWN',
 };
 
@@ -406,7 +467,16 @@ export function route(text) {
   // legal knowledge
   if (has('legal')) return { label: ROUTE_LABELS.legal, score: 0.8, meaning: m };
 
-  // data domain
+  // INFORMATION / CATALOG request: "data yang ada apa aja", "aplikasi ini
+  // isinya apa?", "bisa ngelola data apa saja?" — user enumerates what the
+  // app holds. If a SPECIFIC entity is named ("dokumen apa yang tersedia")
+  // that stays a real DB query (DATABASE below). "selain ... apalagi?"
+  // names an entity but asks about OTHER kinds -> INFORMATION.
+  const catExclude = /\b(selain|lainnya|apalagi|selain itu)\b/i.test(String(text || '').toLowerCase());
+  const catWho = /\bsiapa\b/i.test(String(text || '').toLowerCase());
+  if (has('catalog') && !catWho && (!has('data_domain') || catExclude)) return { label: ROUTE_LABELS.information, score: 0.78, meaning: m };
+
+// data domain
   if (has('data_domain')) return { label: ROUTE_LABELS.database, score: 0.7, meaning: m };
 
   // low-confidence -> clarification path (router fallback for COPILOT)

@@ -25,10 +25,11 @@ const EMOJI_RE = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{2700}
 const FUNCTION_WORDS = new Set([
   'berapa', 'jumlah', 'total', 'sebanyak', 'count', 'banyaknya', 'ada',
   'masing', 'masing-masing', 'masing2', 'per', 'berdasarkan', 'setiap', 'by', 'group',
-  'daftar', 'siapa', 'sebutkan', 'tampilkan', 'list', 'semua', 'tolong', 'mohon',
+  'daftar', 'siapa', 'sebutkan', 'tampilkan', 'list', 'lihat', 'tampil', 'semua', 'tolong', 'mohon',
   'terbaru', 'terakhir', 'latest', 'paling', 'baru', 'terkahir',
   'cari', 'mencari', 'cariin', 'carikan', 'find', 'cek', 'data', 'info', 'informasi',
-  'tentang', 'terkait', 'yang', 'dengan', 'untuk', 'saya', 'mau', 'kamu', 'anda', 'bisa',
+  'tentang', 'terkait', 'yang', 'dengan', 'untuk', 'saya', 'mau', 'ingin', 'pengen', 'pingin',
+  'kamu', 'anda', 'bisa',
   'kantor', 'notaris', 'sekarang', 'hari', 'ini', 'nya', 'sudah', 'masih', 'berisi',
   'saja', 'dari', 'di', 'on', 'the', 'a', 'an', 'apakah', 'adalah', 'itu',
   'bekerja', 'kerja', 'aktif', 'berjalan', 'diproses', 'berlangsung', 'silakan', 'tolongin',

@@ -1,9 +1,9 @@
 import http from 'http';
 import { buildDataIntent, getContext, saveContext, clearContext } from './database/aiDatabaseContext.js';
 import { executeDataQuery, runRead, DbUnavailableError, SchemaMissingError, PermissionDeniedError } from './database/queryService.js';
-import { TABLE_META, getDomainSummary, CASE_PAGES, CASE_CATEGORIES, FINAL_CASE_STATUSES, SERVICE_LABELS } from './database/schemaInspector.js';
+import { TABLE_META, getDomainSummary, getVisibleColumns, CASE_PAGES, CASE_CATEGORIES, FINAL_CASE_STATUSES, SERVICE_LABELS } from './database/schemaInspector.js';
 import { buildEntityPlan, executeEntityPlan } from './database/entitySearch.js';
-import { getAppAnswer, getSemanticHelp, getTroubleshootAnswer } from './database/appKnowledge.js';
+import { getAppAnswer, getSemanticHelp, getTroubleshootAnswer, getCrudHelp } from './database/appKnowledge.js';
 import {
   getConv, saveConv, updateConv, clearConv, setRef, pushHistory, resolveReferenceConversation,
   setPending, getPending, clearPending, setTopic, getTopic, isTopicFollowUp,
@@ -494,7 +494,49 @@ function fmtDomain(role) {
   return `🗄️ **Data yang tersedia untuk akun Anda di sistem Noffice:**
 ${lines.join('\n')}
 
-Semua data diambil langsung dari database lokal (100% offline). Sebutkan apa yang ingin Anda ketahui, misalnya berapa jumlah karyawan? atau dokumen apa yang paling baru?.`;
+Semua data diambil langsung dari database lokal (100% offline). Sebutkan apa yang ingin Anda ketahui, misalnya berapa jumlah karyawan atau dokumen apa yang paling baru.`;
+}
+
+// INFORMATION/CATALOG reply — enumerates what the app actually holds, from the
+// real schema. Free-form phrasings ("data yang ada apa aja", "isinya apa aja",
+// "selain klien ada apalagi") all land here via the `catalog` semantic field.
+// When the user is browsing a dataset (prior topic kind 'dataset'), the answer
+// scopes to THAT data instead of repeating the whole app catalog.
+function fmtCatalog(role, rawMsg, priorTopic) {
+  const list = getDomainSummary(role);
+  if (!list.length) return 'Saya tidak dapat mengakses data apa pun untuk akun Anda.';
+
+  const lower = normalizeText(rawMsg);
+  const excl = /\b(selain|kecuali|lainnya|apalagi)\b/i.test(lower);
+  const mentions = (entity) => {
+    const m = TABLE_META[entity];
+    if (!m) return false;
+    const words = [entity, m.label, m.kata, m.plural].filter(Boolean);
+    return words.some((w) => lower.includes(String(w).toLowerCase()));
+  };
+
+  // "selain data klien ada apalagi?" -> list every domain EXCEPT klien.
+  if (excl) {
+    const others = list.filter((s) => !mentions(s.entity));
+    if (others.length) {
+      const lines = others.map((s) => `• ${s.icon} **${s.label}** — ${s.plural}`);
+      return `Selain itu, di Noffice juga tersedia beberapa bagian data yang bisa Anda kelola:\n${lines.join('\n')}\n\nSemuanya diambil langsung dari database lokal yang ada di perangkat Anda.`;
+    }
+  }
+
+  // Dataset scope: user is browsing one kind of data ("data klien") and asks
+  // "yang tersedia apa aja?" — enumerate the columns of that dataset.
+  if (priorTopic && priorTopic.kind === 'dataset' && priorTopic.id) {
+    const ent = Object.keys(TABLE_META).find((e) => e === priorTopic.id || e.toLowerCase() === String(priorTopic.id).toLowerCase() || (priorTopic.id && String(priorTopic.id).toLowerCase().includes(e.toLowerCase())));
+    const meta = ent && TABLE_META[ent];
+    if (meta && list.some((s) => s.entity === ent)) {
+      const cols = getVisibleColumns(ent, role);
+      const labels = cols.map((c) => meta.fieldLabels?.[c] || c);
+      return `Di bagian **${meta.label}** (${meta.icon}) yang sedang Anda lihat, kolom yang tersedia untuk ditampilkan adalah: ${labels.join(', ')}.\n\nMau saya tampilkan datanya sekarang?`;
+    }
+  }
+
+  return fmtDomain(role);
 }
 
 // ----------------------------------------------------------------------
@@ -811,6 +853,7 @@ export function sanitizeReply(text) {
     .replace(/[“”]/g, '"')
     .replace(/"/g, '')
     .replace(/\#{1,6}/g, '')
+    .replace(/—/g, '-')
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n{4,}/g, '\n\n\n')
     .trim();
@@ -1452,6 +1495,46 @@ export async function generateCopilotResponse(userMessage, contextData = {}, ses
         return copilot(h.reply, 'NOFFICE_HELP', {});
       }
     }
+
+    // INFORMATION / CATALOG request — "data yang ada apa aja", "aplikasi ini
+    // isinya apa?", "bisa ngelola data apa saja?", "selain klien ada apalagi?"
+    // Answered from the REAL schema (getDomainSummary) so the app tells the
+    // truth about what it holds; scoped to the current dataset topic when the
+    // user is inside one ("yang tersedia apa aja" after browsing "data klien").
+    // A continuation follow-up on an ACTIVE client ref ("masih ada kasus Siska
+    // yang lain?", "tidak ada data yang lain?") is NOT a catalog question —
+    // it rechecks that client's records on the data path below.
+    const catContinuation = _hasClientRef && !entityMention && /\b(masih ada|yang lain|ada lagi|apalagi|data yang lain|tadi|terus)\b/i.test(normLower);
+    if (semRoute.label === SEM_LABELS.information && !catContinuation) {
+      const priorTopic = getTopic(token);
+      const infoReply = fmtCatalog(role, rawMsg, priorTopic);
+      setTopic(token, { kind: 'general', id: 'catalog', label: 'Data yang tersedia', recap: infoReply.split('\n')[0] });
+      aiLog(`Intent: INFORMATION_REQUEST (${rawMsg})`);
+      aiLog(`Final response: ${infoReply.split('\n')[0]}...`);
+      return copilot(infoReply, 'INFORMATION_REQUEST', {});
+    }
+
+    // DATA-ACTION / CRUD answers — "cara tambahin data gimana", "masukin
+    // klien gimana", "cara ngedit klien", "hapus data dari mana". Resolved
+    // semantically (data_act_* verb × obj_* object), answered with REAL
+    // Noffice UI navigation (menu + button names). Runs for ANY route label
+    // because these phrasings often name a data object (=> DATABASE route);
+    // getCrudHelp self-guards: statistics/entity lookups back off to the DB.
+    // A stored topic ("data klien") supplies the OBJECT for short follow-ups
+    // like "masukinnya gimana?" so the topic survives the terse message.
+    {
+      const priorTopic = getTopic(token) || {};
+      let fbObj;
+      if (priorTopic.objId) fbObj = priorTopic.objId;
+      else if (String(priorTopic.id || '').startsWith('crud_') && String(priorTopic.id).split('_').length >= 3) fbObj = String(priorTopic.id).split('_')[2];
+      const crud = getCrudHelp(rawMsg, page, role, { entityMention: !!entityMention, fallbackObjId: fbObj });
+      if (crud) {
+        setTopic(token, { kind: 'feature', id: crud.feature.id, label: crud.feature.label, recap: crud.reply.split('\n')[0], objId: crud.feature.objId });
+        aiLog(`Intent: DATA_ACTION (${rawMsg}) | ${crud.feature.id}`);
+        aiLog(`Final response: ${crud.reply.split('\n')[0]}...`);
+        return copilot(crud.reply, 'DATA_ACTION', {});
+      }
+    }
   }
 
   // ----------------------------------------------------------------------
@@ -1752,22 +1835,21 @@ export async function generateCopilotResponse(userMessage, contextData = {}, ses
   }
 
   // ----------------------------------------------------------------------
-  // UNKNOWN INTENT — ask to clarify (only reached when the question is
-  // neither a data question, nor a legal/knowledge question).
+  // UNKNOWN INTENT — natural, honest fallback (only reached when the question
+  // is neither a data question, nor a legal/knowledge question). Uses any
+  // stored topic for continuity and keeps the tone human, never robotic.
   // ----------------------------------------------------------------------
   aiLog('Intent: UNKNOWN');
+  const _topic = getTopic(token);
+  if (_topic && _topic.label) {
+    return copilot(
+      `Hmm, saya belum yakin yang Anda maksud. Tadi kita sedang membahas ${_topic.label}.\n\nCoba sebutkan lebih jelas: mau melihat datanya, menghitung jumlahnya, atau mencari sesuatu di dalamnya?`,
+      'UNKNOWN',
+      {}
+    );
+  }
   return copilot(
-    `🤖 Noffice Copilot (Asisten Notaris & PPAT Offline):
-
-Saya belum dapat memahami pertanyaan: ${rawMsg}. Bisa diperjelas maksudnya?
-
-Saya bisa membantu:
-• 📊 Rekap Kantor — ringkasan data nyata dari database lokal.
-• 🗄️ Data aplikasi — ketik pertanyaan bebas seperti berapa jumlah karyawan?, siapa saja yang bekerja di Engineering?, dokumen apa yang paling baru?, atau berapa kasus yang sedang diproses?.
-• 📋 Persyaratan Hukum — syarat AJB, syarat PT, syarat Hibah.
-• 🧮 Pajak — hitung pajak BPHTB.
-
-Semua jawaban data diambil langsung dari database SQLite lokal Noffice Anda (100% offline).`,
+    `Hmm, saya belum paham maksudnya. Bisa dijelaskan sedikit lagi ya?\n\nSaya bisa membantu melihat data nyata di Noffice (klien, kasus/permohonan, dokumen, karyawan), menghitung rekap, atau menjelaskan fitur dan syarat hukum dokumen notaris. Coba sebutkan dengan kata-kata sendiri, misalnya "berapa klien sekarang?" atau "cara ubah tema".`,
     'UNKNOWN',
     {}
   );
