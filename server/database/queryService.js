@@ -1,7 +1,7 @@
 import db from '../db.js';
 import {
   TABLE_META, hasTable, hasColumn, isAdminRole, getVisibleColumns,
-  FINAL_CASE_STATUSES,
+  FINAL_CASE_STATUSES, CASE_CATEGORIES,
 } from './schemaInspector.js';
 
 // ----------------------------------------------------------------------
@@ -116,6 +116,14 @@ function buildFilters(entity, filters, role, params) {
       const vals = Array.isArray(f.value) ? f.value : [f.value];
       if (!vals.length) continue;
       clauses.push(`${q} IN (SELECT clientId FROM "cases" WHERE serviceType IN (${vals.map(() => '?').join(',')}))`);
+      vals.forEach((v) => params.push(v));
+      continue;
+    }
+    if (f.op === 'relatedRunningCase') {
+      // clients who own at least one STILL-RUNNING case
+      const vals = Array.isArray(f.value) ? f.value : [f.value];
+      if (!vals.length) continue;
+      clauses.push(`${q} IN (SELECT clientId FROM "cases" WHERE status NOT IN (${vals.map(() => '?').join(',')}))`);
       vals.forEach((v) => params.push(v));
       continue;
     }
@@ -270,11 +278,76 @@ function recapQuery(role) {
   };
 }
 
+// Dashboard page stats — mirrors the real dashboard widgets, all live reads.
+function dashboardQuery(role) {
+  assertUsable();
+  const isAdmin = isAdminRole(role);
+  const out = {};
+  const one = (sql, key, params = []) => {
+    try { out[key] = runSql(sql, params)[0].total; }
+    catch { out[key] = null; }
+  };
+  const feed = (svc) => svc.map(() => '?').join(',');
+  if (hasTable('cases')) {
+    if (hasColumn('cases', 'status')) {
+      one('SELECT COUNT(*) AS total FROM cases', 'cases');
+      one(`SELECT COUNT(*) AS total FROM cases WHERE status NOT IN (${feed(FINAL_CASE_STATUSES)})`, 'casesRunning', FINAL_CASE_STATUSES);
+    }
+    const notarySvc = CASE_CATEGORIES.notary.services;
+    const ppatSvc = CASE_CATEGORIES.ppat.services;
+    if (hasColumn('cases', 'serviceType')) {
+      if (notarySvc.length) one(`SELECT COUNT(*) AS total FROM cases WHERE serviceType IN (${feed(notarySvc)})`, 'casesNotary', notarySvc);
+      if (ppatSvc.length) one(`SELECT COUNT(*) AS total FROM cases WHERE serviceType IN (${feed(ppatSvc)})`, 'casesPpat', ppatSvc);
+    }
+  }
+  if (hasTable('clients')) one('SELECT COUNT(*) AS total FROM clients', 'clients');
+  if (hasTable('documents') && hasColumn('documents', 'isTrashed')) {
+    one('SELECT COUNT(*) AS total FROM documents WHERE isTrashed = 0', 'documents');
+  }
+  if (hasTable('employees') && hasColumn('employees', 'status')) {
+    const scope = isAdmin ? '' : " AND role = 'employee'";
+    one(`SELECT COUNT(*) AS total FROM employees WHERE status = 'active'${scope}`, 'employees');
+  }
+  let recent = [];
+  if (hasTable('cases') && hasColumn('cases', 'createdAt')) {
+    const cols = ['caseNumber', 'serviceType', 'status', 'createdAt'].filter((c) => hasColumn('cases', c));
+    if (cols.length) {
+      recent = runSql(`SELECT ${cols.map((c) => `"${c}"`).join(',')} FROM "cases" ORDER BY "createdAt" DESC LIMIT 5`);
+    }
+  }
+  return {
+    rows: [],
+    data: out,
+    recent,
+    table: 'summary',
+    loggedSql: 'SELECT COUNT(*) FROM cases / running / notary / ppat / clients / documents / employees + recent cases',
+  };
+}
+
+// Agenda / jadwal penandatanganan — real appointmentDate/time rows.
+function agendaQuery() {
+  assertUsable();
+  if (!hasTable('cases') || !hasColumn('cases', 'appointmentDate')) {
+    return { rows: [], data: null, table: 'summary', loggedSql: 'agenda: appointmentDate column not found' };
+  }
+  const join = hasTable('clients') && hasColumn('clients', 'name')
+    ? 'LEFT JOIN clients cl ON cl.id = c.clientId'
+    : '';
+  const clientCol = join ? ', cl.name AS clientName' : '';
+  const rows = runSql(
+    `SELECT c.caseNumber AS caseNumber, c.status AS status, c.serviceType AS serviceType, c.appointmentDate AS appointmentDate, c.appointmentTime AS appointmentTime${clientCol} FROM cases c ${join} WHERE c.appointmentDate IS NOT NULL AND c.appointmentDate != '' ORDER BY c.appointmentDate ASC, c.appointmentTime ASC LIMIT 30`,
+    []
+  );
+  return { rows, data: null, table: 'summary', loggedSql: 'SELECT upcoming appointments (cases.appointmentDate)' };
+}
+
 export function executeDataQuery(spec) {
   if (!spec || !spec.entity) throw new UnsupportedQueryError('invalid data intent');
 
   if (spec.metric === 'recap') return recapQuery(spec.role);
   if (spec.metric === 'fees') return feesQuery(spec);
+  if (spec.metric === 'dashboard') return dashboardQuery(spec.role);
+  if (spec.metric === 'agenda') return agendaQuery(spec.role);
 
   return executePlannedQuery(spec, spec.role || 'admin');
 }

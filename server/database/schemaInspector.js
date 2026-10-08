@@ -205,6 +205,12 @@ export const CASE_PAGES = {
   'ppat-cases': { category: 'ppat', entity: 'PPAT_CASE', source: 'PPATCaseService', label: 'PPAT' },
 };
 
+// Human-readable names for the EXACT service ids the UI modules use.
+// Lets "klien yang punya kasus PT?" bind to the real serviceType value.
+export const SERVICE_LABELS = Object.fromEntries(
+  [...NOTARY_SERVICES, ...PPAT_SERVICES].filter((s) => s && s.id).map((s) => [s.id, s.name])
+);
+
 // Generic value aliases (not tied to one question).
 export const VALUE_ALIASES = {
   active: { col: 'status', value: 'active', words: ['aktif', 'active'] },

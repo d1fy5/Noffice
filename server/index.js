@@ -5,7 +5,7 @@ import path from 'path';
 import crypto from 'crypto';
 import os from 'os';
 import { dbGet, dbQuery, dbRun, hashPassword } from './db.js';
-import { checkAiStatus, extractDocumentData, generateLegalClause, auditCaseData, generateCopilotResponse } from './aiEngine.js';
+import { checkAiStatus, extractDocumentData, generateLegalClause, auditCaseData, generateCopilotResponse, sanitizeReply } from './aiEngine.js';
 
 const app = express();
 const PORT = 3001;
@@ -515,7 +515,7 @@ app.post('/api/ai/chat', requireAuth, async (req, res) => {
       userId: req.sessionUser?.userId,
       token: req.sessionUser?.token,
     });
-    const reply = typeof result === 'string' ? result : result.reply;
+    const reply = sanitizeReply(typeof result === 'string' ? result : result.reply);
     const intent = typeof result === 'object' ? result.intent : undefined;
     const meta = typeof result === 'object' ? result.meta : undefined;
     res.json({ success: true, reply, intent, meta });

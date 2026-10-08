@@ -1,6 +1,7 @@
 import {
   TABLE_META, ENTITY_KEYWORDS, STATUS_ALIASES, VALUE_ALIASES, FINAL_CASE_STATUSES,
-  CASE_CATEGORIES, CASE_PAGES, DOMAIN_PHRASES, hasTable, hasColumn, getValueVocab, getIdentityVocab,
+  CASE_CATEGORIES, CASE_PAGES, DOMAIN_PHRASES, SERVICE_LABELS, hasTable, hasColumn,
+  getValueVocab, getIdentityVocab,
 } from './schemaInspector.js';
 
 // ----------------------------------------------------------------------
@@ -60,6 +61,9 @@ const SEARCH_PHRASES = /\b(cari|mencari|cariin|carikan|find|cek)\b/i;
 const UNSUPPORTED_CONCEPTS = ['gaji', 'upah', 'invoice', 'faktur', 'tagihan', 'hutang', 'piutang',
   'aset', 'inventaris', 'kehadiran', 'absensi', 'lembur', 'tunjangan', 'bonus', 'cuti',
   'izin', 'stok', 'penjualan', 'pembelian', 'laba', 'rugi', 'pajak karyawan'];
+
+// Status values that mean "berkas belum lengkap / masih di tahap awal".
+const INCOMPLETE_STATUSES = ['kurang', 'berkas_masuk', 'pending', 'review', 'draf_akta'];
 
 // Which categorical column to prefer when the user supplies a value that is
 // not already in a live value vocabulary (e.g. "Engineering" for a new dept).
@@ -214,6 +218,12 @@ export function resolveValueAlias(msg, entity, caseCategories) {
   for (const alias of Object.values(VALUE_ALIASES)) {
     for (const word of alias.words) {
       if (new RegExp(String.raw`\b${word}\b`, 'i').test(msg)) {
+        // "kasus aktif" = masih berjalan (cases.status never contains an
+        // 'active' literal — the per-category/national running statuses win).
+        if (alias.value === 'active' && entity === 'cases') {
+          if (!hasColumn(entity, 'status')) continue;
+          return { column: 'status', op: 'nin', value: runningExcludesFor(entity, caseCategories), display: 'masih berjalan' };
+        }
         if (alias.value === 'RUNNING') {
           if (!hasColumn(entity, 'status')) continue;
           return { column: 'status', op: 'nin', value: runningExcludesFor(entity, caseCategories), display: 'masih berjalan' };
@@ -241,6 +251,44 @@ export function resolveValueAlias(msg, entity, caseCategories) {
     }
   }
   return null;
+}
+
+// ----------------------------------------------------------------------
+// SERVICE-TYPE RELATION — "Siapa klien yang punya kasus PT?", "klien yang
+// kasusnya AJB" — the CLIENT is resolved THROUGH their cases.serviceType
+// (real FK cases.clientId -> clients.id). Tokens are derived from the exact
+// service ids the UI uses (PT/AKT-PT/AJB/HIBAH/...), never hardcoded.
+// ----------------------------------------------------------------------
+function serviceIdByToken() {
+  const map = {};
+  for (const id of Object.keys(SERVICE_LABELS)) {
+    const bits = new Set(String(id).toLowerCase().split(/[_\-\s]+/).filter((p) => p.length >= 2));
+    for (const b of bits) (map[b] = map[b] || new Set()).add(id);
+  }
+  return map;
+}
+const SERVICE_ID_TOKENS = serviceIdByToken();
+
+function detectServiceFilter(msg) {
+  // Only meaningful when the question binds a service to entities via a case.
+  if (!/\b(punya|memiliki|kasus|permohonan|berkas|jenis layanan)\b/i.test(msg)) return null;
+  const matched = [];
+  for (const [tok, ids] of Object.entries(SERVICE_ID_TOKENS)) {
+    if (new RegExp(String.raw`\b${tok}\b`, 'i').test(msg)) {
+      for (const id of ids) if (!matched.includes(id)) matched.push(id);
+    }
+  }
+  // "lainnya" service id is only intended when literally named.
+  if (matched.includes('LAINNYA') && matched.length > 1 && !/\blainnya\b/i.test(msg)) {
+    matched.splice(matched.indexOf('LAINNYA'), 1);
+  }
+  if (!matched.length) return null;
+  return {
+    column: 'id',
+    op: 'relatedCase',
+    value: matched,
+    display: matched.map((id) => SERVICE_LABELS[id] || id).join(' & '),
+  };
 }
 
 // Bind a leftover word to either a person/identity column or the entity's
@@ -347,6 +395,23 @@ function buildPlan(msg, entity, role, overrides = {}) {
     plan.humanFilters.push(humanFilterText(vf, entity));
   }
 
+  // "yang belum lengkap" -> cases whose status clearly means not-complete yet
+  // (berkas awal / pending / review / kurang / draf akta).
+  if (isCases && /\b(belum lengkap|kurang lengkap|berkas belum lengkap|belum ada berkas|belum lengkap semua)\b/i.test(msg)
+    && !plan.filters.some((f) => f.column === 'status')) {
+    const inc = { column: 'status', op: 'in', value: INCOMPLETE_STATUSES, display: 'belum lengkap' };
+    plan.filters.push(inc);
+    plan.humanFilters.push(humanFilterText(inc, entity));
+  }
+
+  // Clients are often asked about THROUGH their cases ("klien yang punya
+  // kasus PT/AJB") — bind the named service to the real FK relation.
+  const serviceRel = isClients ? detectServiceFilter(msg) : null;
+  if (serviceRel) {
+    plan.filters.push(serviceRel);
+    plan.humanFilters.push(humanFilterText(serviceRel, entity));
+  }
+
   const isCount = COUNT_PHRASES.test(msg);
   const isGroup = GROUP_PHRASES.test(msg);
   const isList = LIST_PHRASES.test(msg);
@@ -384,7 +449,7 @@ function buildPlan(msg, entity, role, overrides = {}) {
   } else if (isSearch && leftover.length) {
     plan.metric = 'search';
     plan.keyword = leftover.join(' ');
-  } else if (!isList && leftover.length && !vf) {
+  } else if (!isList && leftover.length && !vf && !serviceRel) {
     // natural-language value binding ("yang bekerja di Engineering")
     const lf = overrides.leftoverFilter || resolveLeftover(msg, entity);
     if (lf) {
@@ -395,7 +460,7 @@ function buildPlan(msg, entity, role, overrides = {}) {
       plan.metric = 'search';
       plan.keyword = leftover[0];
     }
-  } else if (isList && leftover.length && !vf) {
+  } else if (isList && leftover.length && !vf && !serviceRel) {
     // listing that also carries a value ("Siapa yang bekerja di Engineering?")
     const lf = overrides.leftoverFilter || resolveLeftover(msg, entity);
     if (lf) {
@@ -419,20 +484,22 @@ function buildPlan(msg, entity, role, overrides = {}) {
 function humanFilterText(f, entity) {
   const meta = TABLE_META[entity];
   let label;
+  if (f.op === 'relatedRunningCase') return 'yang memiliki kasus masih berjalan';
   if (f.op === 'caseUnion' || f.op === 'in') {
-    return `pada jenis layanan **"${cap(String(f.display || 'tersebut'))}"**`;
+    return `pada jenis layanan ${cap(String(f.display || 'tersebut'))}`;
   }
   if (f.op === 'relatedCase') return `yang memiliki kasus ${cap(String(f.display || 'tersebut'))}`;
   if (f.column === 'aktaNumber' && f.op === 'neq') return 'yang nomor akta-nya sudah diterbitkan';
   if (f.op === 'like') {
     const colIsCategory = meta.filterCols?.[f.column] && f.column !== (meta.identityCols || [])[0];
     return colIsCategory
-      ? `pada ${groupLabel(entity, f.column)} **"${cap(String(f.display || f.value))}"**`
-      : `yang namanya mengandung "${cap(String(f.display || f.value))}"`;
+      ? `pada ${groupLabel(entity, f.column)} ${cap(String(f.display || f.value))}`
+      : `yang namanya mengandung ${cap(String(f.display || f.value))}`;
   }
   if (f.op === 'nin') return `yang ${f.display || 'masih berjalan'}`;
+  if (f.op === 'in' && f.display) return `yang ${f.display}`;
   if (f.value === 'active' || f.display === 'aktif') return 'yang berstatus aktif';
-  return `berstatus "${String(f.value)}"`;
+  return `berstatus ${String(f.value)}`;
 }
 
 function cap(s) {
@@ -565,6 +632,44 @@ export function planQuestion(rawMessage, opts = {}) {
   if (FEES_PHRASES.test(msg)) {
     const paid = /\b(dibayar|lunas|paid|terbayar)\b/.test(msg) ? 'paid' : null;
     return { entity: 'cases', metric: 'fees', payment: paid, role };
+  }
+
+  // 5) dashboard — "data apa saja yang ada di dashboard?" -> the REAL live
+  //    page stats (cases/categories/clients/documents/employees + recent).
+  if (/\b(dashboard|beranda)\b/i.test(msg)
+    && /\b(data|statistik|ringkasan|jumlah|rekap|informasi|isi|menampilkan|muncul|apa saja|ada apa)\b/i.test(msg)) {
+    return { entity: 'summary', metric: 'dashboard', role };
+  }
+
+  // 6) agenda / jadwal penandatanganan — from the real appointmentDate column.
+  if (/\b(agenda|jadwal|penjadwalan|penandatanganan)\b/i.test(msg)) {
+    return { entity: 'cases', metric: 'agenda', role };
+  }
+
+  // 7) "Siapa yang punya kasus aktif/berjalan?" / "Siapa yang punya kasus PT?"
+  //    -> the CLIENTS who own those cases (real clients <- cases relation).
+  if (/^siapa\b/i.test(msg) && /\b(kasus|permohonan)\b/i.test(msg)
+    && /\b(punya|pemilik|memiliki|milik|klien)\b/i.test(msg)) {
+    const serviceRel = detectServiceFilter(msg);
+    const runningWord = /\b(aktif|berjalan|diproses|berlangsung|sedang)\b/i.test(msg);
+    const filters = [];
+    if (serviceRel) filters.push(serviceRel);
+    if (runningWord) {
+      filters.push({ column: 'id', op: 'relatedRunningCase', value: runningExcludesFor('cases', detectCaseCategories(msg)), display: 'masih berjalan' });
+    }
+    if (filters.length) {
+      return {
+        entity: 'clients', role, metric: 'list',
+        fields: ['name', 'job', 'phone'],
+        filters,
+        groupBy: null,
+        orderBy: { column: TABLE_META.clients.dateCol, dir: 'desc' },
+        limit: 8,
+        keyword: null,
+        caseCategories: [],
+        humanFilters: filters.map((f) => humanFilterText(f, 'clients')),
+      };
+    }
   }
 
   const topic = pickTopic(msg);

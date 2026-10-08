@@ -1,6 +1,7 @@
 import db from '../db.js';
 import {
   TABLE_META, hasTable, hasColumn, isAdminRole, getVisibleColumns, CASE_CATEGORIES, CASE_PAGES,
+  FINAL_CASE_STATUSES,
 } from './schemaInspector.js';
 import { runRead } from './queryService.js';
 
@@ -35,6 +36,8 @@ const DOC_MARKER = /\b(dokumen|berkas|arsip|file)\b/i;
 const SEARCH_MARKER = /\b(cari|find|cariin|carikan|tampilkan|tampil|lihat|coba)\b/i;
 const EXISTS_MARKER = /\b(ada\b|apakah|nggak|gak)\b/i;
 
+const INCOMPLETE_STATUSES = ['kurang', 'berkas_masuk', 'pending', 'review', 'draf_akta'];
+
 let vocabCache = { rows: null, ts: 0 };
 
 // STOP words — question scaffolding that must never become the search term.
@@ -51,7 +54,15 @@ const STOP = new Set(
     'service', 'dan', 'atau', 'serta', 'didalam', 'dalam', 'pada', 'kini', 'saat', 'ini', 'juga', 'semua',
     'seluruh', 'lihatlah', 'bisa', 'dapat', 'berikan', 'kasih', 'ke', 'kepada', 'bagaimana', 'gimana', 'kah',
     'nya', 'nya?', 'tersedia', 'per', 'divisi', 'juta', 'gaji', 'nominal', 'atas', 'deviasi',
-    'kalau', 'begitu', 'lantas', 'terus', 'tadi', 'tersebut', 'saja'].filter(Boolean)
+    'kalau', 'begitu', 'lantas', 'terus', 'tadi', 'tersebut', 'saja',
+    'terbaru', 'terakhir', 'terkahir', 'paling', 'baru', 'lama', 'lalu',
+    'dashboard', 'beranda', 'rekap', 'statistik', 'ringkasan', 'laporan',
+    'umum', 'overview', 'gambaran',
+    'aktif', 'berjalan', 'berlangsung', 'diproses', 'selesai', 'lengkap',
+    'belum', 'mana', 'diantara', 'lain', 'lainnya', 'paling', 'kurang',
+    'sekarang', 'coba', 'dong', 'tanya', 'nanya', 'bertanya', 'bertanyakan',
+    'bulan', 'minggu', 'hari', 'tahun', 'tanggal', 'jalan', 'aceh', 'nanti',
+    'iya', 'ya', 'yap', 'iyaa', 'gakpapa', 'semuanya', 'totalnya', 'keseluruhan'].filter(Boolean)
 );
 
 const NUM_CASE = /\b(0\d{2,})\b/;
@@ -235,6 +246,20 @@ function extractTerm(msg, vocab) {
     scored.sort((a, b) => b.score - a.score);
     const best = scored.find((s) => s.score > 0);
     if (best) return { term: best.t, via: 'fuzzy' };
+
+    // Multi-token name ("muhammad hasbi"): try consecutive phrases of the
+    // best non-stop tokens so a partial person name binds as ONE entity
+    // instead of only its strongest single word.
+    const ordered = terms.slice(0, 3);
+    for (let w = 2; w <= ordered.length; w++) {
+      for (let i = 0; i + w <= ordered.length; i++) {
+        const phrase = ordered.slice(i, i + w).join(' ');
+        const ph = matchTerm(phrase, vocab);
+        if (ph.length) {
+          return { term: phrase, via: 'fuzzy' };
+        }
+      }
+    }
     return { term: terms.slice(0, 2).join(' '), via: 'word' }; // title-ish free search
   }
   return null;
@@ -244,6 +269,11 @@ function extractTerm(msg, vocab) {
 // Question focus + answer shape
 // ----------------------------------------------------------------------
 function focusOf(msg, page) {
+  // "kasus ... yang dokumennya sudah tersedia" is case-oriented — the doc
+  // phrase is a QUALIFIER, not the search subject.
+  if (/\b(kasusnya|permohonannya|kasus|permohonan)\b/i.test(msg)
+    && /\b(dokumennya|dokumen|berkas)\b/i.test(msg)
+    && /\b(tersedia|siap|lengkap|sudah|ada)\b/i.test(msg)) return 'cases';
   for (const [focus, re] of FOCUS_MARKERS) if (re.test(msg)) return focus;
   const cat = CASE_PAGES[page];
   if (cat && cat.category) return 'cases';
@@ -306,6 +336,24 @@ export function buildEntityPlan(rawMsg, opts = {}) {
   const qtype = qtypeOf(msg, focus);
   const category = categoryFilter(msg, page);
 
+  // status qualifier: "kasus aktif/berjalan/diproses" -> running cases (the
+  // case status is never an 'active' literal — same semantics as the planner).
+  let statusFilter = null;
+  if (focus === 'cases' && /\b(aktif|berjalan|diproses|berlangsung|sedang diproses|belum selesai|belum tuntas|belum beres|masih proses)\b/i.test(msg)) {
+    const excludes = category === 'notary'
+      ? CASE_CATEGORIES.notary.runningExcludes
+      : category === 'ppat'
+        ? CASE_CATEGORIES.ppat.runningExcludes
+        : FINAL_CASE_STATUSES;
+    statusFilter = { op: 'nin', value: excludes, display: 'masih berjalan' };
+  } else if (focus === 'cases' && /\b(belum lengkap|kurang lengkap|belum ada berkas|berkas belum lengkap|belum lengkap semua)\b/i.test(msg)) {
+    statusFilter = { op: 'in', value: INCOMPLETE_STATUSES, display: 'belum lengkap' };
+  }
+  // doc-availability qualifier: "kasus ... yang dokumennya sudah tersedia".
+  const docReady = focus === 'cases'
+    && /\b(dokumennya|dokumen|berkas)\b/i.test(msg)
+    && /\b(tersedia|siap|lengkap|sudah|ada)\b/i.test(msg);
+
   // Only treat this as an ENTITY question when we have an actual reason:
   //   - the term hit something in the vocab (fuzzy/name/number), OR
   //   - explicit search wording (cari/tampil/ada/apakah/lihat), OR
@@ -340,6 +388,8 @@ export function buildEntityPlan(rawMsg, opts = {}) {
     role,
     matched,
     matchedCount: matched.length,
+    statusFilter,
+    docReady,
   };
 }
 
@@ -374,6 +424,7 @@ export function executeEntityPlan(plan) {
     cases: [],
     officers: [],
     serviceTypes: [],
+    docReadyByCase: {},
     foundAny: false,
   };
 
@@ -434,9 +485,35 @@ export function executeEntityPlan(plan) {
       const cat = plan.category;
       if (cat === 'notary') { clauses.push(`"serviceType" IN (${CASE_CATEGORIES.notary.services.map(() => '?').join(',')})`); CASE_CATEGORIES.notary.services.forEach((v) => params.push(v)); }
       else if (cat === 'ppat') { clauses.push(`"serviceType" IN (${CASE_CATEGORIES.ppat.services.map(() => '?').join(',')})`); CASE_CATEGORIES.ppat.services.forEach((v) => params.push(v)); }
+      if (plan.statusFilter) {
+        if (plan.statusFilter.op === 'in') {
+          clauses.push(`"status" IN (${plan.statusFilter.value.map(() => '?').join(',')})`);
+          plan.statusFilter.value.forEach((v) => params.push(v));
+        } else {
+          clauses.push(`"status" NOT IN (${plan.statusFilter.value.map(() => '?').join(',')})`);
+          plan.statusFilter.value.forEach((v) => params.push(v));
+        }
+      }
       const rows = runRead(`SELECT ${sel} FROM "cases" WHERE ${clauses.join(' AND ')} ORDER BY "createdAt" DESC LIMIT 40`, params);
       for (const r of rows) out.cases.push(r);
       if (rows.length) out.foundAny = true;
+    }
+  }
+
+  // doc-availability heuristic for case questions: a case "has documents"
+  // when any non-trashed document's title contains its case number or its
+  // author/term matches (documents has no caseId FK — this is honest, real
+  // data linkage only, never invented).
+  if (plan.docReady && out.cases.length) {
+    const termL = String(plan.term || '').toLowerCase();
+    out.docReadyByCase = {};
+    for (const c of out.cases) {
+      const cn = String(c.caseNumber || '').toLowerCase();
+      out.docReadyByCase[c.id] = vocab.documents.some((d) => {
+        const t = String(d.title || '').toLowerCase();
+        const a = String(d.author || '').toLowerCase();
+        return (cn && t.includes(cn)) || (termL && a.includes(termL)) || (termL && t.includes(termL));
+      });
     }
   }
 

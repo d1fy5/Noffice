@@ -50,6 +50,10 @@ export default function AiCopilotDrawer() {
 
   const DATA_KEYWORDS = /\b(rekap|statistik|ringkasan|laporan|total|dokumen|berkas|arsip|klien|client|kasus|permohonan|akta|status|staf|karyawan|pegawai|cari|daftar|siapa|berapa|jumlah|divisi|departemen)\b/i;
 
+  // Defense-in-depth: never render raw markdown symbols ("**") even if a
+  // future source slips past the server-side sanitizer.
+  const cleanText = (t) => String(t || '').replace(/\*\*/g, '').replace(/\*+/g, '');
+
   const handleSend = async (customMsg = null) => {
     const textToSend = customMsg || input;
     if (!textToSend || !textToSend.trim() || loading) return;
@@ -254,7 +258,7 @@ export default function AiCopilotDrawer() {
                     whiteSpace: 'pre-line',
                   }}
                 >
-                  {m.text}
+                  {cleanText(m.text)}
                 </div>
                 <div
                   style={{
