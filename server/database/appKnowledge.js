@@ -17,64 +17,64 @@ export const APP_PAGES = {
     route: '/cases',
     category: 'notary',
     entities: ['cases'],
-    summary: 'halaman kelola permohonan/kasus Notaris: daftar kasus, membuat permohonan baru, membuka detail kasus, mengisi/update status pengerjaan, menghitung estimasi fee notaris, dan menerbitkan nomor akta.',
+    summary: 'pusat komando untuk layanan keperdataan umum Notaris. Anda bisa tracking pipeline kasus, membuat permohonan baru, update status pengerjaan secara real-time, estimasi fee, hingga auto-generate nomor akta.',
   },
   'ppat-cases': {
     label: 'PPAT Cases (Kasus PPAT)',
     route: '/ppat-cases',
     category: 'ppat',
     entities: ['cases'],
-    summary: 'halaman kelola kasus PPAT (misal AJB/Jual Beli, serta layanan PPAT lainnya): daftar kasus, membuat kasus baru, update status, dan menerbitkan akta PPAT.',
+    summary: 'ruang kendali khusus layanan PPAT (seperti AJB, Hibah, APHT). Mengelola seluruh siklus kasus pertanahan dari awal masuk hingga terbitnya akta.',
   },
   clients: {
     label: 'Klien',
     route: '/clients',
     entities: ['clients', 'cases'],
-    summary: 'halaman kelola data klien: daftar klien, tambah/ubah klien, ekstraksi data dari KTP, dan melihat kasus milik tiap klien.',
+    summary: 'sistem manajemen relasi (CRM) internal. Fitur meliputi: database klien, histori kasus tiap klien, hingga AI KTP-Extractor untuk input data super cepat.',
   },
   documents: {
     label: 'Dokumen',
     route: '/documents',
     entities: ['documents'],
-    summary: 'halaman pengelolaan dokumen/berkas: upload file, kategori, pemilik/penulis dokumen, pencarian, dan trash dokumen yang dihapus.',
+    summary: 'repositori cerdas untuk seluruh berkas digital kantor. Mendukung upload instan, kategorisasi, tracking kepemilikan, pencarian super cepat, dan pemulihan via Trash.',
   },
   employees: {
     label: 'Karyawan/Staf',
     route: '/employees',
     entities: ['employees'],
     adminOnly: true,
-    summary: 'halaman kelola karyawan/staf kantor: daftar pegawai, divisi/departemen, peran, dan status kepegawaian. Khusus admin.',
+    summary: 'panel HR internal untuk mengelola armada staf, role/jabatan, status kepegawaian, dan pembagian divisi. (Khusus otoritas Admin).',
   },
   dashboard: {
     label: 'Dashboard',
     route: '/dashboard',
     entities: ['cases', 'clients', 'documents', 'employees'],
-    summary: 'halaman ringkasan (dashboard): statistik kasus/klients, aktivitas terbaru, dan notifikasi.',
+    summary: 'kokpit analitik utama. Memberikan visualisasi data operasional, statistik real-time, aktivitas terbaru, dan metrik kesehatan kantor secara komprehensif.',
   },
   notifications: {
     label: 'Notifikasi',
     route: '/notifications',
     entities: ['cases'],
-    summary: 'halaman notifikasi/aktivitas sistem, misal perubahan status kasus dan pemberitahuan lainnya.',
+    summary: 'pusat notifikasi sistem yang melacak jejak aktivitas penting, seperti transisi status kasus atau pembaruan dokumen.',
   },
   settings: {
     label: 'Pengaturan',
     route: '/settings',
     entities: [],
-    summary: 'halaman pengaturan aplikasi (setting).',
+    summary: 'pusat konfigurasi aplikasi. Anda bisa mengatur tema, bahasa, keamanan (password), template tanda terima, format auto-akta, hingga backup database.',
   },
   inbox: {
     label: 'Inbox',
     route: '/inbox',
     entities: ['documents'],
-    summary: 'halaman inbox/pesan masuk.',
+    summary: 'ruang komunikasi dan pesan masuk untuk koordinasi internal (Inbox).',
   },
   'data-tables': {
     label: 'Data Tables',
     route: '/data-tables',
     entities: [],
     adminOnly: true,
-    summary: 'halaman tabel data mentah (admin) untuk melihat data langsung dari database.',
+    summary: 'panel akses raw-data khusus admin untuk melakukan inspeksi langsung ke dalam core database.',
   },
 };
 
@@ -132,20 +132,21 @@ export function getAppAnswer(rawMsg, page) {
 
   // 1) "apa bedanya Notary Cases dan PPAT Cases?"
   if (/\b(bedanya|perbedaan|perbandingan|difference)\b/i.test(msg) && /notar/i.test(msg) && /ppat/i.test(msg)) {
-    return 'Perbedaan **Notary Cases** dan **PPAT Cases**:\n'
-      + '• **Notary Cases** — permohonan layanan Notaris (Pendirian PT, Akta Kuasa, Perjanjian, Cessie, Legalitas, dan layanan notaris lainnya).\n'
-      + '• **PPAT Cases** — kasus layanan PPAT (AJB/Jual-Beli dan layanan PPAT lainnya) yang berhubungan dengan tanah/Pertanahan.\n'
-      + 'Keduanya adalah kasus/permohonan pada sistem; kategori ditentukan dari *jenis layanan* tiap kasus (sumber data yang sama dengan halaman Notary Cases & PPAT Cases).';
+    return '🚀 **Perbedaan Esensial Notary Cases & PPAT Cases**:\n'
+      + '• **Notary Cases (Permohonan Notaris)**: Pusat komando untuk layanan keperdataan umum (seperti Pendirian PT, Akta Kuasa, Perjanjian, Cessie, Legalitas, dsb).\n'
+      + '• **PPAT Cases (Kasus PPAT)**: Ruang kendali khusus untuk ranah pertanahan (AJB, Hak Tanggungan/APHT, Hibah, dan layanan PPAT lainnya).\n\n'
+      + '💡 *Pro-tip*: Keduanya terintegrasi dalam engine manajemen kasus yang sama, namun dipisahkan agar *workflow* Anda tetap rapi, terstruktur, dan mudah ditracking sesuai spesialisasinya.';
   }
 
   // 2) case workflow
-  if (/\b(workflow|alur|tahapan|proses kasus|status kasus apa saja|tahap)\b/i.test(msg) && /(kasus|permohonan|akta|notaris|ppat)/i.test(msg)) {
-    return 'Alur umum status kasus di Noffice (from database `status`):\n'
-      + '1. **Berkas Masuk** → review kelengkapan (**Kurang** / **Lengkap**)\n'
-      + '2. **Draf Akta** → **TTD** → proses terbit (mis. **Proses NPWP**, **SIUP/NIB**)\n'
-      + '3. Proses pajak & pendaftaran (**BPHTB**, **PPH**, **Pendaftaran AHU**, **Pendaftaran BPN**)\n'
-      + '4. **Akta Jadi** → **Salinan Selesai** → **Selesai / Diambil** atau **Arsip**\n'
-      + 'Status dapat juga berupa **Pending**, **Review**, atau **Rejected**.';
+  if (/\b(workflow|alur|tahapan|proses kasus|status kasus apa saja|tahap|flow|journey)\b/i.test(msg) && /(kasus|permohonan|akta|notaris|ppat|sistem)/i.test(msg)) {
+    return '🗺️ **End-to-End Workflow (Alur Kasus) di Noffice**:\n'
+      + '1. 📥 **Berkas Masuk & Verifikasi**: Klien mendaftar, tim me-review kelengkapan dokumen (**Kurang** / **Lengkap**).\n'
+      + '2. ✍️ **Drafting & Eksekusi**: Pembuatan **Draf Akta** → dijadwalkan **TTD** → proses paralel (mis. **Proses NPWP**, **SIUP/NIB**).\n'
+      + '3. ⚖️ **Validasi & Pendaftaran**: Validasi setoran pajak (**BPHTB**, **PPH**) → registrasi ke instansi (**Pendaftaran AHU**, **Pendaftaran BPN**).\n'
+      + '4. 📜 **Finalisasi**: Status menjadi **Akta Jadi** → pencetakan **Salinan Selesai**.\n'
+      + '5. 🎉 **Handover**: Dokumen diserahkan (**Selesai / Diambil**) atau dikurasi ke rak **Arsip**.\n\n'
+      + '🚦 *Status kontrol*: Gunakan **Pending** (menunggu), **Review** (pemeriksaan), atau **Rejected** (ditolak) untuk anomali alur.';
   }
 
   // 3) "halaman ini data apa saja?" — live count on the current page
@@ -179,6 +180,28 @@ export function getAppAnswer(rawMsg, page) {
 // Documents.jsx, Docs. The answers are assembled from these facts, never from
 // a canned "Q -> A" table.
 const FEATURE_MAP = [
+  {
+    id: 'dashboard',
+    fields: ['dashboard', 'analitik', 'statistik', 'pantau', 'metrics'],
+    label: 'Dashboard & Analitik',
+    where: 'menu Dashboard',
+    facts: [
+      'Gunakan **Dashboard** sebagai *pusat komando* untuk memantau metrik kantor secara real-time.',
+      'Sistem menyajikan data intelijen: total kasus aktif, beban kerja, hingga grafik penyelesaian.',
+      'Aktivitas terbaru (recent logs) juga ter-tracking rapi agar tidak ada pergerakan dokumen yang luput dari pantauan.',
+    ],
+  },
+  {
+    id: 'approval',
+    fields: ['approve', 'setuju', 'validasi', 'review', 'tolak', 'reject'],
+    label: 'Alur Validasi & Approval Dokumen',
+    where: 'detail Dokumen / detail Kasus',
+    facts: [
+      'Dokumen atau tahapan kasus yang butuh otorisasi bisa Anda set statusnya ke **Review** atau **Pending**.',
+      'Otorisator (Admin/Notaris) dapat mengecek berkas, lalu memberikan stamp **Approve** (Disetujui) lewat *dropdown* status.',
+      'Jika ada anomali, kembalikan ke **Rejected** atau **Kurang** beserta catatannya.',
+    ],
+  },
   {
     id: 'theme',
     fields: ['theme'],
@@ -278,7 +301,7 @@ const FEATURE_MAP = [
 // Tiny semantic field aliases for features with no explicit FIELDS entry.
 const EXTRA_ALIASES = {
   recipient: ['tanda terima', 'tanda terimanya', 'kop surat', 'receipt', 'subtitle', 'alamat kantor'],
-  ktp: ['ktp', 'ektp', 'extract', 'ekstrak', 'ocr', 'scan', 'autofill', 'auto fill'],
+  ktp: ['ktp', 'ektp', 'extract', 'ekstrak', 'ocr', 'scan', 'autofill', 'auto fill', 'ai ktp', 'baca ktp'],
 };
 
 function featureScore(msgLower, fieldName) {
@@ -413,62 +436,62 @@ const CRUD_OBJECTS = [
 // never invent a button that does not exist.
 const CRUD_STEPS = {
   add: {
-    klien: ['Buka menu Klien, klik tombol Tambah Klien', 'Isi form (nama, NIK, alamat, telepon, dsb)', 'Klik Simpan; klien baru langsung masuk daftar'],
-    karyawan: ['Buka menu Karyawan, klik tombol Tambah Karyawan', 'Isi form login + data pribadi', 'Klik Simpan'],
-    kasus: ['Buka menu Kasus (atau PPAT Cases), klik tombol Buat Permohonan / Permohonan Akta', 'Pilih/isi klien, jenis layanan, dan detail kasus', 'Klik Simpan; kasus muncul di daftar'],
-    dokumen: ['Buka menu Dokumen, klik tombol Upload', 'Pilih file (bisa juga tarik-lepas/drag-drop) dan tentukan kategori', 'Simpan; dokumen masuk daftar'],
-    akta: ['Nomor akta dibuat dari detail kasus', 'Klik tombol Generate Nomor Akta untuk menerbitkan nomor sesuai format', 'Formatnya diatur di Pengaturan → Umum → Format Nomor Akta'],
-    pengguna: ['Kelola akun lewat Pengaturan → Akun', 'Menambah akun login baru tidak tersedia di antarmuka ini; data pengguna dikelola dari database'],
+    klien: ['Buka menu **Klien**, lalu eksekusi tombol **Tambah Klien** di sudut layar.', 'Isi formulir pendaftaran (nama, NIK, alamat, telepon).', 'Klik **Simpan**; voila, profil klien baru langsung live di database.'],
+    karyawan: ['Akses menu **Karyawan**, klik **Tambah Karyawan**.', 'Set up profil login, tentukan otorisasi (role), dan mapping divisinya.', 'Klik **Simpan** untuk mengaktifkan staf.'],
+    kasus: ['Masuk ke **Kasus** (atau PPAT Cases), tembak tombol **Buat Permohonan**.', 'Assign ke klien terkait, pilih jenis layanan, dan tulis deskripsi singkat.', 'Klik **Simpan** untuk mendaftarkan kasus ke dalam *pipeline*.'],
+    dokumen: ['Navigasi ke menu **Dokumen**, klik **Upload**.', 'Pilih file dari direktori atau gunakan aksi *drag-and-drop* secara instan.', 'Set kategori, tambahkan metadata/keterangan, lalu **Simpan** ke repositori cerdas.'],
+    akta: ['Sistem penomoran beroperasi dari dalam antarmuka detail kasus.', 'Gunakan aksi **⚡ Generate Nomor Akta** untuk mencetak nomor registrasi resmi.', 'Pola penomoran bisa Anda kustomisasi penuh di **Pengaturan → Umum → Format Nomor Akta**.'],
+    pengguna: ['Manajemen akun profil sepenuhnya dikendalikan via **Pengaturan → Akun**.', 'Catatan: Injeksi akun baru (register) ditangani langsung di level core database demi regulasi keamanan.'],
   },
   edit: {
-    klien: ['Buka menu Klien, klik ikon pensil (Edit) di baris klien yang dituju', 'Perbarui datanya pada form', 'Klik Simpan'],
-    karyawan: ['Buka menu Karyawan, klik ikon pensil (Edit) di baris karyawan', 'Perbarui datanya', 'Klik Simpan'],
-    kasus: ['Buka menu Kasus, klik ikon mata (detail) pada kasus', 'Ubah status pengerjaan / checklist pada panel detail', 'Ubah status lewat dropdown, lalu simpan'],
-    dokumen: ['Buka menu Dokumen, klik dokumennya untuk membuka detail', 'Ubah status dokumen (Approve/Pending/Ditolak) lewat dropdown pada detail', 'Dokumen tidak bisa di-edit isinya di antarmuka ini'],
-    akta: ['Format nomor akta diatur di Pengaturan → Umum → Format Nomor Akta', 'Ubah variabel sesuai pola ({no}, {bulanRomawi}, {tahun}, {jenisAkta})', 'Simpan agar berlaku untuk generate berikutnya'],
-    pengguna: ['Buka Pengaturan → Akun untuk mengubah data/profil login', 'Ubah foto/profil yang tersedia', 'Klik Simpan Perubahan'],
+    klien: ['Akses menu **Klien**, bidik ikon pensil (Edit) pada baris data klien incaran.', 'Lakukan pembaruan data pada form.', 'Trigger aksi **Simpan** untuk sinkronisasi.'],
+    karyawan: ['Buka menu **Karyawan**, klik ikon pensil pada staf yang dituju.', 'Mutakhirkan data profil atau jabatannya.', 'Klik **Simpan**.'],
+    kasus: ['Di menu **Kasus**, klik ikon mata (detail) untuk masuk ke panel inspeksi.', 'Mutakhirkan checklist berkas atau transisikan status pengerjaannya.', 'Ubah via dropdown status, lalu klik ikon **Simpan**.'],
+    dokumen: ['Buka **Dokumen**, klik *item* dokumen untuk membedah detailnya.', 'Anda bisa melakukan validasi dokumen (Approve/Pending/Ditolak) via dropdown status.', 'Catatan: Konten file itu sendiri (PDF/Word) diedit secara eksternal, bukan dari dalam UI Noffice.'],
+    akta: ['Format orkestrasi nomor ada di **Pengaturan → Umum → Format Nomor Akta**.', 'Tata letak sintaks variabel sesuai selera (seperti {no}, {bulanRomawi}, {tahun}).', 'Simpan konfigurasi; otomatis berlaku pada iterasi generate berikutnya.'],
+    pengguna: ['Navigasi ke **Pengaturan → Akun** untuk memodifikasi identitas login Anda.', 'Sesuaikan profil atau avatar.', 'Klik **Simpan Perubahan**.'],
   },
   delete: {
-    klien: ['Buka menu Klien, klik ikon tempat sampah (Hapus) di baris klien', 'Konfirmasi pada dialog Hapus Data Klien'],
-    karyawan: ['Buka menu Karyawan, klik ikon tempat sampah di baris karyawan', 'Konfirmasi hapus; tersedia juga hapus massal untuk yang terpilih'],
-    kasus: ['Kasus tidak dihapus permanen di Noffice', 'Ubah status kasus menjadi Arsip/Dibatalkan lewat detail kasus sebagai pengganti hapus'],
-    dokumen: ['Buka menu Dokumen, klik ikon tempat sampah di baris dokumen', 'Dokumen masuk ke folder Tempat Sampah, masih bisa dipulihkan', 'Hapus permanen (Admin) dilakukan dari folder Trash'],
-    pengguna: ['Hapus akun login tidak tersedia di antarmuka ini; dikelola dari database'],
+    klien: ['Buka **Klien**, klik ikon tempat sampah (Delete) di baris data target.', 'Beri otorisasi pada dialog konfirmasi Hapus Data.'],
+    karyawan: ['Di menu **Karyawan**, eksekusi ikon tempat sampah.', 'Konfirmasi tindakan; fitur hapus massal (bulk delete) juga siap digunakan jika beberapa baris dipilih.'],
+    kasus: ['Untuk audit-trail yang baik, kasus tidak dimusnahkan secara fisik dari Noffice.', 'Cukup transisikan statusnya menjadi **Arsip** atau **Dibatalkan** di panel detail.'],
+    dokumen: ['Aksi hapus dokumen (ikon sampah) akan melempar file ke folder **Tempat Sampah (Trash)**.', 'Data aman (bisa di-restore). Pemusnahan absolut hanya dilakukan dari dalam folder Trash oleh Admin.'],
+    pengguna: ['Terminasi akun aktif tidak tersedia di front-end UI; operasi ini membutuhkan akses level database.'],
   },
   find: {
-    klien: ['Buka menu Klien', 'Ketik nama/NIK di kolom pencarian di atas tabel'],
-    karyawan: ['Buka menu Karyawan', 'Gunakan kolom pencarian di atas tabel'],
-    kasus: ['Buka menu Kasus / PPAT Cases', 'Gunakan kolom pencarian dan filter status'],
-    dokumen: ['Buka menu Dokumen', 'Ketik judul di kolom pencarian; bisa difilter folder & status'],
-    akta: ['Cari kasus terkait di menu Kasus', 'Nomor akta tampil di detail kasus'],
+    klien: ['Akses layar **Klien**.', 'Tembakkan nama atau NIK klien ke dalam *search bar* di atas tabel untuk pencarian instan.'],
+    karyawan: ['Buka panel **Karyawan**.', 'Gunakan kolom pencarian *real-time* di atas tabel.'],
+    kasus: ['Di menu **Kasus / PPAT Cases**.', 'Kombinasikan *search bar* (untuk nama/nomor) dengan *dropdown filter* (berdasarkan status) untuk akurasi maksimal.'],
+    dokumen: ['Buka repositori **Dokumen**.', 'Ketik kata kunci; manfaatkan filter kategori folder dan filter status untuk isolasi pencarian.'],
+    akta: ['Telusuri kasus induknya di menu **Kasus**.', 'Nomor akta definitif akan terpampang di dalam panel detail kasus tersebut.'],
   },
   view: {
-    klien: ['Buka menu Klien', 'Daftar klien tampil sebagai tabel; klik baris untuk detail'],
-    karyawan: ['Buka menu Karyawan', 'Tabel karyawan tampil lengkap dengan divisi/jabatan'],
-    kasus: ['Buka menu Kasus / PPAT Cases', 'Daftar kasus tampil; klik ikon mata untuk detail'],
-    dokumen: ['Buka menu Dokumen', 'Daftar dokumen tampil sebagai kartu/tabel'],
+    klien: ['Masuk ke layar **Klien**.', 'Tabel akan merender seluruh matriks data; klik baris mana pun untuk *drill-down* ke profil detail.'],
+    karyawan: ['Buka panel **Karyawan**.', 'Daftar armada ter-render lengkap (beserta divisi/jabatan).'],
+    kasus: ['Buka layar **Kasus / PPAT Cases**.', 'Klik ikon mata pada baris kasus untuk membedah log aktivitas dan detailnya.'],
+    dokumen: ['Masuk ke direktori **Dokumen**.', 'Galeri dokumen disajikan secara dinamis dalam format *card* maupun baris data.'],
   },
   save: {
-    klien: ['Data klien tersimpan lewat tombol Simpan pada form Tambah/Edit', 'Pastikan klik Simpan setelah mengisi form'],
-    karyawan: ['Data karyawan tersimpan lewat tombol Simpan pada form Tambah/Edit'],
-    kasus: ['Perubahan kasus disimpan lewat tombol Simpan pada detail/form'],
-    dokumen: ['Dokumen disimpan saat tombol Upload diklik'],
+    klien: ['Profil tersimpan otomatis setelah eksekusi tombol **Simpan** pada jendela Tambah/Edit.', 'Pastikan aksi ini tidak tertinggal setelah mengisi data.'],
+    karyawan: ['Eksekusi tombol **Simpan** pasca modifikasi form.'],
+    kasus: ['Seluruh mutasi status atau update data wajib divalidasi dengan klik tombol **Simpan** di area detail.'],
+    dokumen: ['Unggahan ter-commit ke sistem tepat saat Anda mengeklik **Upload**.'],
   },
   filter: {
-    klien: ['Di halaman Klien tersedia filter/kolom pencarian di atas tabel'],
-    kasus: ['Di halaman Kasus ada dropdown filter status (semua/diambil/draf/arsip/dsb)'],
-    dokumen: ['Di halaman Dokumen ada filter status dan folder di atas daftar'],
+    klien: ['Filter cerdas (pencarian instan) tertanam langsung di *header* layar Klien.'],
+    kasus: ['Panel Kasus dilengkapi dengan interaktif filter status (semua/diambil/arsip/dsb) untuk merapikan pipeline Anda.'],
+    dokumen: ['Gunakan sepasang filter super: penyaringan berdasarkan **Folder (Kategori)** dan **Status (Approve/Pending)**.'],
   },
 };
 
 const CRUD_ANYOBJECT = {
-  add: ['Di Noffice data ditambahkan di masing-masing halamannya', 'Klien → tombol Tambah Klien; Karyawan → Tambah Karyawan; Kasus → Buat Permohonan; Dokumen → Upload'],
-  edit: ['Data diubah lewat ikon Edit (pensil) di baris tabel halaman terkait', 'Kasus diubah statusnya lewat detail kasus'],
-  delete: ['Data dihapus lewat ikon tempat sampah di baris tabel', 'Dokumen yang dihapus masuk ke Tempat Sampah; kasus dipindah ke status Arsip'],
-  find: ['Gunakan kolom pencarian di atas tabel pada halaman Klien, Karyawan, Kasus, atau Dokumen', 'Sebutkan data apa yang ingin dicari supaya saya arahkan ke halaman yang tepat'],
-  view: ['Buka halaman Klien, Kasus, Dokumen, atau Karyawan lewat sidebar', 'Data tampil sebagai tabel/daftar; klik baris untuk detail'],
-  save: ['Pastikan setiap form (Klien/Karyawan/Kasus) diklik tombol Simpan agar perubahan tersimpan', 'Dokumen tersimpan lewat tombol Upload'],
-  filter: ['Tiap halaman data punya filter (status, folder, pencarian) di bagian atas'],
+  add: ['Di ekosistem Noffice, entri data selalu berpusat di masing-masing modulnya.', 'Contoh: Klien → klik **Tambah Klien**; Karyawan → **Tambah Karyawan**; Kasus → **Buat Permohonan**; Dokumen → aksi **Upload**.'],
+  edit: ['Proses mutasi data dieksekusi via ikon Edit (pensil) pada *grid/table* terkait.', 'Khusus untuk Kasus, update pengerjaan dilakukan di dalam panel detail kasus.'],
+  delete: ['Eliminasi data dipicu via ikon tempat sampah.', 'Dokumen transit ke Tempat Sampah (bisa direcovery); kasus cukup dialihkan ke status **Arsip** untuk *safekeeping*.'],
+  find: ['Engine pencarian cerdas tertanam di *header* setiap layar (Klien, Karyawan, Kasus, Dokumen).', 'Beri tahu saya spesifik data apa yang Anda lacak, dan saya arahkan kompasnya ke sana.'],
+  view: ['Akses modul data (Klien, Kasus, dsb) melalui panel sidebar navigasi utama.', 'Sistem merender data dalam bentuk matriks; klik baris data untuk melakukan *deep-dive*.'],
+  save: ['Protokol utamanya: selalu pastikan menekan tombol **Simpan** di akhir tiap form entri.', 'Aksi ini menjamin sinkronisasi data Anda dengan *database layer*.'],
+  filter: ['Noffice mempersenjatai setiap modul utamanya dengan alat filter (berbasis status/kategori/search) di bagian atas layar.'],
 };
 
 // Object detection WITHOUT re-scoring the same message against huge field
