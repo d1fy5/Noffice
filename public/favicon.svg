@@ -1,4 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <rect width="32" height="32" rx="8" fill="#2563eb" />
-  <path d="M9 22V10h3l4 7 4-7h3v12h-3v-7l-4 7-4-7v7z" fill="#ffffff" />
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Noffice">
+  <rect width="512" height="512" rx="112" fill="#3157D5" />
+  <rect x="26" y="26" width="460" height="460" rx="90" fill="none" stroke="#EFCE7B" stroke-width="7" opacity="0.6" />
+  <text x="256" y="378" text-anchor="middle"
+    font-family="'Noto Serif Display','Playfair Display','Cormorant Garamond','Libre Baskerville',Georgia,'Times New Roman',serif"
+    font-size="340" font-weight="700" fill="#EFCE7B">N</text>
 </svg>

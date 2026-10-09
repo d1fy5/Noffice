@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../store/AuthContext.jsx';
 import { useTranslation } from '../store/useTranslation.js';
 import Button from '../components/Button.jsx';
-import Icon from '../components/Icon.jsx';
+import LogoMark from '../components/LogoMark.jsx';
 import { useToast } from '../store/hooks.js';
 
 export default function Login() {
@@ -44,7 +44,7 @@ export default function Login() {
       <div className="login-box card">
         <div className="login-header">
           <div className="login-logo">
-            <div className="logo-icon"><Icon name="box" size={24} /></div>
+            <LogoMark size={46} className="logo-icon" />
             <span>Noffice</span>
           </div>
           <h2>Selamat Datang Kembali</h2>

@@ -249,13 +249,8 @@ h2 {
   width: 38px;
   height: 38px;
   border-radius: var(--radius-sm);
-  background: var(--primary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  font-size: 17px;
-  color: #fff;
+  display: block;
+  flex-shrink: 0;
 }
 
 .logo-text {
@@ -3709,11 +3704,7 @@ code {
   width: 46px;
   height: 46px;
   border-radius: 12px;
-  background: var(--primary);
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
   flex-shrink: 0;
 }
 .login-subtitle {

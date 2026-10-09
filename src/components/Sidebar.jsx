@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import Icon from './Icon.jsx';
 import Avatar from './Avatar.jsx';
+import LogoMark from './LogoMark.jsx';
 import { useTranslation } from '../store/useTranslation.js';
 import { useAuth } from '../store/AuthContext.jsx';
 import { useToast } from "../store/hooks.js";
@@ -54,7 +55,7 @@ export default function Sidebar({ open, onClose }) {
       <div className={`drawer-backdrop ${open ? 'show' : ''}`} onClick={onClose} aria-hidden="true" />
       <aside className={`sidebar ${open ? 'open' : ''}`} aria-label={t('app.name')}>
         <div className="sidebar-logo">
-          <div className="logo-mark">N</div>
+          <LogoMark size={38} className="logo-mark" />
           <div>
             <div className="logo-text">{t('app.name')}</div>
             <div className="logo-tag">{t('app.subtitle')}</div>
