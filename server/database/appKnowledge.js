@@ -130,8 +130,8 @@ export function getAppAnswer(rawMsg, page) {
   const msg = rawMsg.toLowerCase().replace(/\s+/g, ' ').trim();
   if (!msg) return null;
 
-  // 1) "apa bedanya Notary Cases dan PPAT Cases?"
-  if (/\b(bedanya|perbedaan|perbandingan|difference)\b/i.test(msg) && /notar/i.test(msg) && /ppat/i.test(msg)) {
+  // 1) "apa bedanya Notary Cases dan PPAT Cases?" (App specific)
+  if (/\b(bedanya|perbedaan|perbandingan|difference)\b/i.test(msg) && /notar/i.test(msg) && /ppat/i.test(msg) && /(case|halaman|menu|fitur|modul|di noffice|di sistem)/i.test(msg)) {
     return '🚀 **Perbedaan Esensial Notary Cases & PPAT Cases**:\n'
       + '• **Notary Cases (Permohonan Notaris)**: Pusat komando untuk layanan keperdataan umum (seperti Pendirian PT, Akta Kuasa, Perjanjian, Cessie, Legalitas, dsb).\n'
       + '• **PPAT Cases (Kasus PPAT)**: Ruang kendali khusus untuk ranah pertanahan (AJB, Hak Tanggungan/APHT, Hibah, dan layanan PPAT lainnya).\n\n'
@@ -544,6 +544,12 @@ function crudDetect(rawMsg, extra = {}) {
   if (actions[0].id === 'find' || actions[0].id === 'view') {
     const how = /\b(cara|gimana|bagaimana|caranya|langkah|tutorial|prosedur|begini\s+caranya)\b/i.test(msgLower);
     if (!how) return null;
+  }
+
+  // Legal deed questions ("apa saja akta yang bisa dibuat ppat", "akta ppat apa saja")
+  // are legal domain questions, not software deed number generation.
+  if (objects[0].id === 'akta' && /\b(ppat|notaris|kewenangan|resmi|syarat|jenis|macam|hukum|delapan|8)\b/i.test(msgLower)) {
+    return null;
   }
 
   return { actions, objects, m, msgLower, entityMention: !!(extra && extra.entityMention) };

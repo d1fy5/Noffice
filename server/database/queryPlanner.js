@@ -33,7 +33,7 @@ const FUNCTION_WORDS = new Set([
   'kantor', 'notaris', 'sekarang', 'hari', 'ini', 'nya', 'sudah', 'masih', 'berisi',
   'saja', 'dari', 'di', 'on', 'the', 'a', 'an', 'apakah', 'adalah', 'itu',
   'bekerja', 'kerja', 'aktif', 'berjalan', 'diproses', 'berlangsung', 'silakan', 'tolongin',
-  'ppat',
+  'ppat', 'kita', 'kami', 'milik', 'punya', 'seluruh', 'semuanya',
 ]);
 
 // Semantic hints: a word that directly names a table/topic.

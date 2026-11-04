@@ -1,9 +1,12 @@
 import http from 'http';
+import path from 'path';
+import { createWorker } from 'tesseract.js';
 import { buildDataIntent, getContext, saveContext, clearContext } from './database/aiDatabaseContext.js';
 import { executeDataQuery, runRead, DbUnavailableError, SchemaMissingError, PermissionDeniedError } from './database/queryService.js';
 import { TABLE_META, getDomainSummary, getVisibleColumns, CASE_PAGES, CASE_CATEGORIES, FINAL_CASE_STATUSES, SERVICE_LABELS } from './database/schemaInspector.js';
 import { buildEntityPlan, executeEntityPlan } from './database/entitySearch.js';
 import { getAppAnswer, getSemanticHelp, getTroubleshootAnswer, getCrudHelp } from './database/appKnowledge.js';
+import { getNotaryLegalAnswer, NOTARY_TOPICS } from './database/notaryKnowledge.js';
 import {
   getConv, saveConv, updateConv, clearConv, setRef, pushHistory, resolveReferenceConversation,
   setPending, getPending, clearPending, setTopic, getTopic, isTopicFollowUp,
@@ -23,15 +26,17 @@ import {
 const OLLAMA_URL = 'http://localhost:11434/api/generate';
 
 // Helper to query local Ollama model if available
-async function queryOllama(prompt, model = 'qwen2.5') {
+async function queryOllama(prompt, model = 'qwen2.5', systemPrompt = '') {
   return new Promise((resolve) => {
     try {
       const url = new URL(OLLAMA_URL);
-      const postData = JSON.stringify({
+      const postPayload = {
         model: model,
         prompt: prompt,
         stream: false,
-      });
+      };
+      if (systemPrompt) postPayload.system = systemPrompt;
+      const postData = JSON.stringify(postPayload);
 
       const req = http.request(
         {
@@ -43,7 +48,7 @@ async function queryOllama(prompt, model = 'qwen2.5') {
             'Content-Type': 'application/json',
             'Content-Length': Buffer.byteLength(postData),
           },
-          timeout: 4000,
+          timeout: 10000,
         },
         (res) => {
           let data = '';
@@ -76,10 +81,10 @@ async function queryOllama(prompt, model = 'qwen2.5') {
 export async function checkAiStatus() {
   const isOllamaActive = await queryOllama('ping').then((res) => res !== '');
   return {
-    engine: 'Local Notary AI Engine',
+    engine: 'Noffice Smart Legal AI Engine',
     ollamaActive: isOllamaActive,
     fallbackActive: true,
-    mode: isOllamaActive ? 'Ollama LLM (Lokal)' : 'Built-in Smart NLP Engine (100% Offline)',
+    mode: isOllamaActive ? 'Ollama LLM (Lokal)' : 'AI Notaris & PPAT (100% Offline Cerdas)',
   };
 }
 
@@ -98,6 +103,12 @@ export async function extractDocumentData(rawText) {
       const match = ollamaResult.match(/\{[\s\S]*\}/);
       if (match) {
         const parsed = JSON.parse(match[0]);
+        if (parsed.birthdate) {
+          const dMatch = parsed.birthdate.match(/(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/);
+          if (dMatch) {
+            parsed.birthdate = `${dMatch[3]}-${String(dMatch[2]).padStart(2, '0')}-${String(dMatch[1]).padStart(2, '0')}`;
+          }
+        }
         return { success: true, data: parsed, engine: 'Ollama LLM' };
       }
     } catch {
@@ -116,41 +127,80 @@ export async function extractDocumentData(rawText) {
     npwp: '',
   };
 
-  // NIK Extractor (16 digits)
-  const nikMatch = rawText.match(/\b\d{16}\b/);
-  if (nikMatch) data.nik = nikMatch[0];
+  // 1. NIK Extractor (16 digits or NIK label followed by digits with spaces/hyphens)
+  const nikExact = rawText.match(/\b\d{16}\b/);
+  if (nikExact) {
+    data.nik = nikExact[0];
+  } else {
+    const nikLine = rawText.match(/(?:NIK|N1K|N!K|Nomor\s*Induk)\s*[:=.]?\s*([0-9\s-]{16,24})/i);
+    if (nikLine) {
+      const cleanedNik = nikLine[1].replace(/[\s-]/g, '');
+      if (cleanedNik.length === 16) {
+        data.nik = cleanedNik;
+      }
+    }
+  }
 
-  // NPWP Extractor (15 digits formatted or unformatted)
+  // 2. NPWP Extractor (15 digits formatted or unformatted)
   const npwpMatch = rawText.match(/\b\d{2}[\s.-]?\d{3}[\s.-]?\d{3}[\s.-]?\d{1}[\s.-]?\d{3}[\s.-]?\d{3}\b/);
   if (npwpMatch) data.npwp = npwpMatch[0];
 
-  // Phone Extractor (08xx or +628xx)
+  // 3. Phone Extractor (08xx or +628xx)
   const phoneMatch = rawText.match(/\b(08\d{8,11}|\+628\d{8,11})\b/);
   if (phoneMatch) data.phone = phoneMatch[0];
 
-  // Name Extractor
-  const nameLineMatch = rawText.match(/(?:Nama|Name|Atas Nama|Pihak I|Pihak II|Pemohon)\s*[:=]\s*([^\r\n,]+)/i);
+  // 4. Name Extractor
+  const nameLineMatch = rawText.match(/(?:Nama|Name|Atas Nama|Pihak I|Pihak II|Pemohon)\s*[:=.]?\s*([^\r\n,]+)/i);
   if (nameLineMatch) {
-    data.name = nameLineMatch[1].trim().replace(/^[:=\s]+/, '');
+    let rawName = nameLineMatch[1].trim().replace(/^[:=.\s]+/, '');
+    rawName = rawName.replace(/(?:Tempat|TTL|Jenis Kelamin|Alamat).*$/i, '').trim();
+    data.name = rawName;
   }
 
-  // Address Extractor
-  const addrMatch = rawText.match(/(?:Alamat|Address|Jl\.|Jalan|Domisili)\s*[:=]?\s*([^\n]+(?:,\s*[^\n]+)*)/i);
-  if (addrMatch) {
-    data.address = addrMatch[0].replace(/^(?:Alamat|Address|Domisili)\s*[:=]?\s*/i, '').trim();
-  }
-
-  // Job Extractor
-  const jobMatch = rawText.match(/(?:Pekerjaan|Job|Jabatan|Profesi)\s*[:=]\s*([^\r\n,]+)/i);
-  if (jobMatch) data.job = jobMatch[1].trim();
-
-  // Birthdate & Birthplace Extractor
-  const ttlMatch = rawText.match(/(?:Tempat[/\s]*Tgl[.\s]*Lahir|TTL|Tgl[.\s]*Lahir|Birthdate)\s*[:=]\s*([^\r\n]+)/i);
-  if (ttlMatch) {
-    data.birthdate = ttlMatch[1].trim();
+  // 5. Birthdate & Birthplace Extractor (Formatted as YYYY-MM-DD for HTML date picker)
+  const ttlMatch = rawText.match(/(?:Tempat[/\s]*Tgl[.\s]*Lahir|TTL|Tgl[.\s]*Lahir|Birthdate|Tanggal Lahir)\s*[:=.]?\s*([^\r\n]+)/i);
+  const dateTarget = ttlMatch ? ttlMatch[1] : rawText;
+  const dateMatch = dateTarget.match(/(\d{1,2})[-/. ](\d{1,2})[-/. ](\d{4})/);
+  if (dateMatch) {
+    const day = String(dateMatch[1]).padStart(2, '0');
+    const month = String(dateMatch[2]).padStart(2, '0');
+    const year = dateMatch[3];
+    data.birthdate = `${year}-${month}-${day}`;
   } else {
-    const dateMatch = rawText.match(/\b(\d{2}[-/.]\d{2}[-/.]\d{4}|\d{4}[-/.]\d{2}[-/.]\d{2})\b/);
-    if (dateMatch) data.birthdate = dateMatch[0];
+    const isoMatch = dateTarget.match(/\b(\d{4})[-/.](\d{2})[-/.](\d{2})\b/);
+    if (isoMatch) data.birthdate = isoMatch[0];
+  }
+
+  // 6. Address Extractor (Composes Alamat + RT/RW + Kelurahan + Kecamatan + Kota)
+  const addrMatch = rawText.match(/(?:Alamat|Address|Jl\.|Jalan|Domisili)\s*[:=.]?\s*([^\r\n]+)/i);
+  const rtrwMatch = rawText.match(/RT[/\s.]*RW\s*[:=.]?\s*([0-9/\s]+)/i);
+  const kelMatch = rawText.match(/(?:Kel[/\s.]*Desa|Kelurahan|Desa)\s*[:=.]?\s*([^\r\n,]+)/i);
+  const kecMatch = rawText.match(/(?:Kecamatan|Kec[.]?)\s*[:=.]?\s*([^\r\n,]+)/i);
+  const kotaMatch = rawText.match(/(?:KOTA|KABUPATEN|KAB[.]?)\s+([A-Z\s]+)/i);
+
+  if (addrMatch) {
+    let fullAddr = addrMatch[1].replace(/^(?:Alamat|Address|Domisili)\s*[:=.]?\s*/i, '').trim();
+    if (rtrwMatch && !fullAddr.toLowerCase().includes('rt')) {
+      fullAddr += `, RT/RW ${rtrwMatch[1].trim()}`;
+    }
+    if (kelMatch && !fullAddr.toLowerCase().includes('kel')) {
+      fullAddr += `, Kel. ${kelMatch[1].trim()}`;
+    }
+    if (kecMatch && !fullAddr.toLowerCase().includes('kec')) {
+      fullAddr += `, Kec. ${kecMatch[1].trim()}`;
+    }
+    if (kotaMatch && !fullAddr.toLowerCase().includes(kotaMatch[1].trim().toLowerCase())) {
+      fullAddr += `, ${kotaMatch[0].trim()}`;
+    }
+    data.address = fullAddr;
+  }
+
+  // 7. Job Extractor
+  const jobMatch = rawText.match(/(?:Pekerjaan|Job|Jabatan|Profesi)\s*[:=.]?\s*([^\r\n,]+)/i);
+  if (jobMatch) {
+    let cleanJob = jobMatch[1].trim().replace(/^[:=.\s]+/, '');
+    cleanJob = cleanJob.replace(/(?:Kewarganegaraan|Agama|Status).*$/i, '').trim();
+    data.job = cleanJob;
   }
 
   return {
@@ -158,6 +208,59 @@ export async function extractDocumentData(rawText) {
     data,
     engine: 'Built-in Smart NLP Engine (100% Offline)',
   };
+}
+
+// 1b. Scan KTP Image via Local Offline Tesseract OCR
+export async function scanKtpImage(imageData) {
+  if (!imageData) {
+    return { success: false, message: 'Data gambar tidak ditemukan' };
+  }
+  try {
+    const worker = await createWorker(['ind', 'eng'], 1, {
+      langPath: path.resolve('public/tessdata'),
+      cachePath: path.resolve('public/tessdata'),
+    });
+
+    // Pass 1: PSM 6 (single uniform block, sangat presisi untuk dokumen ID card)
+    await worker.setParameters({
+      tessedit_pageseg_mode: '6',
+      preserve_interword_spaces: '1',
+    });
+    let ret = await worker.recognize(imageData);
+    let rawText = ret.data?.text || '';
+
+    // Pass 2: Jika teks yang didapat kurang dari 15 karakter, coba PSM 11 (sparse text)
+    if (rawText.trim().length < 15) {
+      await worker.setParameters({
+        tessedit_pageseg_mode: '11',
+      });
+      const ret2 = await worker.recognize(imageData);
+      if ((ret2.data?.text || '').length > rawText.length) {
+        rawText = ret2.data.text;
+      }
+    }
+
+    await worker.terminate();
+
+    if (!rawText.trim()) {
+      return {
+        success: false,
+        message: 'Teks KTP tidak terbaca jelas (buram). Dekatkan KTP ke kamera agar memenuhi bingkai panduan, atau gunakan opsi Unggah Foto KTP jika webcam kurang tajam.',
+      };
+    }
+
+    const extracted = await extractDocumentData(rawText);
+
+    return {
+      success: true,
+      text: rawText,
+      data: extracted.data || {},
+      engine: 'Tesseract OCR + Smart NLP (100% Offline)',
+    };
+  } catch (err) {
+    console.error('Scan KTP OCR Error:', err);
+    return { success: false, message: 'Gagal memindai gambar KTP: ' + err.message };
+  }
 }
 
 // 2. AI Clause & Draft Generator
@@ -703,6 +806,12 @@ function fmtIssuedBoth(notary, ppat) {
 }
 
 function generalKnowledgeBase(rawMsg, msgLower) {
+  // Check the comprehensive Notaris & PPAT Knowledge Base
+  const legalMatch = getNotaryLegalAnswer(rawMsg, msgLower);
+  if (legalMatch && legalMatch.reply) {
+    return legalMatch.reply;
+  }
+
   // 1. Akta Jual Beli (AJB)
   if (msgLower.match(/\b(ajb|jual beli|tanah|bangunan|rumah)\b/i)) {
     return `📋 **Persyaratan Akta Jual Beli (AJB) PPAT:**
@@ -869,7 +978,7 @@ function copilot(reply, intent, meta) {
 // data/knowledge intent word), so "halo, berapa klien?" still reaches the
 // data engine and is answered with real data.
 // ----------------------------------------------------------------------
-const CHIT_CHAT = /^(ya|yah|siap|oke|ok|banyak|semuanya|atas bantuannya|bantuannya|sudah|banget|sangat|kamu|anda|kau|apa kabar|kabarnya|gimana kabar|kabar(nya)?|kabar baik|baik|baik saja|baik\s+baik\s+saja)\s*[?.!]*$/i;
+const CHIT_CHAT = /^(ya|yah|siap|oke|ok|banyak|semuanya|atas bantuannya|bantuannya|sudah|banget|sangat|kamu|anda|kau|apa kabar|kabarnya|gimana kabar|kabar(nya)?|kabar baik|baik|baik saja|baik\s+baik\s+saja|bro|sis|min|gan|kak|bang|mas|mbak|pak|bu|kawan|sobat|banyak\s+(bro|sis|min|gan|kak|bang|mas|mbak|pak|bu|ya|yah))\s*[?.!]*$/i;
 
 function detectConversation(rawMsg) {
   const lower = String(rawMsg || '').trim().toLowerCase().replace(/\s+/g, ' ').trim();
@@ -881,16 +990,16 @@ function detectConversation(rawMsg) {
     return !r || CHIT_CHAT.test(r);
   };
 
-  if (/^(terima kasih|makasih|thanks|thank(?:\s*)you|thankyou|tq)\b/i.test(lower)) {
-    if (isPure(/^(terima kasih|makasih|thanks|thank(?:\s*)you|thankyou|tq)\b/i)) return 'thanks';
+  if (/^(terima kasih|makasih|thanks|thank(?:\s*)you|thankyou|tq|trims)\b/i.test(lower)) {
+    if (isPure(/^(terima kasih|makasih|thanks|thank(?:\s*)you|thankyou|tq|trims)\b/i)) return 'thanks';
   }
   if (/^(dadah|bye\b|sampai jumpa|selamat tinggal)\b/i.test(lower)) return 'farewell';
   if (/^(halo|hai|hi|hello|hallo|hay|oy|pagi|siang|sore|malam|selamat (pagi|siang|sore|malam))\b/i.test(lower)) {
     if (isPure(/^(halo|hai|hi|hello|hallo|hay|oy|pagi|siang|sore|malam|selamat (pagi|siang|sore|malam))\b/i)) return 'greeting';
   }
   if (/^apa kabar\b|^gimana kabar\b/i.test(lower)) return 'greeting';
-  if (/^(kamu|anda|kau) bisa (bantu apa|apa saja|ngapain|apa|lakukan apa|kerjakan apa)\b|\bapa yang bisa (kamu|anda) (bantu|lakukan|kerjakan|jawab)\b|^bantu apa\b/i.test(lower)) {
-    if (isPure(/^(kamu|anda|kau) bisa (bantu apa|apa saja|ngapain|apa|lakukan apa|kerjakan apa)\b|\bapa yang bisa (kamu|anda) (bantu|lakukan|kerjakan|jawab)\b|^bantu apa\b/i)) return 'capabilities';
+  if (/^(kamu|anda|kau)?\s*bisa (bantu apa|apa saja|ngapain|apa|lakukan apa|kerjakan apa)\b|\bapa yang bisa (kamu|anda) (bantu|lakukan|kerjakan|jawab)\b|^bisa bantu apa saja\b|^bantu apa\b/i.test(lower)) {
+    if (isPure(/^(kamu|anda|kau)?\s*bisa (bantu apa|apa saja|ngapain|apa|lakukan apa|kerjakan apa)\b|\bapa yang bisa (kamu|anda) (bantu|lakukan|kerjakan|jawab)\b|^bisa bantu apa saja\b|^bantu apa\b/i)) return 'capabilities';
   }
   if (/\bsiapa (kamu|anda|kau)\b|^(kamu|anda|kau) siapa\b/i.test(lower)) return 'identity';
   if (/^(oke|ok|siap|noted|mantap|nice|good|bagus|sip)\b[?.!]*$/i.test(lower)) return 'ack';
@@ -1263,6 +1372,7 @@ function windowRange(msgLower, now = new Date()) {
 function smallTalkIntent(norm, hasEntity) {
   if (hasEntity) return null;
   if (hasDataDomain(norm)) return null;
+  if (getNotaryLegalAnswer(norm, norm)) return null;
 
   if (detectAskCheck(norm)) {
     return { reply: 'Tentu. Mau saya cek data klien, kasus, atau dokumen? Bisa sebutkan juga nama atau nomor yang lebih spesifik.', pending: { type: 'choice' } };
@@ -1436,6 +1546,19 @@ export async function generateCopilotResponse(userMessage, contextData = {}, ses
       aiLog(`Intent: APPLICATION | Page: ${(contextData && contextData.page) || 'none'}`);
       aiLog(`Final response: ${appAnswer.split('\n')[0]}...`);
       return copilot(appAnswer, 'APPLICATION', {});
+    }
+
+    // ----------------------------------------------------------------------
+    // NOTARY & PPAT LEGAL KNOWLEDGE — authoritative legal knowledge base for
+    // Indonesian Notary & PPAT practice (UUJN, UUPA, PP 24/1997, PP 37/1998,
+    // 8 Akta PPAT, perizinan AHU, perpajakan transaksi, pertanahan BPN, dsb).
+    // Answers legal requirements, conceptual queries, regulations, and taxes.
+    // ----------------------------------------------------------------------
+    const legalAnswer = getNotaryLegalAnswer(rawMsg, msgLower);
+    if (legalAnswer) {
+      aiLog(`Intent: LEGAL_KNOWLEDGE (${legalAnswer.id}) | ${rawMsg}`);
+      aiLog(`Final response: ${legalAnswer.reply.split('\n')[0]}...`);
+      return copilot(legalAnswer.reply, 'LEGAL_KNOWLEDGE', { topic: legalAnswer.id });
     }
   }
 
@@ -1818,8 +1941,8 @@ export async function generateCopilotResponse(userMessage, contextData = {}, ses
   // GENERAL PATH — optional local Ollama, then the offline knowledge base.
   // ----------------------------------------------------------------------
   aiLog(`Intent: GENERAL (${rawMsg})`);
-  const prompt = `Anda adalah Noffice Copilot, asisten AI lokal Notaris & PPAT Indonesia yang cerdas dan ramah. Jawab singkat dan tepat pertanyaan berikut:\n${rawMsg}`;
-  const ollamaResult = await queryOllama(prompt);
+  const systemPrompt = 'Anda adalah Noffice Copilot, asisten AI profesional untuk kantor Notaris dan PPAT di Indonesia. Anda menguasai penuh hukum kenotariatan (UUJN), pertanahan (UUPA, PP 24/1997, PP 37/1998), keperdataan, perpajakan transaksi (PPh, BPHTB), dan operasional kantor. Berikan jawaban dalam Bahasa Indonesia yang sangat baik, ramah, jelas, terstruktur rapi, dan solutif.';
+  const ollamaResult = await queryOllama(rawMsg, 'qwen2.5', systemPrompt);
   if (ollamaResult && ollamaResult.trim()) {
     return copilot(ollamaResult, 'GENERAL', {});
   }
@@ -1849,7 +1972,7 @@ export async function generateCopilotResponse(userMessage, contextData = {}, ses
     );
   }
   return copilot(
-    `Hmm, saya belum paham maksudnya. Bisa dijelaskan sedikit lagi ya?\n\nSaya bisa membantu melihat data nyata di Noffice (klien, kasus/permohonan, dokumen, karyawan), menghitung rekap, atau menjelaskan fitur dan syarat hukum dokumen notaris. Coba sebutkan dengan kata-kata sendiri, misalnya "berapa klien sekarang?" atau "cara ubah tema".`,
+    `Saya belum sepenuhnya menangkap maksud pertanyaan Anda. Bisa dijelaskan dengan kalimat lain?\n\nSebagai Asisten Cerdas Notaris & PPAT, saya siap menjawab seputar:\n• Syarat & Prosedur Akta (AJB, Hibah, APHT, APHB, Ruislag, Pendirian PT/CV, Yayasan, Perjanjian Kawin, Wasiat, Fidusia)\n• Pertanahan BPN (Pengecekan sertifikat, Roya HT, Balik Nama, SKMHT, Pemecahan sertifikat, Peningkatan hak SHGB ke SHM)\n• Pajak Transaksi & Biaya (Simulasi PPh Final 2,5%, BPHTB 5%, PNBP BPN, Honorarium)\n• Operasional Noffice (misal: "berapa kasus aktif?", "daftar klien", "rekap kantor", "cara backup db")`,
     'UNKNOWN',
     {}
   );

@@ -258,7 +258,7 @@ export const FIELDS = {
   capability: ['bisa apa', 'bantu apa', 'kemampuan', 'bisa lakukan', 'bisa kerja apa'],
 
   // ----- NOFFICE app (feature-level) — facts live in appKnowledge.js -----
-  theme: ['tema', 'tampil', 'gelap', 'terang', 'malam', 'hitam', 'putih', 'warna', 'mode', 'dark', 'light', 'kepadatan', 'reduced', 'gerakan', 'compact', 'appearance'],
+  theme: ['tema', 'tampilan tema', 'mode gelap', 'mode terang', 'gelap', 'terang', 'malam', 'hitam', 'putih', 'warna', 'mode', 'dark', 'light', 'kepadatan', 'reduced', 'gerakan', 'compact', 'appearance'],
   upload: ['upload', 'unggah', 'tambah dokumen', 'naikkan', 'kirim file', 'import', 'drag'],
   document: ['dokumen', 'berkas', 'arsip', 'file', 'surat', 'paper', 'document'],
   trash: ['trash', 'sampah', 'hapus permanen', 'pulihkan', 'restore', 'tong sampah', 'bins'],
@@ -327,7 +327,16 @@ export const FIELDS = {
   howto: ['cara', 'bagaimana', 'gimana', 'langkah', 'proses', 'tutorial', 'panduan', 'cara pakai'],
 
   // ----- Legal / general knowledge -----
-  legal: ['syarat', 'ajb', 'jual beli', 'hibah', 'waris', 'pt', 'cv', 'fidusia', 'apht', 'skmht', 'bphtb', 'pph', 'legalisasi', 'waarmerking', 'akta', 'pendirian', 'pajak', 'bphtb', 'ppn', 'nop'],
+  legal: [
+    'syarat', 'persyaratan', 'ajb', 'jual beli', 'hibah', 'waris', 'skw', 'pt', 'cv', 'yayasan',
+    'koperasi', 'fidusia', 'apht', 'skmht', 'aphb', 'inbreng', 'ruislag', 'roya', 'bphtb', 'pph',
+    'legalisasi', 'waarmerking', 'copy colationee', 'akta', 'pendirian', 'pajak', 'pnbp', 'nop',
+    'shm', 'shgb', 'shp', 'hgu', 'hpl', 'girik', 'letter c', 'petok', 'komparisi', 'premisse',
+    'renvooi', 'minuta', 'salinan', 'grosse', 'wasiat', 'testament', 'perjanjian kawin', 'prenup',
+    'postnup', 'pisah harta', 'kuasa mutlak', 'akta kuasa', 'balik nama', 'pecah sertifikat',
+    'splitsing', 'peningkatan hak', 'checking bpn', 'cek sertifikat', 'uujn', 'uupa', 'notaris',
+    'ppat', 'majelis pengawas', 'mpd', 'mkn', 'kode etik', 'honorarium', 'pt perorangan', 'saksi akta'
+  ],
   general: ['apa itu', 'apa saja', 'pengertian', 'definisi', 'misal', 'contoh', 'tentang', 'menjelaskan'],
 };
 

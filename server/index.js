@@ -5,7 +5,7 @@ import path from 'path';
 import crypto from 'crypto';
 import os from 'os';
 import { dbGet, dbQuery, dbRun, hashPassword } from './db.js';
-import { checkAiStatus, extractDocumentData, generateLegalClause, auditCaseData, generateCopilotResponse, sanitizeReply } from './aiEngine.js';
+import { checkAiStatus, extractDocumentData, scanKtpImage, generateLegalClause, auditCaseData, generateCopilotResponse, sanitizeReply } from './aiEngine.js';
 
 const app = express();
 const PORT = 3001;
@@ -481,6 +481,16 @@ app.post('/api/ai/extract', requireAuth, async (req, res) => {
   try {
     const { text } = req.body;
     const result = await extractDocumentData(text);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/ai/scan-ktp', requireAuth, async (req, res) => {
+  try {
+    const { image } = req.body;
+    const result = await scanKtpImage(image);
     res.json(result);
   } catch (error) {
     res.status(500).json({ error: error.message });

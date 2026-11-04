@@ -220,6 +220,14 @@ export const AiAPI = {
     });
     return handleJsonResponse(res);
   },
+  scanKtp: async (image) => {
+    const res = await fetch(`${API_URL}/ai/scan-ktp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify({ image })
+    });
+    return handleJsonResponse(res);
+  },
   generateDraft: async (serviceType, parameters) => {
     const res = await fetch(`${API_URL}/ai/draft-clause`, {
       method: 'POST',

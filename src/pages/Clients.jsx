@@ -11,6 +11,7 @@ import Modal from '../components/Modal.jsx';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
 import FormField from '../components/FormField.jsx';
 import PageHeader from '../components/PageHeader.jsx';
+import KtpScanner from '../components/KtpScanner.jsx';
 
 const EMPTY_FORM = {
   nik: '',
@@ -57,6 +58,19 @@ export default function Clients() {
   const [selectedClient, setSelectedClient] = useState(null);
   const [rawText, setRawText] = useState('');
   const [extracting, setExtracting] = useState(false);
+
+  const handleKtpExtracted = (data) => {
+    if (!data) return;
+    setForm((prev) => ({
+      ...prev,
+      nik: data.nik || prev.nik,
+      name: data.name || prev.name,
+      phone: data.phone || prev.phone,
+      address: data.address || prev.address,
+      job: data.job || prev.job,
+      birthdate: data.birthdate || prev.birthdate,
+    }));
+  };
 
   const handleAiExtract = async () => {
     if (!rawText.trim()) {
@@ -297,33 +311,7 @@ export default function Clients() {
         }
       >
         {/* AI Extract KTP / Teks Box */}
-        <div
-          style={{
-            background: 'var(--info-soft)',
-            borderRadius: 'var(--radius-sm)',
-            border: '1px solid var(--info-border)',
-            padding: '16px',
-            marginBottom: '20px'
-          }}
-        >
-          <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--info)', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
-            <Icon name="activity" size={15} />
-            <span>AI Data Extractor</span>
-            <span style={{ fontSize: '0.75rem', fontWeight: 400, color: 'var(--text-2)' }}>(Paste teks hasil scan KTP di sini untuk auto-fill form)</span>
-          </label>
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <input
-              type="text"
-              placeholder="Paste hasil scan KTP / teks dokumen di sini..."
-              value={rawText}
-              onChange={(e) => setRawText(e.target.value)}
-              style={{ flex: 1 }}
-            />
-            <Button variant="secondary" size="sm" onClick={handleAiExtract} disabled={extracting}>
-              {extracting ? 'Mengestrak...' : 'Ekstrak ke Form'}
-            </Button>
-          </div>
-        </div>
+        <KtpScanner onExtracted={handleKtpExtracted} notify={notify} />
 
         <div className="form-grid">
           <FormField label="NIK (Nomor Induk Kependudukan)" error={errors.nik} required>
