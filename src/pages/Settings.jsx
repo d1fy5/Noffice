@@ -557,7 +557,7 @@ export default function Settings() {
                 <p style={{ fontSize: '0.83rem', color: 'var(--text-2)', marginBottom: '14px', lineHeight: 1.4 }}>
                   Unduh salinan cadangan file database SQLite (`database.sqlite`) ke Flashdisk atau Harddisk Eksternal setiap sore hari untuk menjamin keamanan penuh data kantor Notaris.
                 </p>
-                <a href="http://localhost:3001/api/system/backup" download style={{ textDecoration: 'none' }}>
+                <a href={typeof window !== 'undefined' ? `http://${window.location.hostname}:3005/api/system/backup` : 'http://localhost:3005/api/system/backup'} download style={{ textDecoration: 'none' }}>
                   <Button variant="secondary" icon="download">
                     Unduh Backup Database (.sqlite)
                   </Button>

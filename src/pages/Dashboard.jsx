@@ -25,7 +25,7 @@ export default function Dashboard() {
   const activeDocs = documents.filter((d) => !d.isTrashed);
 
   const recentDocs = activeDocs
-    .filter((d) => !q || d.title.toLowerCase().includes(q) || d.author.toLowerCase().includes(q))
+    .filter((d) => !q || d.title.toLowerCase().includes(q) || d.author.toLowerCase().includes(q) || (d.ocrContent || "").toLowerCase().includes(q) || (d.description || "").toLowerCase().includes(q))
     .slice(0, 4);
 
   const recentCases = cases

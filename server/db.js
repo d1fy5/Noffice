@@ -76,6 +76,7 @@ function initDb() {
     phone TEXT,
     email TEXT,
     job TEXT,
+    ktpImage TEXT,
     createdAt TEXT
   )`);
 
@@ -143,12 +144,19 @@ function initDb() {
   try { db.exec(`ALTER TABLE cases ADD COLUMN appointmentTime TEXT`); } catch(e) {}
   try { db.exec(`ALTER TABLE cases ADD COLUMN landAddress TEXT`); } catch(e) {} // kolom baru
 
+  try { db.exec(`ALTER TABLE clients ADD COLUMN ktpImage TEXT`); } catch(e) {}
   try { db.exec(`ALTER TABLE documents ADD COLUMN isTrashed INTEGER DEFAULT 0`); } catch(e) {}
   try { db.exec(`ALTER TABLE documents ADD COLUMN trashedAt TEXT`); } catch(e) {}
   try { db.exec(`ALTER TABLE documents ADD COLUMN trashedBy TEXT`); } catch(e) {}
   try { db.exec(`ALTER TABLE documents ADD COLUMN storedFilename TEXT`); } catch(e) {}
   try { db.exec(`ALTER TABLE documents ADD COLUMN originalFilename TEXT`); } catch(e) {}
   try { db.exec(`ALTER TABLE documents ADD COLUMN mimeType TEXT`); } catch(e) {}
+  try { db.exec(`ALTER TABLE documents ADD COLUMN caseId TEXT`); } catch(e) {}
+  try { db.exec(`ALTER TABLE documents ADD COLUMN clientId TEXT`); } catch(e) {}
+  try { db.exec(`ALTER TABLE documents ADD COLUMN aktaNumber TEXT`); } catch(e) {}
+  try { db.exec(`ALTER TABLE documents ADD COLUMN ocrContent TEXT`); } catch(e) {}
+  try { db.exec(`ALTER TABLE employees ADD COLUMN firstName TEXT`); } catch(e) {}
+  try { db.exec(`ALTER TABLE employees ADD COLUMN lastName TEXT`); } catch(e) {}
   // Migration untuk case_logs (jika DB lama tidak punya)
   try { db.exec(`CREATE TABLE IF NOT EXISTS case_logs (id TEXT PRIMARY KEY, caseId TEXT NOT NULL, action TEXT NOT NULL, changedBy TEXT NOT NULL, oldStatus TEXT, newStatus TEXT, timestamp TEXT NOT NULL)`); } catch(e) {}
 

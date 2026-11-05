@@ -116,7 +116,7 @@ export async function extractDocumentData(rawText) {
     }
   }
 
-  // Built-in Smart NLP Extractor (Offline Fallback)
+  // Built-in Smart NLP Extractor (Offline Resilient Parser)
   const data = {
     nik: '',
     name: '',
@@ -127,81 +127,208 @@ export async function extractDocumentData(rawText) {
     npwp: '',
   };
 
-  // 1. NIK Extractor (16 digits or NIK label followed by digits with spaces/hyphens)
+  const lines = rawText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+
+  // 1. NIK Extractor (16 digit persis atau perbaikan subtitusi OCR pada angka)
   const nikExact = rawText.match(/\b\d{16}\b/);
   if (nikExact) {
     data.nik = nikExact[0];
   } else {
-    const nikLine = rawText.match(/(?:NIK|N1K|N!K|Nomor\s*Induk)\s*[:=.]?\s*([0-9\s-]{16,24})/i);
-    if (nikLine) {
-      const cleanedNik = nikLine[1].replace(/[\s-]/g, '');
-      if (cleanedNik.length === 16) {
-        data.nik = cleanedNik;
+    for (const l of lines) {
+      if (/(?:NIK|N1K|N!K|Nomor\s*Induk)/i.test(l) || /^[0-9OIlZSBgq\s-]{16,28}$/i.test(l)) {
+        let norm = l.replace(/^(?:NIK|N1K|N!K|Nomor|Induk|Kependudukan)[\s:=.]*/i, '');
+        norm = norm.replace(/[OoDd]/g, '0')
+                   .replace(/[Ili|!]/g, '1')
+                   .replace(/[Zz]/g, '2')
+                   .replace(/[Ss]/g, '5')
+                   .replace(/[Bb]/g, '8')
+                   .replace(/[gq]/g, '9')
+                   .replace(/[^0-9]/g, '');
+        if (norm.length >= 16) {
+          data.nik = norm.slice(0, 16);
+          break;
+        }
       }
     }
   }
 
-  // 2. NPWP Extractor (15 digits formatted or unformatted)
+  // 2. NPWP Extractor
   const npwpMatch = rawText.match(/\b\d{2}[\s.-]?\d{3}[\s.-]?\d{3}[\s.-]?\d{1}[\s.-]?\d{3}[\s.-]?\d{3}\b/);
   if (npwpMatch) data.npwp = npwpMatch[0];
 
-  // 3. Phone Extractor (08xx or +628xx)
+  // 3. Phone Extractor
   const phoneMatch = rawText.match(/\b(08\d{8,11}|\+628\d{8,11})\b/);
   if (phoneMatch) data.phone = phoneMatch[0];
 
-  // 4. Name Extractor
-  const nameLineMatch = rawText.match(/(?:Nama|Name|Atas Nama|Pihak I|Pihak II|Pemohon)\s*[:=.]?\s*([^\r\n,]+)/i);
-  if (nameLineMatch) {
-    let rawName = nameLineMatch[1].trim().replace(/^[:=.\s]+/, '');
-    rawName = rawName.replace(/(?:Tempat|TTL|Jenis Kelamin|Alamat).*$/i, '').trim();
-    data.name = rawName;
+  // 4. Name Extractor (Mendukung Nama, Narna, Narria, multi-baris, dan urutan setelah NIK)
+  let nameFound = '';
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i];
+    if (/(?:Nama|Narna|Narria|N\s*ama|NAMA|Atas\s*Nama)\s*[:=.]?\s*(.*)/i.test(l)) {
+      const match = l.match(/(?:Nama|Narna|Narria|N\s*ama|NAMA|Atas\s*Nama)\s*[:=.]?\s*(.*)/i);
+      let cand = (match[1] || '').trim();
+      if (!cand && i + 1 < lines.length) {
+        const next = lines[i + 1].trim();
+        if (!/(?:Tempat|TTL|NIK|Provinsi|Kabupaten|Kota|Agama|Jenis|Gol)/i.test(next)) {
+          cand = next;
+        }
+      }
+      if (cand) {
+        nameFound = cand;
+        break;
+      }
+    }
   }
 
-  // 5. Birthdate & Birthplace Extractor (Formatted as YYYY-MM-DD for HTML date picker)
-  const ttlMatch = rawText.match(/(?:Tempat[/\s]*Tgl[.\s]*Lahir|TTL|Tgl[.\s]*Lahir|Birthdate|Tanggal Lahir)\s*[:=.]?\s*([^\r\n]+)/i);
-  const dateTarget = ttlMatch ? ttlMatch[1] : rawText;
-  const dateMatch = dateTarget.match(/(\d{1,2})[-/. ](\d{1,2})[-/. ](\d{4})/);
-  if (dateMatch) {
-    const day = String(dateMatch[1]).padStart(2, '0');
-    const month = String(dateMatch[2]).padStart(2, '0');
-    const year = dateMatch[3];
-    data.birthdate = `${year}-${month}-${day}`;
-  } else {
-    const isoMatch = dateTarget.match(/\b(\d{4})[-/.](\d{2})[-/.](\d{2})\b/);
-    if (isoMatch) data.birthdate = isoMatch[0];
+  // Fallback nama: baris tepat setelah NIK (standar tata letak fisik KTP Indonesia)
+  if (!nameFound && data.nik) {
+    const nikIdx = lines.findIndex(l => l.includes(data.nik));
+    if (nikIdx !== -1 && nikIdx + 1 < lines.length) {
+      const nextLine = lines[nikIdx + 1].trim();
+      if (!/(?:Tempat|TTL|Alamat|Agama|Jenis|Gol|Provinsi|Kota)/i.test(nextLine) && nextLine.length > 3) {
+        nameFound = nextLine.replace(/^(?:Nama|Narna|NAMA)\s*[:=.]?\s*/i, '');
+      }
+    }
   }
 
-  // 6. Address Extractor (Composes Alamat + RT/RW + Kelurahan + Kecamatan + Kota)
-  const addrMatch = rawText.match(/(?:Alamat|Address|Jl\.|Jalan|Domisili)\s*[:=.]?\s*([^\r\n]+)/i);
-  const rtrwMatch = rawText.match(/RT[/\s.]*RW\s*[:=.]?\s*([0-9/\s]+)/i);
-  const kelMatch = rawText.match(/(?:Kel[/\s.]*Desa|Kelurahan|Desa)\s*[:=.]?\s*([^\r\n,]+)/i);
-  const kecMatch = rawText.match(/(?:Kecamatan|Kec[.]?)\s*[:=.]?\s*([^\r\n,]+)/i);
-  const kotaMatch = rawText.match(/(?:KOTA|KABUPATEN|KAB[.]?)\s+([A-Z\s]+)/i);
-
-  if (addrMatch) {
-    let fullAddr = addrMatch[1].replace(/^(?:Alamat|Address|Domisili)\s*[:=.]?\s*/i, '').trim();
-    if (rtrwMatch && !fullAddr.toLowerCase().includes('rt')) {
-      fullAddr += `, RT/RW ${rtrwMatch[1].trim()}`;
-    }
-    if (kelMatch && !fullAddr.toLowerCase().includes('kel')) {
-      fullAddr += `, Kel. ${kelMatch[1].trim()}`;
-    }
-    if (kecMatch && !fullAddr.toLowerCase().includes('kec')) {
-      fullAddr += `, Kec. ${kecMatch[1].trim()}`;
-    }
-    if (kotaMatch && !fullAddr.toLowerCase().includes(kotaMatch[1].trim().toLowerCase())) {
-      fullAddr += `, ${kotaMatch[0].trim()}`;
-    }
-    data.address = fullAddr;
+  if (nameFound) {
+    nameFound = nameFound.replace(/^(?:Nama|Narna|Narria|N\s*ama|NAMA|Atas\s*Nama)\s*[:=.]?\s*/i, '');
+    nameFound = nameFound.replace(/(?:Tempat|TTL|Jenis|Kelamin|Gol|Darah|Alamat|Agama).*$/i, '').trim();
+    nameFound = nameFound.replace(/[^a-zA-Z\s.,'-]/g, '').trim();
+    data.name = nameFound;
   }
 
-  // 7. Job Extractor
-  const jobMatch = rawText.match(/(?:Pekerjaan|Job|Jabatan|Profesi)\s*[:=.]?\s*([^\r\n,]+)/i);
-  if (jobMatch) {
-    let cleanJob = jobMatch[1].trim().replace(/^[:=.\s]+/, '');
-    cleanJob = cleanJob.replace(/(?:Kewarganegaraan|Agama|Status).*$/i, '').trim();
-    data.job = cleanJob;
+  // 5. Tanggal Lahir (Mendukung DD-MM-YYYY, nama bulan teks, dan toleransi OCR typo)
+  const monthMap = {
+    januari: '01', jan: '01',
+    februari: '02', pebruari: '02', feb: '02',
+    maret: '03', mar: '03',
+    april: '04', apr: '04',
+    mei: '05', may: '05',
+    juni: '06', jun: '06',
+    juli: '07', jul: '07',
+    agustus: '08', agu: '08', ags: '08',
+    september: '09', sep: '09',
+    oktober: '10', okt: '10', oct: '10',
+    november: '11', nopember: '11', nov: '11',
+    desember: '12', dec: '12', des: '12'
+  };
+
+  let dateFound = '';
+  for (const l of lines) {
+    const cleanLine = l.replace(/(\d{1,2})[-/. ][OoDd](\d)[-/. ]/g, '$1-0$2-')
+                       .replace(/(\d{1,2})[-/. ](\d)[-/. ][12][90][0-9SOB]{2}/g, (m) => m.replace(/S/g, '5').replace(/O/g, '0').replace(/B/g, '8'));
+
+    const numMatch = cleanLine.match(/\b(\d{1,2})[-/. ](\d{1,2})[-/. ](\d{4})\b/);
+    if (numMatch) {
+      const d = String(numMatch[1]).padStart(2, '0');
+      const m = String(numMatch[2]).padStart(2, '0');
+      const y = numMatch[3];
+      if (Number(m) >= 1 && Number(m) <= 12 && Number(d) >= 1 && Number(d) <= 31 && Number(y) >= 1930 && Number(y) <= 2025) {
+        dateFound = `${y}-${m}-${d}`;
+        break;
+      }
+    }
+
+    const textMonthMatch = l.match(/(\d{1,2})[\s\-]+([A-Za-z]{3,10})[\s\-]+(\d{4})/);
+    if (textMonthMatch) {
+      const d = String(textMonthMatch[1]).padStart(2, '0');
+      const mStr = textMonthMatch[2].toLowerCase();
+      const y = textMonthMatch[3];
+      if (monthMap[mStr]) {
+        dateFound = `${y}-${monthMap[mStr]}-${d}`;
+        break;
+      }
+    }
   }
+  data.birthdate = dateFound;
+
+  // 6. Alamat Lengkap (Jalan + RT/RW + Kelurahan + Kecamatan + Kota/Kabupaten)
+  let street = '';
+  let rtrw = '';
+  let kel = '';
+  let kec = '';
+  let kota = '';
+
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i];
+    if (/(?:Alamat|Alarnat|Address)\s*[:=.]?\s*(.*)/i.test(l)) {
+      let cand = l.replace(/(?:Alamat|Alarnat|Address)\s*[:=.]?\s*/i, '').trim();
+      if (!cand && i + 1 < lines.length) {
+        const next = lines[i + 1].trim();
+        if (!/(?:RT|RW|Kel|Desa|Kecamatan|Kecarnatan|Agama)/i.test(next)) {
+          cand = next;
+        }
+      }
+      if (cand) street = cand;
+    }
+    if (!street && /^(?:Jl|Jalan|Gg|Gang|Komplek|Blok|Kp|Kampung)\b/i.test(l)) {
+      street = l;
+    }
+
+    const mRt = l.match(/RT[\/\s.]*RW\s*[:=.]?\s*([0-9OIl/\s-]+)/i);
+    if (mRt) {
+      rtrw = mRt[1].replace(/[Oo]/g, '0').replace(/[Il]/g, '1').replace(/\s/g, '').trim();
+    }
+
+    const mKel = l.match(/(?:Kel[\/\s.]*Desa|Kelurahan|Desa)\s*[:=.]?\s*([A-Za-z\s]+)/i);
+    if (mKel) kel = mKel[1].trim();
+
+    const mKec = l.match(/(?:Kecamatan|Kecarnatan|Kecamatarn|Kec[.:\s]+)\s*[:=.]?\s*([A-Za-z\s]+)/i);
+    if (mKec) kec = mKec[1].trim();
+
+    const mKota = l.match(/(?:KOTA|KABUPATEN|KAB[.]?)\s+([A-Za-z\s]+)/i);
+    if (mKota && !kota) kota = mKota[0].trim();
+  }
+
+  const addrParts = [];
+  if (street) addrParts.push(street);
+  if (rtrw) addrParts.push(`RT/RW ${rtrw}`);
+  if (kel) addrParts.push(`Kel. ${kel}`);
+  if (kec) addrParts.push(`Kec. ${kec}`);
+  if (kota) addrParts.push(kota);
+  data.address = addrParts.join(', ');
+
+  // 7. Pekerjaan (Pekerjaan / Jabatan / Profesi + Fallback Daftar Pekerjaan Resmi KTP)
+  const occupations = [
+    'WIRASWASTA', 'KARYAWAN SWASTA', 'PEGAWAI NEGERI SIPIL', 'PNS',
+    'PELAJAR/MAHASISWA', 'PELAJAR', 'MAHASISWA', 'BELUM/TIDAK BEKERJA',
+    'MENGURUS RUMAH TANGGA', 'IBU RUMAH TANGGA', 'BURUH HARIAN LEPAS', 'BURUH',
+    'PEDAGANG', 'PETANI/PEKEBUN', 'PETANI', 'PETERNAK', 'NELAYAN',
+    'DOKTER', 'BIDAN', 'PERAWAT', 'GURU', 'DOSEN', 'PENGACARA', 'ADVOKAT',
+    'NOTARIS', 'PPAT', 'AKUNTAN', 'KONSULTAN', 'ARSITEK', 'SOPIR', 'PENSIUNAN',
+    'TNI', 'POLRI', 'KARYAWAN BUMN', 'KARYAWAN BUMD'
+  ];
+
+  let jobFound = '';
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i];
+    if (/(?:Pekerjaan|Pekerjaarn|Pekeriaan|Profesi|Jabatan)\s*[:=.]?\s*(.*)/i.test(l)) {
+      let cand = l.replace(/(?:Pekerjaan|Pekerjaarn|Pekeriaan|Profesi|Jabatan)\s*[:=.]?\s*/i, '').trim();
+      if (!cand && i + 1 < lines.length) {
+        const next = lines[i + 1].trim();
+        if (!/(?:Kewarganegaraan|WNI|Agama|Berlaku)/i.test(next)) {
+          cand = next;
+        }
+      }
+      if (cand) {
+        cand = cand.replace(/(?:Kewarganegaraan|WNI|Agama|Berlaku).*$/i, '').trim();
+        jobFound = cand;
+        break;
+      }
+    }
+  }
+
+  if (!jobFound) {
+    const upperText = rawText.toUpperCase();
+    for (const occ of occupations) {
+      if (upperText.includes(occ)) {
+        jobFound = occ;
+        break;
+      }
+    }
+  }
+  data.job = jobFound;
 
   return {
     success: true,
@@ -210,42 +337,73 @@ export async function extractDocumentData(rawText) {
   };
 }
 
-// 1b. Scan KTP Image via Local Offline Tesseract OCR
+// 1b. Scan KTP Image via Local Offline Tesseract OCR (Multi-Pass & Resilient)
 export async function scanKtpImage(imageData) {
   if (!imageData) {
     return { success: false, message: 'Data gambar tidak ditemukan' };
   }
+
+  let cleanBuffer = null;
   try {
-    const worker = await createWorker(['ind', 'eng'], 1, {
+    if (typeof imageData === 'string' && imageData.startsWith('data:image')) {
+      const base64Data = imageData.replace(/^data:image\/[a-zA-Z]+;base64,/, '');
+      cleanBuffer = Buffer.from(base64Data, 'base64');
+    } else if (Buffer.isBuffer(imageData)) {
+      cleanBuffer = imageData;
+    }
+  } catch (e) {
+    console.warn('Buffer conversion failed:', e);
+  }
+
+  let worker = null;
+  try {
+    worker = await createWorker(['ind', 'eng'], 1, {
       langPath: path.resolve('public/tessdata'),
       cachePath: path.resolve('public/tessdata'),
+      errorHandler: (err) => {
+        console.warn('Tesseract worker error handled safely:', err);
+      },
     });
+
+    let rawText = '';
 
     // Pass 1: PSM 6 (single uniform block, sangat presisi untuk dokumen ID card)
-    await worker.setParameters({
-      tessedit_pageseg_mode: '6',
-      preserve_interword_spaces: '1',
-    });
-    let ret = await worker.recognize(imageData);
-    let rawText = ret.data?.text || '';
-
-    // Pass 2: Jika teks yang didapat kurang dari 15 karakter, coba PSM 11 (sparse text)
-    if (rawText.trim().length < 15) {
+    try {
       await worker.setParameters({
-        tessedit_pageseg_mode: '11',
+        tessedit_pageseg_mode: '6',
+        preserve_interword_spaces: '1',
       });
-      const ret2 = await worker.recognize(imageData);
-      if ((ret2.data?.text || '').length > rawText.length) {
-        rawText = ret2.data.text;
+      const ret = await worker.recognize(cleanBuffer || imageData);
+      rawText = ret.data?.text || '';
+    } catch (pass1Err) {
+      console.warn('Pass 1 OCR error:', pass1Err.message);
+    }
+
+    // Pass 2: Jika nama atau alamat belum lengkap, coba PSM 4 / 11 untuk memperkaya deteksi
+    let pass1Data = (await extractDocumentData(rawText)).data || {};
+    if (!pass1Data.name || !pass1Data.address || rawText.trim().length < 30) {
+      try {
+        await worker.setParameters({
+          tessedit_pageseg_mode: '4',
+          preserve_interword_spaces: '1',
+        });
+        const ret2 = await worker.recognize(cleanBuffer || imageData);
+        const pass2Text = ret2.data?.text || '';
+        if (pass2Text.length > 20) {
+          rawText = rawText + '\n' + pass2Text;
+        }
+      } catch (pass2Err) {
+        console.warn('Pass 2 OCR error:', pass2Err.message);
       }
     }
 
     await worker.terminate();
+    worker = null;
 
     if (!rawText.trim()) {
       return {
         success: false,
-        message: 'Teks KTP tidak terbaca jelas (buram). Dekatkan KTP ke kamera agar memenuhi bingkai panduan, atau gunakan opsi Unggah Foto KTP jika webcam kurang tajam.',
+        message: 'Teks KTP tidak terbaca jelas. Pastikan foto KTP tidak buram, atau gunakan opsi Unggah Foto KTP yang diambil lewat kamera HP.',
       };
     }
 
@@ -258,8 +416,49 @@ export async function scanKtpImage(imageData) {
       engine: 'Tesseract OCR + Smart NLP (100% Offline)',
     };
   } catch (err) {
-    console.error('Scan KTP OCR Error:', err);
+    if (worker) {
+      try { await worker.terminate(); } catch {}
+    }
+    console.error('Scan KTP Error safely caught:', err);
     return { success: false, message: 'Gagal memindai gambar KTP: ' + err.message };
+  }
+}
+
+// 1c. Scan General Document Image via Local Tesseract OCR (Full-text Content Indexing)
+export async function scanDocumentImage(imageData) {
+  if (!imageData) return '';
+  let cleanBuffer = null;
+  try {
+    if (typeof imageData === 'string' && imageData.startsWith('data:image')) {
+      const base64Data = imageData.replace(/^data:image\/[a-zA-Z]+;base64,/, '');
+      cleanBuffer = Buffer.from(base64Data, 'base64');
+    } else if (Buffer.isBuffer(imageData)) {
+      cleanBuffer = imageData;
+    }
+  } catch (e) {
+    return '';
+  }
+
+  let worker = null;
+  try {
+    worker = await createWorker(['ind', 'eng'], 1, {
+      langPath: path.resolve('public/tessdata'),
+      cachePath: path.resolve('public/tessdata'),
+      errorHandler: (err) => console.warn('Worker error:', err),
+    });
+    await worker.setParameters({
+      tessedit_pageseg_mode: '3', // Fully automatic page segmentation
+      preserve_interword_spaces: '1',
+    });
+    const ret = await worker.recognize(cleanBuffer || imageData);
+    await worker.terminate();
+    return ret.data?.text || '';
+  } catch (err) {
+    if (worker) {
+      try { await worker.terminate(); } catch {}
+    }
+    console.warn('scanDocumentImage error:', err.message);
+    return '';
   }
 }
 

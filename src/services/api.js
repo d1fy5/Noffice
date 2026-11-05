@@ -5,8 +5,8 @@
  */
 
 const API_URL = typeof window !== 'undefined' && window.location && window.location.hostname
-  ? `http://${window.location.hostname}:3001/api`
-  : 'http://localhost:3001/api';
+  ? `http://${window.location.hostname}:3005/api`
+  : 'http://localhost:3005/api';
 
 const getAuthHeaders = () => {
   const token = localStorage.getItem('noffice_auth_token');

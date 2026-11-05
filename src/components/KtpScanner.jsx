@@ -3,35 +3,54 @@ import Icon from './Icon.jsx';
 import Button from './Button.jsx';
 import { AiAPI } from '../services/api.js';
 
-// Auto-contrast & Binarization filter khusus KTP:
+// Auto-contrast & Unsharp Sharpening filter khusus KTP:
 // Menghilangkan latar belakang biru & hologram, mempertajam font hitam teks KTP
 function applyKtpEnhancement(canvas) {
   try {
     const ctx = canvas.getContext('2d');
-    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const w = canvas.width;
+    const h = canvas.height;
+    const imgData = ctx.getImageData(0, 0, w, h);
     const d = imgData.data;
 
     let minGray = 255;
     let maxGray = 0;
 
     // Pass 1: Cari rentang luminansi piksel
-    for (let i = 0; i < d.length; i += 4) {
+    const grayBuffer = new Float32Array(w * h);
+    for (let i = 0, p = 0; i < d.length; i += 4, p++) {
       const gray = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+      grayBuffer[p] = gray;
       if (gray < minGray) minGray = gray;
       if (gray > maxGray) maxGray = gray;
     }
 
     const range = maxGray - minGray || 1;
 
-    // Pass 2: Contrast stretch & binarisasi adaptif
-    for (let i = 0; i < d.length; i += 4) {
-      const gray = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-      let stretched = ((gray - minGray) / range) * 255;
-      // Tingkatkan ketajaman: gelap jadi lebih hitam (tulisan), terang jadi putih (background KTP)
-      let val = stretched > 120 ? Math.min(255, stretched * 1.25) : Math.max(0, stretched * 0.7);
-      d[i] = val;
-      d[i + 1] = val;
-      d[i + 2] = val;
+    // Pass 2: Contrast stretch
+    for (let p = 0; p < grayBuffer.length; p++) {
+      grayBuffer[p] = ((grayBuffer[p] - minGray) / range) * 255;
+    }
+
+    // Pass 3: 3x3 Unsharp Sharpening Filter untuk mengatasi foto yang blur/kurang tajam
+    for (let y = 1; y < h - 1; y++) {
+      for (let x = 1; x < w - 1; x++) {
+        const p = y * w + x;
+        const sharpVal = 5 * grayBuffer[p]
+          - grayBuffer[p - 1]
+          - grayBuffer[p + 1]
+          - grayBuffer[p - w]
+          - grayBuffer[p + w];
+
+        const clamped = Math.max(0, Math.min(255, sharpVal));
+        // Huruf KTP dibuat hitam tegas, latar KTP diputihkan
+        const finalVal = clamped < 125 ? Math.max(0, clamped * 0.7) : Math.min(255, clamped * 1.3);
+
+        const idx = p * 4;
+        d[idx] = finalVal;
+        d[idx + 1] = finalVal;
+        d[idx + 2] = finalVal;
+      }
     }
     ctx.putImageData(imgData, 0, 0);
   } catch (err) {
@@ -201,25 +220,31 @@ export default function KtpScanner({ onExtracted, notify }) {
     const startX = Math.max(0, Math.round((vw - cropW) / 2));
     const startY = Math.max(0, Math.round((vh - cropH) / 2));
 
-    // Canvas 1: Raw photo cropped
+    // Target resolusi optimal untuk OCR Tesseract (resolusi diperbesar agar karakter huruf tidak buram)
+    const targetW = Math.max(cropW, 1200);
+    const targetH = Math.round(targetW / 1.58);
+
+    // Canvas 1: Raw photo cropped & upscaled high quality
     const rawCanvas = document.createElement('canvas');
-    rawCanvas.width = cropW;
-    rawCanvas.height = cropH;
+    rawCanvas.width = targetW;
+    rawCanvas.height = targetH;
     const rawCtx = rawCanvas.getContext('2d');
-    rawCtx.drawImage(video, startX, startY, cropW, cropH, 0, 0, cropW, cropH);
+    rawCtx.imageSmoothingEnabled = true;
+    rawCtx.imageSmoothingQuality = 'high';
+    rawCtx.drawImage(video, startX, startY, cropW, cropH, 0, 0, targetW, targetH);
     const rawDataUrl = rawCanvas.toDataURL('image/jpeg', 0.95);
     setRawCaptured(rawDataUrl);
 
     // Canvas 2: Filtered & contrast-enhanced for OCR
     const filterCanvas = document.createElement('canvas');
-    filterCanvas.width = cropW;
-    filterCanvas.height = cropH;
+    filterCanvas.width = targetW;
+    filterCanvas.height = targetH;
     const filterCtx = filterCanvas.getContext('2d');
     filterCtx.drawImage(rawCanvas, 0, 0);
     applyKtpEnhancement(filterCanvas);
     const enhancedDataUrl = filterCanvas.toDataURL('image/jpeg', 0.95);
 
-    setCapturedImage(useFilter ? enhancedDataUrl : rawDataUrl);
+    setCapturedImage(enhancedDataUrl);
     stopStream();
   };
 
@@ -302,13 +327,14 @@ export default function KtpScanner({ onExtracted, notify }) {
     try {
       const res = await AiAPI.scanKtp(capturedImage);
       if (res && res.success && res.data) {
-        onExtracted(res.data);
+        const imageToSave = rawCaptured || capturedImage;
+        onExtracted(res.data, imageToSave);
         setLastExtracted(res.data);
         if (notify) {
           const detail = [res.data.nik ? `NIK: ${res.data.nik}` : '', res.data.name ? res.data.name : '']
             .filter(Boolean)
             .join(' - ');
-          notify(`KTP berhasil discan (${detail || 'Selesai'})! Form telah terisi otomatis.`, 'success');
+          notify(`KTP berhasil discan (${detail || 'Selesai'})! Foto KTP & data siap disimpan ke dokumen.`, 'success');
         }
         setScanStatus('Scan KTP selesai!');
       } else {

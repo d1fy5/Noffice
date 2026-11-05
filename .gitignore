@@ -5,3 +5,6 @@ dist-ssr
 .DS_Store
 npm-debug.log*
 .dev.log
+scratch/
+*.sqlite-shm
+*.sqlite-wal

@@ -12,9 +12,19 @@ import EmptyState from '../components/EmptyState.jsx';
 import UploadModal from '../components/UploadModal.jsx';
 import Breadcrumb from '../components/Breadcrumb.jsx';
 import PageHeader from '../components/PageHeader.jsx';
+import DocThumbnail from '../components/DocThumbnail.jsx';
 import { DocumentAPI } from '../services/api.js';
 
 const CATEGORY_IDS = DOC_CATEGORIES.map((c) => c.id);
+function getMatchSnippet(text, query) {
+  if (!text || !query) return null;
+  const idx = text.toLowerCase().indexOf(query.toLowerCase());
+  if (idx === -1) return null;
+  const start = Math.max(0, idx - 25);
+  const end = Math.min(text.length, idx + query.length + 35);
+  return (start > 0 ? '...' : '') + text.slice(start, end).replace(/\r?\n/g, ' ') + (end < text.length ? '...' : '');
+}
+
 
 // Determines which folder a document belongs to. Uses the stored category
 // (the value set on upload) and falls back to a default folder for any
@@ -68,7 +78,7 @@ export default function Documents() {
       rows = rows.filter((d) => categoryOf(d) === folder);
     }
     if (status !== 'all') rows = rows.filter((d) => d.status === status);
-    if (q) rows = rows.filter((d) => `${d.title} ${d.author} ${d.dept}`.toLowerCase().includes(q));
+    if (q) rows = rows.filter((d) => `${d.title} ${d.author} ${d.dept} ${d.description || ''} ${d.ocrContent || ''} ${d.aktaNumber || ''}`.toLowerCase().includes(q));
     if (sort === 'newest') rows = [...rows].sort((a, b) => (b.dateTs || 0) - (a.dateTs || 0));
     else if (sort === 'oldest') rows = [...rows].sort((a, b) => (a.dateTs || 0) - (b.dateTs || 0));
     else if (sort === 'size') rows = [...rows].sort((a, b) => (b.sizeBytes || 0) - (a.sizeBytes || 0));
@@ -234,12 +244,16 @@ export default function Documents() {
               {filtered.map((d) => (
                 <div className="doc-card" key={d.id}>
                   <button className="doc-card-main" onClick={() => (inTrash ? null : setSelected(d))} aria-label={`${t('action.view')} ${d.title}`}>
-                    <div className="doc-thumb">
-                      <span className="thumb-file"><Icon name="file" size={30} /></span>
-                    </div>
+                    <DocThumbnail doc={d} size="card" />
                     <div className="doc-body">
                       <h3 className="doc-title">{d.title}</h3>
                       <div className="doc-author">{t('doc.by')} {d.author}</div>
+                      {q && d.ocrContent && d.ocrContent.toLowerCase().includes(q) && !d.title.toLowerCase().includes(q) && (
+                        <div style={{ marginTop: '6px', padding: '4px 8px', background: 'rgba(59, 130, 246, 0.09)', border: '1px solid rgba(59, 130, 246, 0.25)', borderRadius: '6px', fontSize: '0.73rem', color: 'var(--primary)', lineHeight: 1.3 }}>
+                          <Icon name="search" size={11} style={{ display: 'inline', marginRight: '4px', verticalAlign: '-1px' }} />
+                          Cocok di isi dokumen: &ldquo;<strong>{getMatchSnippet(d.ocrContent, q)}</strong>&rdquo;
+                        </div>
+                      )}
                       <div className="doc-meta">
                         <span>{d.size} • {d.date}</span>
                         <Badge status={d.status} />
@@ -270,7 +284,15 @@ export default function Documents() {
                   <tbody>
                     {filtered.map((d) => (
                       <tr key={d.id}>
-                        <td data-label={t('doc.col.name')} style={{ fontWeight: 500 }}>{d.title}</td>
+                        <td data-label={t('doc.col.name')} style={{ fontWeight: 500 }}>
+                          <div>{d.title}</div>
+                          {q && d.ocrContent && d.ocrContent.toLowerCase().includes(q) && !d.title.toLowerCase().includes(q) && (
+                            <div style={{ marginTop: '3px', fontSize: '0.72rem', color: 'var(--primary)', fontWeight: 400 }}>
+                              <Icon name="search" size={11} style={{ display: 'inline', marginRight: '4px', verticalAlign: '-1px' }} />
+                              Cocok di isi dokumen: &ldquo;<strong>{getMatchSnippet(d.ocrContent, q)}</strong>&rdquo;
+                            </div>
+                          )}
+                        </td>
                         <td data-label={t('doc.col.author')}>{d.author}</td>
                         <td data-label={t('doc.col.dept')}>{d.dept}</td>
                         <td data-label={t('doc.col.size')}>{d.size}</td>
@@ -293,9 +315,7 @@ export default function Documents() {
 
       {selected && !inTrash && (
         <Modal open onClose={() => setSelected(null)} title={selected.title}>
-          <div className="doc-thumb modal-thumb">
-            <span className="thumb-file"><Icon name="file" size={34} /></span>
-          </div>
+          <DocThumbnail doc={selected} size="modal" />
           {selected.description && (
             <p style={{ color: 'var(--text-2)', fontSize: 13.5, margin: '0 0 16px', lineHeight: 1.6 }}>{selected.description}</p>
           )}
@@ -329,6 +349,16 @@ export default function Documents() {
               <option value="rejected">{t('doc.status.rejected')}</option>
             </select>
           </div>
+          {selected.ocrContent && (
+            <div style={{ marginTop: '14px', marginBottom: '14px', borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
+              <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text)', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Icon name="fileText" size={14} /> Isi Dokumen (Hasil Scan / OCR):
+              </div>
+              <div style={{ maxHeight: '160px', overflowY: 'auto', background: 'var(--surface-2)', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--border)', fontSize: '0.76rem', fontFamily: 'monospace', whiteSpace: 'pre-wrap', lineHeight: 1.45, color: 'var(--text-2)' }}>
+                {selected.ocrContent}
+              </div>
+            </div>
+          )}
           <div className="modal-actions">
             <Button
               variant="secondary"
@@ -345,6 +375,18 @@ export default function Documents() {
             >
               {t('action.download')}
             </Button>
+            {selected?.storedFilename && (
+              <Button
+                variant="ghost"
+                icon="eye"
+                onClick={() => {
+                  const url = DocumentAPI.getDownloadUrl(selected.id) + '&view=1';
+                  window.open(url, '_blank');
+                }}
+              >
+                Buka Berkas ↗
+              </Button>
+            )}
             <Button variant="ghost" icon="trash" onClick={() => confirmDelete(selected)}>{t('action.delete')}</Button>
             {isAdmin && selected.status === 'pending' && (
               <>

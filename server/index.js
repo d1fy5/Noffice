@@ -5,10 +5,17 @@ import path from 'path';
 import crypto from 'crypto';
 import os from 'os';
 import { dbGet, dbQuery, dbRun, hashPassword } from './db.js';
-import { checkAiStatus, extractDocumentData, scanKtpImage, generateLegalClause, auditCaseData, generateCopilotResponse, sanitizeReply } from './aiEngine.js';
+import { checkAiStatus, extractDocumentData, scanKtpImage, scanDocumentImage, generateLegalClause, auditCaseData, generateCopilotResponse, sanitizeReply } from './aiEngine.js';
+
+process.on('uncaughtException', (err) => {
+  console.error('[SERVER CAUGHT UNCAUGHT EXCEPTION]', err);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[SERVER CAUGHT UNHANDLED REJECTION]', reason);
+});
 
 const app = express();
-const PORT = 3001;
+const PORT = process.env.PORT || 3005;
 
 // Pastikan folder uploads ada di disk server
 const UPLOADS_DIR = path.resolve('server/uploads');
@@ -77,7 +84,24 @@ app.post('/api/auth/login', async (req, res) => {
 app.get('/api/employees', requireAuth, async (req, res) => {
   try {
     const employees = await dbQuery('SELECT * FROM employees');
-    res.json(employees);
+    const mapped = employees.map((e) => {
+      let firstName = e.firstName;
+      let lastName = e.lastName;
+      if (!firstName && e.name) {
+        const parts = e.name.trim().split(' ');
+        firstName = parts[0];
+        lastName = parts.slice(1).join(' ') || '';
+      }
+      return {
+        ...e,
+        firstName: firstName || '',
+        lastName: lastName || '',
+        name: e.name || (firstName ? firstName + ' ' + (lastName || '') : '').trim(),
+        dateJoined: e.joinDate || e.dateJoined || '2024-01-01',
+        status: e.status ? (e.status.charAt(0).toUpperCase() + e.status.slice(1).toLowerCase()) : 'Active',
+      };
+    });
+    res.json(mapped);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -85,11 +109,42 @@ app.get('/api/employees', requireAuth, async (req, res) => {
 
 app.post('/api/employees', requireAdmin, async (req, res) => {
   try {
-    const { id, name, email, department, role, status, joinDate } = req.body;
+    const { id, name, firstName, lastName, email, department, role, status, joinDate, dateJoined } = req.body;
+    const computedName = name || ((firstName || '') + ' ' + (lastName || '')).trim();
+    const fName = firstName || (computedName.split(' ')[0] || '');
+    const lName = lastName || (computedName.split(' ').slice(1).join(' ') || '');
+    const finalDate = joinDate || dateJoined || new Date().toISOString().split('T')[0];
     await dbRun(
-      'INSERT INTO employees (id, name, email, department, role, status, joinDate) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [id, name, email, department, role, status, joinDate]
+      'INSERT INTO employees (id, name, firstName, lastName, email, department, role, status, joinDate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [id, computedName, fName, lName, email, department, role, status || 'Active', finalDate]
     );
+    res.json({ success: true, id });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.patch('/api/employees/:id', requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, firstName, lastName, email, department, role, status } = req.body;
+    const existing = await dbGet('SELECT * FROM employees WHERE id = ?', [id]);
+    if (!existing) return res.status(404).json({ error: 'Employee not found' });
+    const computedName = name || (firstName || lastName ? ((firstName || '') + ' ' + (lastName || '')).trim() : existing.name);
+    await dbRun(
+      'UPDATE employees SET name = COALESCE(?, name), firstName = COALESCE(?, firstName), lastName = COALESCE(?, lastName), email = COALESCE(?, email), department = COALESCE(?, department), role = COALESCE(?, role), status = COALESCE(?, status) WHERE id = ?',
+      [computedName, firstName, lastName, email, department, role, status, id]
+    );
+    res.json({ success: true, id });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/employees/:id', requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    await dbRun('DELETE FROM employees WHERE id = ?', [id]);
     res.json({ success: true, id });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -109,9 +164,10 @@ app.get('/api/documents', requireAuth, async (req, res) => {
 // Create Document metadata + Simpan file fisik (base64)
 app.post('/api/documents', requireAuth, async (req, res) => {
   try {
-    const { id, title, description, category, author, size, sizeBytes, date, dateTs, status, type, dept, fileData, originalFilename, mimeType } = req.body;
+    const { id, title, description, category, author, size, sizeBytes, date, dateTs, status, type, dept, fileData, originalFilename, mimeType, caseId, clientId, aktaNumber } = req.body;
     
     let storedFilename = null;
+    let ocrContent = req.body.ocrContent || '';
 
     // Simpan file fisik ke folder server/uploads/ jika fileData disertakan
     if (fileData) {
@@ -121,14 +177,47 @@ app.post('/api/documents', requireAuth, async (req, res) => {
       storedFilename = `${Date.now()}-${safeName}`;
       const fullPath = path.join(UPLOADS_DIR, storedFilename);
       fs.writeFileSync(fullPath, buffer);
+
+      // Otomatis Scan OCR jika berkas berupa gambar atau teks untuk pencarian isi berkas
+      const lowerType = (type || '').toLowerCase();
+      const lowerMime = (mimeType || '').toLowerCase();
+      if (lowerMime.startsWith('image/') || ['jpg', 'jpeg', 'png', 'webp', 'bmp'].includes(lowerType)) {
+        try {
+          console.log('[DOCUMENT OCR] Scanning uploaded image text for full-text search...');
+          const scannedText = await scanDocumentImage(buffer);
+          if (scannedText && scannedText.trim()) {
+            ocrContent = scannedText.trim();
+            console.log('[DOCUMENT OCR] Successfully scanned', ocrContent.length, 'characters.');
+          }
+        } catch (ocrErr) {
+          console.warn('[DOCUMENT OCR] Image scan warning:', ocrErr.message);
+        }
+      } else if (lowerMime.startsWith('text/') || ['txt', 'csv', 'md', 'json', 'html', 'xml'].includes(lowerType)) {
+        try {
+          ocrContent = buffer.toString('utf8');
+        } catch (e) {}
+      } else if (lowerType === 'pdf') {
+        try {
+          const rawStr = buffer.toString('binary');
+          const strings = [];
+          const matches = rawStr.match(/\(([^)]{2,})\)/g);
+          if (matches) {
+            matches.forEach(m => {
+              const clean = m.replace(/[()]/g, '').trim();
+              if (clean.length > 2 && /[a-zA-Z0-9]/.test(clean)) strings.push(clean);
+            });
+            if (strings.length > 5) ocrContent = strings.join(' ');
+          }
+        } catch (e) {}
+      }
     }
 
     await dbRun(
-      'INSERT INTO documents (id, title, description, category, author, size, sizeBytes, date, dateTs, status, type, dept, storedFilename, originalFilename, mimeType) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [id, title, description, category, author, size, sizeBytes, date, dateTs, status || 'pending', type, dept, storedFilename, originalFilename || title, mimeType || 'application/octet-stream']
+      'INSERT INTO documents (id, title, description, category, author, size, sizeBytes, date, dateTs, status, type, dept, storedFilename, originalFilename, mimeType, caseId, clientId, aktaNumber, ocrContent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [id, title, description, category, author, size, sizeBytes, date, dateTs, status || 'pending', type, dept, storedFilename, originalFilename || title, mimeType || 'application/octet-stream', caseId || null, clientId || null, aktaNumber || null, ocrContent || null]
     );
 
-    res.json({ success: true, id, storedFilename });
+    res.json({ success: true, id, storedFilename, ocrContent });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -158,7 +247,8 @@ app.get('/api/documents/:id/download', requireAuth, async (req, res) => {
 
     const filename = doc.originalFilename || doc.title || 'dokumen.pdf';
     res.setHeader('Content-Type', doc.mimeType || 'application/octet-stream');
-    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
+    const isInline = (doc.mimeType && doc.mimeType.startsWith('image/')) || req.query.view === '1' || req.query.preview === '1';
+    res.setHeader('Content-Disposition', `${isInline ? 'inline' : 'attachment'}; filename="${encodeURIComponent(filename)}"`);
     
     fs.createReadStream(filePath).pipe(res);
   } catch (error) {
@@ -264,10 +354,10 @@ app.get('/api/clients', requireAuth, async (req, res) => {
 
 app.post('/api/clients', requireAuth, async (req, res) => {
   try {
-    const { id, nik, name, birthdate, address, phone, email, job, createdAt } = req.body;
+    const { id, nik, name, birthdate, address, phone, email, job, createdAt, ktpImage } = req.body;
     await dbRun(
-      'INSERT INTO clients (id, nik, name, birthdate, address, phone, email, job, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [id, nik, name, birthdate, address, phone, email, job, createdAt || new Date().toISOString().split('T')[0]]
+      'INSERT INTO clients (id, nik, name, birthdate, address, phone, email, job, createdAt, ktpImage) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [id, nik, name, birthdate, address, phone, email, job, createdAt || new Date().toISOString().split('T')[0], ktpImage || null]
     );
     res.json({ success: true, id });
   } catch (error) {
@@ -278,11 +368,18 @@ app.post('/api/clients', requireAuth, async (req, res) => {
 app.put('/api/clients/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    const { nik, name, birthdate, address, phone, email, job } = req.body;
-    await dbRun(
-      'UPDATE clients SET nik = ?, name = ?, birthdate = ?, address = ?, phone = ?, email = ?, job = ? WHERE id = ?',
-      [nik, name, birthdate, address, phone, email, job, id]
-    );
+    const { nik, name, birthdate, address, phone, email, job, ktpImage } = req.body;
+    if (ktpImage !== undefined) {
+      await dbRun(
+        'UPDATE clients SET nik = ?, name = ?, birthdate = ?, address = ?, phone = ?, email = ?, job = ?, ktpImage = ? WHERE id = ?',
+        [nik, name, birthdate, address, phone, email, job, ktpImage, id]
+      );
+    } else {
+      await dbRun(
+        'UPDATE clients SET nik = ?, name = ?, birthdate = ?, address = ?, phone = ?, email = ?, job = ? WHERE id = ?',
+        [nik, name, birthdate, address, phone, email, job, id]
+      );
+    }
     res.json({ success: true, id });
   } catch (error) {
     res.status(500).json({ error: error.message });

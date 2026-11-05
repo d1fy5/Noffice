@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { StoreContext } from './contexts.js';
 import { STORAGE_KEYS } from './constants.js';
 import { load, uid, formatBytes, extOf } from './utils.js';
-import { buildInitialNotifications } from './seed.js';
+import { buildInitialNotifications, INITIAL_MESSAGES } from './seed.js';
 import { EmployeeAPI, DocumentAPI, ClientAPI, CaseAPI } from '../services/api.js';
 
 export function StoreProvider({ children }) {
@@ -10,7 +10,11 @@ export function StoreProvider({ children }) {
   const [employees, setEmployees] = useState([]);
   const [clients, setClients] = useState([]);
   const [cases, setCases] = useState([]);
-  const [messages, setMessages] = useState(() => load(STORAGE_KEYS.messages, []));
+  const [messages, setMessages] = useState(() => {
+    const loaded = load(STORAGE_KEYS.messages, null);
+    if (Array.isArray(loaded) && loaded.length > 0) return loaded;
+    return INITIAL_MESSAGES;
+  });
   
   // Load data from backend on mount
   useEffect(() => {
@@ -99,10 +103,10 @@ export function StoreProvider({ children }) {
     for (let idx = 0; idx < items.length; idx++) {
       const item = items[idx];
       const f = item.file;
-      const name = (item.name && item.name.trim()) || f.name;
+      const name = (item.name && item.name.trim()) || (f ? f.name : 'Dokumen');
 
-      let fileData = null;
-      if (f && typeof FileReader !== 'undefined') {
+      let fileData = item.fileData || null;
+      if (!fileData && f && typeof FileReader !== 'undefined') {
         try {
           fileData = await new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -115,35 +119,46 @@ export function StoreProvider({ children }) {
         }
       }
       
+      const rawSize = f ? f.size : (fileData ? Math.round(fileData.length * 0.75) : 1024);
+      const fileExt = item.type || (f ? extOf(f.name) : extOf(name) || 'jpg');
+      const mime = item.mimeType || (f && f.type) || (fileExt === 'jpg' || fileExt === 'jpeg' ? 'image/jpeg' : 'application/octet-stream');
+
       const doc = {
         id: uid() + idx,
         title: name,
         description: item.description || '',
-        category: item.category || '',
-        author: account.firstName ? `${account.firstName} ${account.lastName}`.trim() : 'You',
-        size: formatBytes(f.size),
-        sizeBytes: f.size,
+        category: item.category || 'Dokumen Klien',
+        author: account.firstName ? `${account.firstName} ${account.lastName}`.trim() : 'Staff Notaris',
+        size: formatBytes(rawSize),
+        sizeBytes: rawSize,
         date: new Date(now - idx * 1000).toLocaleDateString(undefined, {
           month: 'short',
           day: 'numeric',
           year: 'numeric',
         }),
         dateTs: now - idx * 1000,
-        status: 'pending',
-        type: extOf(f.name),
+        status: item.status || 'pending',
+        type: fileExt,
         dept: item.category || account.department || 'General',
         isTrashed: false,
         trashedAt: null,
         trashedBy: null,
         fileData,
-        originalFilename: f.name,
-        mimeType: f.type || 'application/octet-stream',
+        originalFilename: (f && f.name) || name,
+        mimeType: mime,
+        clientId: item.clientId || null,
+        caseId: item.caseId || null,
+        aktaNumber: item.aktaNumber || null,
+        ocrContent: item.ocrContent || null,
       };
       
       try {
         const res = await DocumentAPI.create(doc);
         if (res && res.storedFilename) {
           doc.storedFilename = res.storedFilename;
+        }
+        if (res && res.ocrContent) {
+          doc.ocrContent = res.ocrContent;
         }
         // Jangan simpan base64 string raksasa di state React setelah terkirim ke server
         delete doc.fileData;
@@ -164,7 +179,7 @@ export function StoreProvider({ children }) {
           dateTs: now,
           read: false,
           approval: true,
-          route: '/data-tables',
+          route: '/documents',
         },
         ...(items || []),
       ]);
@@ -377,23 +392,57 @@ export function StoreProvider({ children }) {
     try {
       await ClientAPI.create(newClient);
       setClients((prev) => [newClient, ...prev]);
+
+      // Jika ada lampiran foto/scan KTP, otomatis simpan ke arsip Dokumen Klien!
+      if (data.ktpImage) {
+        const safeName = (data.name || 'Klien').trim().replace(/[^a-zA-Z0-9]/g, '_');
+        await addDocuments([{
+          name: `Scan_KTP_${safeName}_${data.nik || 'NIK'}.jpg`,
+          category: 'Dokumen Klien',
+          description: `Berkas KTP resmi hasil pemindaian Smart Scanner untuk ${data.name || 'Klien'} (NIK: ${data.nik || '-'}). Otomatis diarsipkan ke sistem.`,
+          fileData: data.ktpImage,
+          type: 'jpg',
+          mimeType: 'image/jpeg',
+          clientId: newClient.id,
+          status: 'approved',
+          ocrContent: `REPUBLIK INDONESIA - KARTU TANDA PENDUDUK (KTP)\nNIK: ${data.nik || ''}\nNama: ${data.name || ''}\nTanggal Lahir: ${data.birthdate || ''}\nAlamat: ${data.address || ''}\nPekerjaan: ${data.job || ''}`,
+        }]);
+      }
+
       return newClient;
     } catch (err) {
       console.error('Failed to create client', err);
       return null;
     }
-  }, []);
+  }, [addDocuments]);
 
   const updateClient = useCallback(async (id, data) => {
     try {
       await ClientAPI.update(id, data);
       setClients((prev) => prev.map((c) => (c.id === id ? { ...c, ...data } : c)));
+
+      // Jika ada update foto KTP baru, arsipkan juga ke dokumen
+      if (data.ktpImage && data.isNewKtpScan) {
+        const safeName = (data.name || 'Klien').trim().replace(/[^a-zA-Z0-9]/g, '_');
+        await addDocuments([{
+          name: `Scan_KTP_${safeName}_${data.nik || 'NIK'}.jpg`,
+          category: 'Dokumen Klien',
+          description: `Berkas KTP hasil pembaruan untuk ${data.name || 'Klien'} (NIK: ${data.nik || '-'}).`,
+          fileData: data.ktpImage,
+          type: 'jpg',
+          mimeType: 'image/jpeg',
+          clientId: id,
+          status: 'approved',
+          ocrContent: `REPUBLIK INDONESIA - KARTU TANDA PENDUDUK (KTP)\nNIK: ${data.nik || ''}\nNama: ${data.name || ''}\nTanggal Lahir: ${data.birthdate || ''}\nAlamat: ${data.address || ''}\nPekerjaan: ${data.job || ''}`,
+        }]);
+      }
+
       return true;
     } catch (err) {
       console.error('Failed to update client', err);
       return false;
     }
-  }, []);
+  }, [addDocuments]);
 
   const deleteClient = useCallback(async (id) => {
     try {
