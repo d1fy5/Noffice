@@ -180,58 +180,101 @@ export async function extractDocumentData(rawText) {
   if (phoneMatch) data.phone = phoneMatch[0];
 
   // ---- 4. Nama ----
-  // Kata-kata yang BUKAN nama (untuk filter)
-  const NON_NAME_WORDS = /^(?:REPUBLIK|INDONESIA|PROVINSI|KABUPATEN|KOTA|KARTU|TANDA|PENDUDUK|GOLONGAN|DARAH|WARGA|NEGARA|SEUMUR|HIDUP|KAWIN|BELUM|CERAI|ISLAM|KRISTEN|KATOLIK|HINDU|BUDHA|KONGHUCU|LAKI|PEREMPUAN|WNI|WNA|PETANI|PELAJAR|MAHASISWA|WIRASWASTA|KARYAWAN|PEGAWAI|BURUH|MENGURUS|RUMAH|TANGGA|PENSIUNAN|TNI|POLRI|DOKTER|GURU|DOSEN|BIDAN|PERAWAT|BERLAKU|SEUMUR|HIDUP|NOMOR|INDUK|KEPENDUDUKAN|JENIS|KELAMIN|AGAMA|STATUS|PERKAWINAN|PEKERJAAN|KEWARGANEGARAAN|ALAMAT|KELURAHAN|DESA|KECAMATAN|RT|RW)$/i;
+  // Kata-kata yang BUKAN nama — per kata (single word) check
+  const NON_NAME_SINGLE = new Set([
+    'REPUBLIK','INDONESIA','PROVINSI','KABUPATEN','KOTA','KARTU','TANDA','PENDUDUK',
+    'GOLONGAN','DARAH','WARGA','NEGARA','SEUMUR','HIDUP','KAWIN','BELUM','CERAI',
+    'ISLAM','KRISTEN','KATOLIK','HINDU','BUDHA','BUDDHA','KONGHUCU',
+    'LAKI','PEREMPUAN','WNI','WNA',
+    'PETANI','PELAJAR','MAHASISWA','WIRASWASTA','KARYAWAN','PEGAWAI','BURUH',
+    'MENGURUS','RUMAH','TANGGA','PENSIUNAN','TNI','POLRI',
+    'DOKTER','GURU','DOSEN','BIDAN','PERAWAT','SWASTA','NELAYAN',
+    'BERLAKU','NOMOR','INDUK','KEPENDUDUKAN','JENIS','KELAMIN',
+    'AGAMA','STATUS','PERKAWINAN','PEKERJAAN','KEWARGANEGARAAN',
+    'ALAMAT','KELURAHAN','DESA','KECAMATAN','RT','RW','JALAN',
+    'TEMPAT','LAHIR','BARAT','TIMUR','UTARA','SELATAN','TENGAH',
+    'TANDA','PENDUDUK','PEMILU','ELEKTRONIK','NASIONAL','BARU',
+    'DAERAH','KHUSUS','IBUKOTA','ISTIMEWA',
+    'JAWA','SUMATERA','SUMATRA','KALIMANTAN','SULAWESI','PAPUA','BALI','NUSA','TENGGARA','MALUKU','ACEH','BANTEN','BENGKULU','GORONTALO','JAMBI','LAMPUNG','RIAU','YOGYAKARTA',
+    'BANYUMAS','BANDUNG','SURABAYA','SEMARANG','MEDAN','MAKASSAR','PALEMBANG','BEKASI','TANGERANG','DEPOK','BOGOR','JAKARTA','MALANG','SOLO','SURAKARTA','PURWOKERTO','CIREBON','SERANG','DENPASAR','YOGYA','SLEMAN','BANTUL','KULONPROGO','GUNUNGKIDUL','KLATEN','SUKOHARJO','WONOGIRI','BOYOLALI','SRAGEN','KARANGANYAR','GROBOGAN','BLORA','REMBANG','PATI','KUDUS','JEPARA','DEMAK','KENDAL','BATANG','PEKALONGAN','PEMALANG','TEGAL','BREBES','CILACAP','PURBALINGGA','BANJARNEGARA','KEBUMEN','PURWOREJO','WONOSOBO','MAGELANG','TEMANGGUNG'
+  ]);
 
-  // Fungsi clean nama
+  // Apakah sebuah string mengandung kata non-nama?
+  function hasNonNameWord(s) {
+    return s.trim().toUpperCase().split(/\s+/).some(w => NON_NAME_SINGLE.has(w));
+  }
+
+  // Fungsi clean nama — hapus prefix label dan suffix field lain
   function cleanNameCandidate(s) {
-    // Hapus prefix label
+    // Hapus prefix label Nama (dengan separator wajib)
     s = s.replace(/^(?:Nama|Narna|Narria|Marna|Hama|N\s*ama|NAMA)(?:\s*\/\s*Name)?\s*[:=.\-|;!]\s*/i, '');
     s = s.replace(/^\/\s*Name\s*[:=.\-|;!]?\s*/i, '');
-    // Hapus suffix yang bukan nama (Tempat Tgl Lahir biasanya ada setelah nama)
+    // Hapus suffix field lain
     s = s.replace(/\s*(?:Tempat|TTL|Tgl|Lahir|Jenis|Kelamin|Gol|Agama|Status|Berlaku|Alamat|NIK|RT|RW).*$/i, '');
-    // Hapus digit dan simbol yang tidak wajar dalam nama
+    // Hapus digit dan simbol bukan nama
     s = s.replace(/[0-9#@$%^&*()_+=\[\]{};:"<>?,\/\\]/g, '');
-    // Hapus tanda titik dan koma di awal/akhir
     s = s.replace(/^[.,!|\-]+|[.,!|\-]+$/g, '').trim();
     return s;
   }
 
   let nameFound = '';
 
-  // Metode 1: Cari label "Nama" eksplisit
+  // Metode 1: Cari label "Nama" eksplisit — WAJIB ada separator setelah label
+  // Ini mencegah false match pada baris seper"HAMA TEN BANYUMAS" yang tidak punya separator
   for (let i = 0; i < lines.length; i++) {
     const l = lines[i];
-    if (/^(?:Nama|Narna|Narria|Marna|Hama|N\s*ama)(?:\s*\/\s*Name)?\s*[:=.\-|;!]?/i.test(l)) {
+    // Label harus diikuti separator (: = . - | ; !) agar tidak salah deteksi
+    if (/^(?:Nama|Narna|Narria|Marna|Hama|N\s*ama)(?:\s*\/\s*Name)?\s*[:=.\-|;!]/i.test(l)) {
       let cand = cleanNameCandidate(l);
-      // Jika baris label kosong, ambil baris berikutnya
       if (!cand && i + 1 < lines.length) {
         const nextLine = lines[i + 1];
         if (!/^(?:Tempat|TTL|Tgl|NIK|Provinsi|Kabupaten|Kota|Agama|Jenis|Gol|Alamat|RT|Status)/i.test(nextLine)) {
           cand = cleanNameCandidate(nextLine);
         }
       }
-      // Validasi: minimal 3 huruf, minimal 2 kata atau 1 kata panjang >3
       if (cand && cand.length >= 3 && /[A-Za-z]/.test(cand)) {
-        const words = cand.trim().split(/\s+/).filter(w => w.length > 0);
-        if (words.length >= 1 && !NON_NAME_WORDS.test(cand.trim())) {
+        // Validasi: tidak boleh mengandung kata non-nama
+        if (!hasNonNameWord(cand)) {
           nameFound = cand.trim();
+          break;
+        }
+        // Jika mengandung kata non-nama, coba trim hingga kata non-nama pertama
+        const words = cand.trim().split(/\s+/);
+        const cleanWords = [];
+        for (const w of words) {
+          if (NON_NAME_SINGLE.has(w.toUpperCase())) break;
+          cleanWords.push(w);
+        }
+        if (cleanWords.length >= 1 && cleanWords.join(' ').length >= 3) {
+          nameFound = cleanWords.join(' ');
           break;
         }
       }
     }
   }
 
-  // Metode 2: Baris tepat di bawah NIK (layout standar KTP RI)
+  // Metode 2: Baris tepat di bawah NIK (layout standar KTP RI: NIK → NAMA)
   if (!nameFound && data.nik) {
     const nikLineIdx = lines.findIndex(l => l.replace(/[\s.,-]/g, '').includes(data.nik));
     if (nikLineIdx !== -1) {
+      // Kumpulkan kata dari header KTP (baris sebelum NIK) untuk filter
+      // Mencegah nama kota header (mis. "BANYUMAS") terpilih sebagai nama orang
+      const headerWords = new Set();
+      for (let hi = 0; hi < nikLineIdx; hi++) {
+        lines[hi].trim().toUpperCase().split(/\s+/).forEach(w => {
+          if (w.length >= 4) headerWords.add(w);
+        });
+      }
       for (let off = 1; off <= 3 && nikLineIdx + off < lines.length; off++) {
         let cand = cleanNameCandidate(lines[nikLineIdx + off]);
         if (!cand || cand.length < 3) continue;
         if (/^(?:Tempat|TTL|Tgl|Alamat|Agama|Jenis|Gol|Provinsi|Kota|Kabupaten|RT|Status)/i.test(cand)) break;
-        // Nama di KTP biasanya huruf kapital atau Title Case
-        if (/[A-Za-z]{2}/.test(cand) && !NON_NAME_WORDS.test(cand.trim())) {
+        if (/[A-Za-z]{2}/.test(cand) && !hasNonNameWord(cand)) {
+          // Skip jika ADA SATU PUN kata dari header KTP (nama kota/kabupaten) di baris ini
+          // Ini mencegah "HAMA TEN BANYUMAS" terpilih karena "BANYUMAS" ada di header
+          const candWords = cand.trim().toUpperCase().split(/\s+/);
+          const headerOverlap = candWords.filter(w => headerWords.has(w)).length;
+          if (headerOverlap >= 1) continue; // ada kata dari header → bukan nama orang
           nameFound = cand.trim();
           break;
         }
@@ -239,27 +282,25 @@ export async function extractDocumentData(rawText) {
     }
   }
 
-  // Metode 3: Fallback — baris ALL CAPS 2+ kata yang bukan kata kunci (format KTP lama)
+  // Metode 3: Fallback — baris ALL CAPS 2+ kata yang semuanya bukan kata kunci
+  // PENTING: Skip 2 baris teratas (area header Provinsi / Kabupaten KTP)
   if (!nameFound) {
-    for (const l of lines) {
-      // Harus mengandung huruf, 4-50 karakter, hanya huruf+spasi+titik+apostrof
+    const startIndex = Math.min(2, lines.length);
+    for (let i = startIndex; i < lines.length; i++) {
+      const l = lines[i];
       if (!/^[A-Z][A-Z\s.,'\-]{3,49}$/.test(l)) continue;
       const words = l.trim().split(/\s+/);
       if (words.length < 2) continue;
-      // Pastikan tidak satupun kata adalah kata kunci
-      if (words.some(w => NON_NAME_WORDS.test(w))) continue;
+      // Semua kata harus bukan kata kunci — tidak ada satu pun yang lolos
+      if (words.some(w => NON_NAME_SINGLE.has(w.toUpperCase()))) continue;
+      // Tambahan: minimal ada 1 kata >= 3 huruf (filter noise seperti "A B C D")
+      if (!words.some(w => w.length >= 3)) continue;
       nameFound = l.trim();
       break;
     }
   }
 
   if (nameFound) {
-    // Judul kasus yang lebih manusiawi jika semua kapital
-    if (nameFound === nameFound.toUpperCase() && nameFound.length > 3) {
-      nameFound = nameFound.replace(/\b\w/g, c => c.toUpperCase()).replace(/\b(\w)/g, (_, c) => c.toUpperCase());
-      // Kembalikan ke all caps karena format KTP memang kapital
-    }
-    // Batas panjang wajar
     if (nameFound.length > 60) nameFound = nameFound.slice(0, 60).trim();
     data.name = nameFound;
   }
@@ -325,37 +366,99 @@ export async function extractDocumentData(rawText) {
 
   // ---- 6. Alamat ----
   let street = '', rtrw = '', kel = '', kec = '', kota = '';
+
+  // Helper: validasi bahwa string layak jadi nama tempat (minimal 4 huruf, bukan noise)
+  function isValidPlaceName(s) {
+    const cleaned = s.trim();
+    // Minimal 4 karakter, mengandung minimal 3 huruf berurutan
+    if (cleaned.length < 4) return false;
+    if (!/[A-Za-z]{3}/.test(cleaned)) return false;
+    // Tidak boleh semua non-huruf
+    if (/^[^A-Za-z]+$/.test(cleaned)) return false;
+    return true;
+  }
+
   for (let i = 0; i < lines.length; i++) {
     const l = lines[i];
-    // Jalan / Alamat
+
+    // ---- Jalan / Street ----
     if (/^(?:Alamat|Alarnat|Alam[ae]t|Adarnat)\s*[:=.]?/i.test(l)) {
       let cand = l.replace(/^(?:Alamat|Alarnat|Alam[ae]t|Adarnat)\s*[:=.]?\s*/i, '').trim();
+      cand = cand.replace(/\s+/g, ' ').trim();
+      cand = cand.replace(/[\s.,\-~!_=+;:]+$/, '');
+      cand = cand.replace(/\s+[a-z0-9]{1,3}$/i, (match) => {
+        const w = match.trim().toUpperCase();
+        if (['NO', 'RT', 'RW', 'GG', 'JL', 'KM'].includes(w) || /^\d+$/.test(w)) return match;
+        return '';
+      });
+      cand = cand.replace(/[\s.,\-~!_=+;:]+$/, '').trim();
       if (!cand && i + 1 < lines.length) {
-        const nx = lines[i + 1];
+        const nx = lines[i + 1].trim();
         if (!/^(?:RT|RW|Kel|Desa|Kecamatan|Agama)/i.test(nx)) cand = nx;
       }
-      if (cand) street = cand;
+      if (cand && cand.length >= 3) street = cand;
     }
+    // Baris dimulai Jl./Jalan langsung (tanpa label Alamat)
     if (!street && /^(?:Jl\.?|Jalan|Gg\.?|Gang|Komp\.?|Komplek|Blok|Kp\.?|Kampung|Perum)/i.test(l)) {
-      street = l;
+      let cand = l.replace(/\s+/g, ' ').trim();
+      cand = cand.replace(/[\s.,\-~!_=+;:]+$/, '');
+      cand = cand.replace(/\s+[a-z0-9]{1,3}$/i, (match) => {
+        const w = match.trim().toUpperCase();
+        if (['NO', 'RT', 'RW', 'GG', 'JL', 'KM'].includes(w) || /^\d+$/.test(w)) return match;
+        return '';
+      });
+      street = cand.replace(/[\s.,\-~!_=+;:]+$/, '').trim();
     }
-    // RT/RW
-    const mRt = l.match(/RT\s*[\/.:]?\s*(\d{1,3})\s*[\/.\-]?\s*RW\s*[\/.:]?\s*(\d{1,3})/i);
-    if (mRt) rtrw = `${mRt[1].padStart(3,'0')}/${mRt[2].padStart(3,'0')}`;
-    else {
-      const mRt2 = l.match(/RT\/RW\s*[:=.]?\s*([0-9OIl\/\s-]+)/i);
-      if (mRt2) rtrw = mRt2[1].replace(/[Oo]/g,'0').replace(/[Il]/g,'1').replace(/\s/g,'').trim();
+
+    // ---- RT/RW — HANYA terima jika mengandung digit asli ----
+    // Prioritas 1: RT NNN RW NNN (digit eksplisit)
+    const mRt1 = l.match(/RT\s*[\/.:]?\s*(\d{1,3})\s*[\/.\-]?\s*RW\s*[\/.:]?\s*(\d{1,3})/i);
+    if (mRt1) {
+      rtrw = `${mRt1[1].padStart(3,'0')}/${mRt1[2].padStart(3,'0')}`;
+    } else {
+      // Prioritas 2: RT/RW diikuti nilai — tapi hanya jika nilai itu benar-benar digit setelah OCR correction
+      const mRt2 = l.match(/RT\/RW\s*[:=.]?\s*([0-9OIlSBo]{1,3}[\/.\-][0-9OIlSBo]{1,3})/i);
+      if (mRt2) {
+        const raw = mRt2[1]
+          .replace(/[Oo]/g,'0').replace(/[Il]/g,'1').replace(/S/g,'5').replace(/B/g,'8');
+        // Validasi: harus jadi format NNN/NNN setelah konversi
+        const parts = raw.split(/[\/.\-]/);
+        if (parts.length === 2 && /^\d+$/.test(parts[0]) && /^\d+$/.test(parts[1])) {
+          rtrw = `${parts[0].padStart(3,'0')}/${parts[1].padStart(3,'0')}`;
+        }
+        // Jika tidak valid (noise seperti "wie"), diabaikan
+      }
     }
-    // Kelurahan/Desa
-    const mKel = l.match(/(?:Kel(?:urahan)?[\/\s.]*|Desa)\s*[:=.]?\s*([A-Za-z][A-Za-z\s]{1,40})/i);
-    if (mKel && !kel) kel = mKel[1].replace(/\s+/g,' ').trim();
-    // Kecamatan
-    const mKec = l.match(/(?:Kecamatan|Kec[.:\s])\s*[:=.]?\s*([A-Za-z][A-Za-z\s]{1,40})/i);
-    if (mKec && !kec) kec = mKec[1].replace(/\s+/g,' ').trim();
-    // Kota/Kabupaten
-    const mKota = l.match(/(?:KOTA|KABUPATEN|KAB[.:\s])\s+([A-Za-z][A-Za-z\s]{1,40})/i);
+
+    // ---- Kelurahan/Desa — toleransi variasi OCR (KellDesa, Kel/Desa, Kel|Desa, dll) ----
+    const mKel = l.match(/(?:Kel(?:urahan)?[/\s.l|!~_I\\-]*Desa|Kelurahan|Kel(?:\.|\s*[:=]|\s+[A-Z])(?!amin|ahiran|uarga))[\s:=.~|\-_]*([A-Za-z][A-Za-z\s]{2,30})/i);
+    if (mKel && !kel) {
+      let kelCand = mKel[1].replace(/\s+/g,' ').replace(/[^a-zA-Z\s]/g, '').trim();
+      kelCand = kelCand.replace(/^Desa\s+/i, '').trim();
+      if (isValidPlaceName(kelCand)) {
+        const kelWords = kelCand.split(/\s+/);
+        const kelClean = kelWords.filter((w,idx) => idx === 0 || w.length >= 3).join(' ');
+        if (isValidPlaceName(kelClean)) kel = kelClean;
+      }
+    }
+
+    // ---- Kecamatan — validasi panjang minimal ----
+    const mKec = l.match(/(?:Kecamatan|Kecarnatan|Kec[.:\s])\s*[:=.]?\s*([A-Za-z][A-Za-z\s]{3,40})/i);
+    if (mKec && !kec) {
+      let kecCand = mKec[1].replace(/\s+/g,' ').replace(/[^a-zA-Z\s]/g, '').trim();
+      if (isValidPlaceName(kecCand)) kec = kecCand;
+    }
+
+    // ---- Kota/Kabupaten ----
+    const mKota = l.match(/(?:KOTA|KABUPATEN|KAB[.:\s])\s+([A-Za-z][A-Za-z\s]{2,40})/i);
     if (mKota && !kota) kota = mKota[0].replace(/\s+/g,' ').trim();
+
+    // Pola Kota Administrasi DKI Jakarta (tanpa awalan KOTA)
+    const mJkt = l.match(/\b(JAKARTA\s+(?:BARAT|PUSAT|SELATAN|TIMUR|UTARA)|KEPULAUAN\s+SERIBU)\b/i);
+    if (mJkt && !kota) kota = mJkt[1].replace(/\s+/g,' ').trim();
   }
+
+  // Susun alamat lengkap — hanya tambahkan field yang sudah tervalidasi
   const addrParts = [];
   if (street) addrParts.push(street);
   if (rtrw) addrParts.push(`RT/RW ${rtrw}`);
@@ -366,13 +469,13 @@ export async function extractDocumentData(rawText) {
 
   // ---- 7. Pekerjaan ----
   const occupations = [
-    'WIRASWASTA', 'KARYAWAN SWASTA', 'PEGAWAI NEGERI SIPIL', 'PNS', 'ASN',
+    'WIRASWASTA', 'KARYAWAN SWASTA', 'PEGAWAI SWASTA', 'PEGAWAI NEGERI SIPIL', 'PNS', 'ASN',
     'PELAJAR/MAHASISWA', 'PELAJAR', 'MAHASISWA', 'BELUM/TIDAK BEKERJA',
     'MENGURUS RUMAH TANGGA', 'IBU RUMAH TANGGA', 'BURUH HARIAN LEPAS', 'BURUH',
     'PEDAGANG', 'PETANI/PEKEBUN', 'PETANI', 'PETERNAK', 'NELAYAN',
     'DOKTER', 'BIDAN', 'PERAWAT', 'GURU', 'DOSEN', 'PENGACARA', 'ADVOKAT',
     'NOTARIS', 'PPAT', 'AKUNTAN', 'KONSULTAN', 'ARSITEK', 'SOPIR', 'PENSIUNAN',
-    'TNI', 'POLRI', 'KARYAWAN BUMN', 'KARYAWAN BUMD', 'SWASTA',
+    'TNI', 'POLRI', 'KARYAWAN BUMN', 'KARYAWAN BUMD', 'KARYAWAN', 'SWASTA',
   ];
   let jobFound = '';
   for (let i = 0; i < lines.length; i++) {
@@ -385,6 +488,12 @@ export async function extractDocumentData(rawText) {
       }
       if (cand) {
         cand = cand.replace(/(?:Kewarganegaraan|WNI|WNA|Agama|Berlaku|Status).*$/i, '').trim();
+        cand = cand.replace(/\s+/g, ' ').trim();
+        // Cek apakah mengandung salah satu pekerjaan standar
+        const candUpper = cand.toUpperCase();
+        for (const occ of occupations) {
+          if (candUpper.includes(occ)) { cand = occ; break; }
+        }
         if (cand.length >= 3) { jobFound = cand; break; }
       }
     }
@@ -494,13 +603,11 @@ export async function scanKtpImage(imageData, rawImageData = null) {
     // -----------------------------------------------
     const OCR_PARAMS_PSM6 = {
       tessedit_pageseg_mode: '6',
-      tessedit_ocr_engine_mode: '1',
       preserve_interword_spaces: '1',
       tessedit_char_blacklist: '|~`^{}[]<>',
     };
     const OCR_PARAMS_PSM11 = {
       tessedit_pageseg_mode: '11',
-      tessedit_ocr_engine_mode: '1',
       preserve_interword_spaces: '1',
       tessedit_char_blacklist: '|~`^{}[]<>',
     };
