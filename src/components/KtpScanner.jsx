@@ -277,7 +277,7 @@ export default function KtpScanner({ onExtracted, notify }) {
     }
   };
 
-  // Handle uploaded image file
+  // Handle uploaded image file (RAM-Safe & Crash-Proof for Mobile Phones)
   const handleFileUpload = (e) => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
@@ -287,11 +287,17 @@ export default function KtpScanner({ onExtracted, notify }) {
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        const maxDim = 1600;
+    // Reset nilai input agar memilih file yang sama tetap memicu onChange
+    e.target.value = '';
+
+    // Gunakan ObjectURL bukan FileReader base64 agar browser HP tidak kehabisan RAM (OOM)
+    const blobUrl = URL.createObjectURL(file);
+    const img = new Image();
+
+    img.onload = () => {
+      try {
+        // Skala ramah mobile: maks 1200px (sangat tajam untuk OCR KTP dan hemat memori)
+        const maxDim = 1200;
         let w = img.width;
         let h = img.height;
         if (w > maxDim || h > maxDim) {
@@ -303,23 +309,36 @@ export default function KtpScanner({ onExtracted, notify }) {
             h = maxDim;
           }
         }
+
         const canvas = document.createElement('canvas');
         canvas.width = w;
         canvas.height = h;
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, w, h);
-        const rawUrl = canvas.toDataURL('image/jpeg', 0.95);
+
+        // Kualitas kompresi 0.85 (file ringkas ~150KB, anti crash di browser HP)
+        const rawUrl = canvas.toDataURL('image/jpeg', 0.85);
         setRawCaptured(rawUrl);
 
-        // Apply contrast boost
+        // Terapkan filter ketajaman teks
         applyKtpEnhancement(canvas);
-        const enhancedUrl = canvas.toDataURL('image/jpeg', 0.95);
+        const enhancedUrl = canvas.toDataURL('image/jpeg', 0.85);
         setCapturedImage(enhancedUrl);
         setScanFailed(false);
-      };
-      img.src = event.target.result;
+      } catch (err) {
+        console.error('Error processing image:', err);
+        if (notify) notify('Gagal memproses gambar pada perangkat HP.', 'danger');
+      } finally {
+        URL.revokeObjectURL(blobUrl);
+      }
     };
-    reader.readAsDataURL(file);
+
+    img.onerror = () => {
+      URL.revokeObjectURL(blobUrl);
+      if (notify) notify('Gagal membaca gambar dari galeri HP.', 'danger');
+    };
+
+    img.src = blobUrl;
   };
 
   // Process OCR on captured / uploaded image
@@ -738,8 +757,7 @@ export default function KtpScanner({ onExtracted, notify }) {
             ref={fileInputRef}
             type="file"
             accept="image/*"
-            capture="environment"
-            onChange={handleFileUpload}
+                        onChange={handleFileUpload}
             style={{ display: 'none' }}
           />
           <div style={{ marginBottom: '8px', color: 'var(--primary)' }}>
