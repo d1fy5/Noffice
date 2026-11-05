@@ -220,11 +220,11 @@ export const AiAPI = {
     });
     return handleJsonResponse(res);
   },
-  scanKtp: async (image) => {
+  scanKtp: async (image, rawImage = null) => {
     const res = await fetch(`${API_URL}/ai/scan-ktp`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-      body: JSON.stringify({ image })
+      body: JSON.stringify({ image, rawImage })
     });
     return handleJsonResponse(res);
   },

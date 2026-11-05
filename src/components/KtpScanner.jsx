@@ -13,43 +13,48 @@ function applyKtpEnhancement(canvas) {
     const imgData = ctx.getImageData(0, 0, w, h);
     const d = imgData.data;
 
-    let minGray = 255;
-    let maxGray = 0;
-
-    // Pass 1: Cari rentang luminansi piksel
-    const grayBuffer = new Float32Array(w * h);
+    // 1. Grayscale dengan bobot perceptual
+    const gray = new Float32Array(w * h);
+    const hist = new Int32Array(256);
     for (let i = 0, p = 0; i < d.length; i += 4, p++) {
-      const gray = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-      grayBuffer[p] = gray;
-      if (gray < minGray) minGray = gray;
-      if (gray > maxGray) maxGray = gray;
+      const g = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+      gray[p] = g;
+      hist[Math.min(255, Math.max(0, Math.round(g)))]++;
     }
 
-    const range = maxGray - minGray || 1;
-
-    // Pass 2: Contrast stretch
-    for (let p = 0; p < grayBuffer.length; p++) {
-      grayBuffer[p] = ((grayBuffer[p] - minGray) / range) * 255;
+    // 2. Percentile stretch (4% - 96%) agar tahan silau & bayangan
+    const total = gray.length;
+    let pLow = 0, count = 0;
+    for (let i = 0; i < 256; i++) {
+      count += hist[i];
+      if (count >= total * 0.04) { pLow = i; break; }
     }
+    count = 0;
+    let pHigh = 255;
+    for (let i = 255; i >= 0; i--) {
+      count += hist[i];
+      if (count >= total * 0.04) { pHigh = i; break; }
+    }
+    const range = Math.max(25, pHigh - pLow);
 
-    // Pass 3: 3x3 Unsharp Sharpening Filter untuk mengatasi foto yang blur/kurang tajam
+    // 3. Normalisasi kontras & Laplacian unsharp mask halus (tanpa binarisasi ekstrem)
     for (let y = 1; y < h - 1; y++) {
       for (let x = 1; x < w - 1; x++) {
         const p = y * w + x;
-        const sharpVal = 5 * grayBuffer[p]
-          - grayBuffer[p - 1]
-          - grayBuffer[p + 1]
-          - grayBuffer[p - w]
-          - grayBuffer[p + w];
+        const norm = Math.min(255, Math.max(0, ((gray[p] - pLow) / range) * 255));
+        const up = Math.min(255, Math.max(0, ((gray[p - w] - pLow) / range) * 255));
+        const dn = Math.min(255, Math.max(0, ((gray[p + w] - pLow) / range) * 255));
+        const lf = Math.min(255, Math.max(0, ((gray[p - 1] - pLow) / range) * 255));
+        const rt = Math.min(255, Math.max(0, ((gray[p + 1] - pLow) / range) * 255));
 
-        const clamped = Math.max(0, Math.min(255, sharpVal));
-        // Huruf KTP dibuat hitam tegas, latar KTP diputihkan
-        const finalVal = clamped < 125 ? Math.max(0, clamped * 0.7) : Math.min(255, clamped * 1.3);
+        // Laplacian sharpening terukur: mempertajam tepi huruf KTP tanpa merusak font
+        const sharp = norm + 1.25 * (norm - 0.25 * (up + dn + lf + rt));
+        const val = Math.min(255, Math.max(0, Math.round(sharp)));
 
         const idx = p * 4;
-        d[idx] = finalVal;
-        d[idx + 1] = finalVal;
-        d[idx + 2] = finalVal;
+        d[idx] = val;
+        d[idx + 1] = val;
+        d[idx + 2] = val;
       }
     }
     ctx.putImageData(imgData, 0, 0);
@@ -325,8 +330,17 @@ export default function KtpScanner({ onExtracted, notify }) {
     setScanFailed(false);
 
     try {
-      const res = await AiAPI.scanKtp(capturedImage);
-      if (res && res.success && res.data) {
+      // Kirim capturedImage dan rawCaptured agar backend mencoba multi-pass
+      const res = await AiAPI.scanKtp(capturedImage, rawCaptured);
+      const hasData = res && res.success && res.data && (
+        Boolean(res.data.nik) ||
+        Boolean(res.data.name) ||
+        Boolean(res.data.birthdate) ||
+        Boolean(res.data.address) ||
+        Boolean(res.data.job)
+      );
+
+      if (hasData) {
         const imageToSave = rawCaptured || capturedImage;
         onExtracted(res.data, imageToSave);
         setLastExtracted(res.data);
@@ -339,12 +353,14 @@ export default function KtpScanner({ onExtracted, notify }) {
         setScanStatus('Scan KTP selesai!');
       } else {
         setScanFailed(true);
-        if (notify) notify(res?.message || 'Teks KTP tidak terbaca jelas (buram).', 'warning');
+        setLastExtracted(null);
+        if (notify) notify(res?.message || 'Teks KTP tidak terbaca jelas (terlalu jauh atau buram). Dekatkan KTP ke kamera.', 'warning');
       }
     } catch (err) {
       console.error('Scan KTP failed:', err);
       setScanFailed(true);
-      if (notify) notify('Gagal memproses OCR KTP. Silakan coba foto ulang atau gunakan opsi Unggah Foto.', 'danger');
+      setLastExtracted(null);
+      if (notify) notify('Gagal memproses OCR KTP. Silakan coba dekatkan kartu atau gunakan opsi Unggah Foto.', 'danger');
     } finally {
       setScanning(false);
     }
@@ -876,7 +892,7 @@ export default function KtpScanner({ onExtracted, notify }) {
           )}
 
           {/* Extracted Summary Card */}
-          {lastExtracted && (
+          {lastExtracted && (lastExtracted.nik || lastExtracted.name || lastExtracted.birthdate || lastExtracted.address || lastExtracted.job) && (
             <div style={{ marginTop: '10px', padding: '10px 12px', background: 'rgba(34, 197, 94, 0.08)', border: '1px solid rgba(34, 197, 94, 0.25)', borderRadius: '8px', fontSize: '0.78rem', color: 'var(--text)' }}>
               <div style={{ fontWeight: 700, color: '#16a34a', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '5px' }}>
                 <Icon name="check" size={14} /> Data KTP Berhasil Terisi ke Formulir:

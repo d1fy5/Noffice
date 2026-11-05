@@ -129,11 +129,22 @@ export async function extractDocumentData(rawText) {
 
   const lines = rawText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
 
-  // 1. NIK Extractor (16 digit persis atau perbaikan subtitusi OCR pada angka)
+  // 1. NIK Extractor (16 digit persis, toleransi spasi, atau perbaikan subtitusi OCR)
   const nikExact = rawText.match(/\b\d{16}\b/);
   if (nikExact) {
     data.nik = nikExact[0];
   } else {
+    // Toleransi spasi/titik pada 16 digit: e.g. "3171 0123 0485 0001"
+    const spacedNik = rawText.match(/\b(?:\d[\s.-]?){15}\d\b/);
+    if (spacedNik) {
+      const cleanDigits = spacedNik[0].replace(/[\s.-]/g, '');
+      if (cleanDigits.length === 16) {
+        data.nik = cleanDigits;
+      }
+    }
+  }
+
+  if (!data.nik) {
     for (const l of lines) {
       if (/(?:NIK|N1K|N!K|Nomor\s*Induk)/i.test(l) || /^[0-9OIlZSBgq\s-]{16,28}$/i.test(l)) {
         let norm = l.replace(/^(?:NIK|N1K|N!K|Nomor|Induk|Kependudukan)[\s:=.]*/i, '');
@@ -338,22 +349,28 @@ export async function extractDocumentData(rawText) {
 }
 
 // 1b. Scan KTP Image via Local Offline Tesseract OCR (Multi-Pass & Resilient)
-export async function scanKtpImage(imageData) {
+export async function scanKtpImage(imageData, rawImageData = null) {
   if (!imageData) {
     return { success: false, message: 'Data gambar tidak ditemukan' };
   }
 
-  let cleanBuffer = null;
-  try {
-    if (typeof imageData === 'string' && imageData.startsWith('data:image')) {
-      const base64Data = imageData.replace(/^data:image\/[a-zA-Z]+;base64,/, '');
-      cleanBuffer = Buffer.from(base64Data, 'base64');
-    } else if (Buffer.isBuffer(imageData)) {
-      cleanBuffer = imageData;
+  const toBuffer = (img) => {
+    try {
+      if (typeof img === 'string' && img.startsWith('data:image')) {
+        const base64Data = img.replace(/^data:image\/[a-zA-Z0-9+]+;base64,/, '');
+        return Buffer.from(base64Data, 'base64');
+      } else if (Buffer.isBuffer(img)) {
+        return img;
+      }
+    } catch {
+      return null;
     }
-  } catch (e) {
-    console.warn('Buffer conversion failed:', e);
-  }
+    return null;
+  };
+
+  const buffer1 = toBuffer(imageData);
+  const buffer2 = rawImageData ? toBuffer(rawImageData) : null;
+  const buffersToTry = [buffer1, buffer2].filter(Boolean);
 
   let worker = null;
   try {
@@ -365,54 +382,88 @@ export async function scanKtpImage(imageData) {
       },
     });
 
-    let rawText = '';
+    let bestExtracted = null;
+    let combinedRawText = '';
 
-    // Pass 1: PSM 6 (single uniform block, sangat presisi untuk dokumen ID card)
-    try {
-      await worker.setParameters({
-        tessedit_pageseg_mode: '6',
-        preserve_interword_spaces: '1',
-      });
-      const ret = await worker.recognize(cleanBuffer || imageData);
-      rawText = ret.data?.text || '';
-    } catch (pass1Err) {
-      console.warn('Pass 1 OCR error:', pass1Err.message);
-    }
-
-    // Pass 2: Jika nama atau alamat belum lengkap, coba PSM 4 / 11 untuk memperkaya deteksi
-    let pass1Data = (await extractDocumentData(rawText)).data || {};
-    if (!pass1Data.name || !pass1Data.address || rawText.trim().length < 30) {
+    for (const buf of buffersToTry) {
+      // Pass 1: PSM 6 (single uniform block)
       try {
         await worker.setParameters({
-          tessedit_pageseg_mode: '4',
+          tessedit_pageseg_mode: '6',
           preserve_interword_spaces: '1',
         });
-        const ret2 = await worker.recognize(cleanBuffer || imageData);
-        const pass2Text = ret2.data?.text || '';
-        if (pass2Text.length > 20) {
-          rawText = rawText + '\n' + pass2Text;
+        const ret1 = await worker.recognize(buf);
+        const t1 = ret1.data?.text || '';
+        combinedRawText += '\n' + t1;
+        const ext1 = await extractDocumentData(t1);
+        if (ext1.data?.nik || (ext1.data?.name && ext1.data?.address)) {
+          bestExtracted = ext1;
+          break;
         }
-      } catch (pass2Err) {
-        console.warn('Pass 2 OCR error:', pass2Err.message);
+      } catch (err1) {
+        console.warn('PSM 6 error:', err1.message);
+      }
+
+      // Pass 2: PSM 11 (Sparse text - sangat efektif jika foto KTP dipegang tangan / ada background)
+      try {
+        await worker.setParameters({
+          tessedit_pageseg_mode: '11',
+          preserve_interword_spaces: '1',
+        });
+        const ret2 = await worker.recognize(buf);
+        const t2 = ret2.data?.text || '';
+        combinedRawText += '\n' + t2;
+        const ext2 = await extractDocumentData(combinedRawText);
+        if (ext2.data?.nik || (ext2.data?.name && ext2.data?.address)) {
+          bestExtracted = ext2;
+          break;
+        }
+      } catch (err2) {
+        console.warn('PSM 11 error:', err2.message);
+      }
+
+      // Pass 3: PSM 3 (Fully automatic segmentation)
+      try {
+        await worker.setParameters({
+          tessedit_pageseg_mode: '3',
+          preserve_interword_spaces: '1',
+        });
+        const ret3 = await worker.recognize(buf);
+        const t3 = ret3.data?.text || '';
+        combinedRawText += '\n' + t3;
+        const ext3 = await extractDocumentData(combinedRawText);
+        if (ext3.data?.nik || ext3.data?.name) {
+          bestExtracted = ext3;
+          break;
+        }
+      } catch (err3) {
+        console.warn('PSM 3 error:', err3.message);
       }
     }
 
     await worker.terminate();
     worker = null;
 
-    if (!rawText.trim()) {
+    if (!bestExtracted) {
+      bestExtracted = await extractDocumentData(combinedRawText);
+    }
+
+    const d = bestExtracted?.data || {};
+    const hasMeaningfulData = Boolean(d.nik || d.name || d.birthdate || d.address || d.job);
+
+    if (!hasMeaningfulData) {
       return {
         success: false,
-        message: 'Teks KTP tidak terbaca jelas. Pastikan foto KTP tidak buram, atau gunakan opsi Unggah Foto KTP yang diambil lewat kamera HP.',
+        text: combinedRawText,
+        data: {},
+        message: 'Teks KTP tidak terbaca jelas. Posisi KTP terlalu jauh dari kamera atau foto buram. Silakan dekatkan kartu KTP ke dalam bingkai kamera hingga memenuhi layar, atau unggah foto KTP dari HP.',
       };
     }
 
-    const extracted = await extractDocumentData(rawText);
-
     return {
       success: true,
-      text: rawText,
-      data: extracted.data || {},
+      text: combinedRawText,
+      data: d,
       engine: 'Tesseract OCR + Smart NLP (100% Offline)',
     };
   } catch (err) {

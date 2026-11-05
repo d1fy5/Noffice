@@ -586,8 +586,8 @@ app.post('/api/ai/extract', requireAuth, async (req, res) => {
 
 app.post('/api/ai/scan-ktp', requireAuth, async (req, res) => {
   try {
-    const { image } = req.body;
-    const result = await scanKtpImage(image);
+    const { image, rawImage } = req.body;
+    const result = await scanKtpImage(image, rawImage);
     res.json(result);
   } catch (error) {
     res.status(500).json({ error: error.message });
