@@ -63,8 +63,16 @@ function applyKtpEnhancement(canvas) {
   }
 }
 
+// Deteksi apakah sedang diakses dari IP Wi-Fi lokal HTTP (bukan HTTPS dan bukan localhost)
+const isNonSecure = typeof window !== 'undefined' && (
+  !window.isSecureContext &&
+  window.location.hostname !== 'localhost' &&
+  window.location.hostname !== '127.0.0.1'
+);
+
 export default function KtpScanner({ onExtracted, notify }) {
-  const [mode, setMode] = useState('camera'); // 'camera' | 'upload' | 'paste'
+  // Jika diakses via IP Wi-Fi HTTP di HP, default-kan ke mode 'upload' karena browser HP memblokir navigator.mediaDevices
+  const [mode, setMode] = useState(() => (isNonSecure ? 'upload' : 'camera')); // 'camera' | 'upload' | 'paste'
   const [streamActive, setStreamActive] = useState(false);
   const [rawCaptured, setRawCaptured] = useState(null); // original crop
   const [capturedImage, setCapturedImage] = useState(null); // active image for OCR
@@ -119,8 +127,12 @@ export default function KtpScanner({ onExtracted, notify }) {
     setScanFailed(false);
 
     try {
+      if (isNonSecure) {
+        throw new Error('SECURE_CONTEXT_REQUIRED');
+      }
+
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('Fitur kamera tidak didukung di browser ini.');
+        throw new Error('DEVICE_UNSUPPORTED');
       }
 
       let stream = null;
@@ -165,7 +177,12 @@ export default function KtpScanner({ onExtracted, notify }) {
       }
     } catch (err) {
       console.error('Camera access failed:', err);
-      setCameraError('Kamera tidak dapat diakses atau izin ditolak. Silakan izinkan akses kamera di ikon gembok URL browser Anda, atau gunakan opsi Unggah Foto.');
+      if (err?.message === 'SECURE_CONTEXT_REQUIRED') {
+        const hostStr = typeof window !== 'undefined' ? window.location.hostname : 'IP Wi-Fi';
+        setCameraError(`Browser HP (Chrome/Safari) memblokir video streaming kamera langsung pada koneksi HTTP IP lokal (${hostStr}). Gunakan tombol "Unggah Foto" untuk memotret KTP langsung dengan kamera HP.`);
+      } else {
+        setCameraError('Kamera tidak dapat diakses atau izin ditolak. Silakan izinkan akses kamera di pengaturan browser Anda, atau gunakan opsi Unggah Foto.');
+      }
       setStreamActive(false);
     }
   }, [loadDevices, stopStream, videoDevices]);
@@ -542,23 +559,55 @@ export default function KtpScanner({ onExtracted, notify }) {
         <div>
           {!capturedImage && !streamActive && (
             <div style={{ textAlign: 'center', padding: '24px 16px', background: 'var(--surface)', borderRadius: '10px', border: '1px dashed var(--border)' }}>
-              <div style={{ marginBottom: '10px', color: 'var(--text-3)' }}>
-                <Icon name="camera" size={36} />
-              </div>
-              <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '4px' }}>
-                Akses Kamera KTP
-              </div>
-              <div style={{ fontSize: '0.78rem', color: 'var(--text-2)', marginBottom: '14px', maxWidth: '340px', marginInline: 'auto' }}>
-                Noffice akan membuka kamera perangkat Anda untuk mengambil foto KTP klien langsung.
-              </div>
-              {cameraError && (
-                <div style={{ fontSize: '0.78rem', color: '#ef4444', background: 'rgba(239,68,68,0.1)', padding: '8px 12px', borderRadius: '8px', marginBottom: '12px' }}>
-                  {cameraError}
-                </div>
+              {isNonSecure ? (
+                <>
+                  <div style={{ marginBottom: '10px', color: '#f59e0b' }}>
+                    <Icon name="alert" size={36} />
+                  </div>
+                  <div style={{ fontWeight: 700, fontSize: '0.92rem', marginBottom: '6px', color: 'var(--text)' }}>
+                    Kamera Streaming Memerlukan HTTPS di HP
+                  </div>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--text-2)', marginBottom: '14px', maxWidth: '380px', marginInline: 'auto', lineHeight: '1.5' }}>
+                    Browser HP (Chrome & Safari) memblokir video kamera streaming langsung pada IP Wi-Fi lokal (<code>{typeof window !== 'undefined' ? window.location.hostname : '192.168...'}</code>). Silakan gunakan tab <strong>Unggah Foto</strong> untuk memotret KTP langsung dengan kamera HP Anda.
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap', marginBottom: '12px' }}>
+                    <Button variant="primary" icon="upload" size="sm" onClick={() => handleSelectMode('upload')}>
+                      Buka Kamera HP (Via Unggah)
+                    </Button>
+                    <Button variant="secondary" icon="camera" size="sm" onClick={() => startCamera(currentDeviceIndex)}>
+                      Coba Buka Kamera
+                    </Button>
+                  </div>
+                  {cameraError && (
+                    <div style={{ fontSize: '0.76rem', color: '#ef4444', background: 'rgba(239,68,68,0.1)', padding: '8px 12px', borderRadius: '8px', marginTop: '10px' }}>
+                      {cameraError}
+                    </div>
+                  )}
+                  <div style={{ marginTop: '14px', fontSize: '0.7rem', color: 'var(--text-3)', borderTop: '1px solid var(--border)', paddingTop: '10px' }}>
+                    💡 <strong>Tips Chrome Android:</strong> Untuk mengizinkan kamera di IP lokal tanpa HTTPS, buka: <code style={{ userSelect: 'all' }}>chrome://flags/#unsafely-treat-insecure-origin-as-secure</code> di Chrome HP, masukkan IP web ini, lalu restart Chrome.
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div style={{ marginBottom: '10px', color: 'var(--text-3)' }}>
+                    <Icon name="camera" size={36} />
+                  </div>
+                  <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '4px' }}>
+                    Akses Kamera KTP
+                  </div>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--text-2)', marginBottom: '14px', maxWidth: '340px', marginInline: 'auto' }}>
+                    Noffice akan membuka kamera perangkat Anda untuk mengambil foto KTP klien langsung.
+                  </div>
+                  {cameraError && (
+                    <div style={{ fontSize: '0.78rem', color: '#ef4444', background: 'rgba(239,68,68,0.1)', padding: '8px 12px', borderRadius: '8px', marginBottom: '12px' }}>
+                      {cameraError}
+                    </div>
+                  )}
+                  <Button variant="primary" icon="camera" size="sm" onClick={() => startCamera(currentDeviceIndex)}>
+                    Buka Kamera Sekarang
+                  </Button>
+                </>
               )}
-              <Button variant="primary" icon="camera" size="sm" onClick={() => startCamera(currentDeviceIndex)}>
-                Buka Kamera Sekarang
-              </Button>
             </div>
           )}
 
@@ -744,7 +793,7 @@ export default function KtpScanner({ onExtracted, notify }) {
         <div
           onClick={() => fileInputRef.current?.click()}
           style={{
-            padding: '26px 16px',
+            padding: '24px 16px',
             background: 'var(--surface)',
             borderRadius: '10px',
             border: '2px dashed var(--primary)',
@@ -757,18 +806,49 @@ export default function KtpScanner({ onExtracted, notify }) {
             ref={fileInputRef}
             type="file"
             accept="image/*"
-                        onChange={handleFileUpload}
+            onChange={handleFileUpload}
             style={{ display: 'none' }}
           />
           <div style={{ marginBottom: '8px', color: 'var(--primary)' }}>
-            <Icon name="upload" size={32} />
+            <Icon name="camera" size={34} />
           </div>
-          <div style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: '4px', color: 'var(--text)' }}>
-            Klik untuk Memilih Foto KTP
+          <div style={{ fontWeight: 700, fontSize: '0.92rem', marginBottom: '4px', color: 'var(--text)' }}>
+            Pilih atau Jepret Foto KTP
           </div>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-2)', maxWidth: '380px', marginInline: 'auto' }}>
-            Rekomendasi terbaik: gunakan foto KTP dari kamera HP (kamera HP memiliki autofocus tajam dan bebas blur).
+          <div style={{ fontSize: '0.76rem', color: 'var(--text-2)', maxWidth: '380px', marginInline: 'auto', marginBottom: '14px', lineHeight: '1.45' }}>
+            Ketuk di sini untuk langsung <strong>memotret KTP lewat kamera HP</strong> atau memilih dari galeri foto Anda.
           </div>
+          <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                fileInputRef.current?.click();
+              }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 16px',
+                borderRadius: '8px',
+                background: 'var(--primary)',
+                color: '#fff',
+                border: 'none',
+                fontWeight: 600,
+                fontSize: '0.8rem',
+                cursor: 'pointer',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.12)',
+              }}
+            >
+              <Icon name="camera" size={15} />
+              <span>Buka Kamera / Galeri HP</span>
+            </button>
+          </div>
+          {isNonSecure && (
+            <div style={{ marginTop: '12px', fontSize: '0.7rem', color: 'var(--text-3)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+              <span>✅ Mode aman & kompatibel untuk Wi-Fi Lokal ({typeof window !== 'undefined' ? window.location.hostname : '192.168...'})</span>
+            </div>
+          )}
         </div>
       )}
 
