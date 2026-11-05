@@ -16,7 +16,6 @@ const PAGE_BY_PATHNAME = {
   '/dashboard': 'dashboard',
   '/notifications': 'notifications',
   '/settings': 'settings',
-  '/inbox': 'inbox',
   '/data-tables': 'data-tables',
 };
 

@@ -324,7 +324,7 @@ export function StoreProvider({ children }) {
         message: `${msg.sender} sent "${msg.subject}".`,
         dateTs: Date.now(),
         read: false,
-        route: '/inbox',
+        route: '/notifications',
       },
       ...(items || []),
     ]);

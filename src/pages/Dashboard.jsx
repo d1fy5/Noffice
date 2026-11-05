@@ -59,10 +59,8 @@ export default function Dashboard() {
           <Button variant="primary" icon="plus" onClick={() => navigate('/cases', { state: { createNew: true } })}>Permohonan Akta</Button>
           <Button variant="secondary" icon="userPlus" onClick={() => navigate('/clients', { state: { createNew: true } })}>Tambah Klien</Button>
           <Button variant="secondary" icon="upload" onClick={openUpload}>Upload Dokumen</Button>
-          {isAdmin ? (
+          {isAdmin && (
             <Button variant="secondary" icon="employees" onClick={() => navigate('/employees')}>Kelola Staff</Button>
-          ) : (
-            <Button variant="secondary" icon="inbox" onClick={() => navigate('/inbox')}>Kotak Masuk</Button>
           )}
         </div>
       </div>

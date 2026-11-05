@@ -63,12 +63,6 @@ export const APP_PAGES = {
     entities: [],
     summary: 'pusat konfigurasi aplikasi. Anda bisa mengatur tema, bahasa, keamanan (password), template tanda terima, format auto-akta, hingga backup database.',
   },
-  inbox: {
-    label: 'Inbox',
-    route: '/inbox',
-    entities: ['documents'],
-    summary: 'ruang komunikasi dan pesan masuk untuk koordinasi internal (Inbox).',
-  },
   'data-tables': {
     label: 'Data Tables',
     route: '/data-tables',
@@ -87,7 +81,6 @@ const PAGE_KEYWORDS = [
   ['dashboard', /\b(dashboard|beranda)\b/i],
   ['notifications', /\b(notifikasi|notifications)\b/i],
   ['settings', /\b(pengaturan|settings)\b/i],
-  ['inbox', /\b(inbox)\b/i],
 ];
 
 const FUNCTION_RE = /\b(fungsi|fungsinya|kegunaan|guna|untuk apa|apa (itu|yang dilakukan|yang bisa dilakukan)|apa isi|menu apa saja)\b/i;

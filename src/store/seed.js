@@ -83,7 +83,7 @@ export function buildInitialNotifications(target = {}) {
       type: 'message',
       title: 'Pesan Masuk Belum Dibaca',
       message: `${m.sender || 'Pengirim'} mengirim: "${m.subject}".`,
-      route: '/inbox',
+      route: '/notifications',
     }, i * 1.2 + 0.3);
   });
 

@@ -11,7 +11,6 @@ const titleKeyMap = {
   '/clients': 'clients',
   '/cases': 'cases',
   '/documents': 'documents',
-  '/inbox': 'inbox',
   '/data-tables': 'data-tables',
   '/employees': 'employees',
   '/notifications': 'notifications',
