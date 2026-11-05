@@ -76,6 +76,8 @@ export default function KtpScanner({ onExtracted, notify }) {
   const [videoDevices, setVideoDevices] = useState([]);
   const [currentDeviceIndex, setCurrentDeviceIndex] = useState(0);
   const [lastExtracted, setLastExtracted] = useState(null);
+  const [partialData, setPartialData] = useState(null);
+  const [errorMessage, setErrorMessage] = useState('');
   const [scanFailed, setScanFailed] = useState(false);
 
   const videoRef = useRef(null);
@@ -327,43 +329,63 @@ export default function KtpScanner({ onExtracted, notify }) {
     setScanning(true);
     setScanStatus('Memindai teks KTP dengan OCR lokal (100% Offline)...');
     setLastExtracted(null);
+    setPartialData(null);
     setScanFailed(false);
+    setErrorMessage('');
 
     try {
-      // Kirim capturedImage dan rawCaptured agar backend mencoba multi-pass
       const res = await AiAPI.scanKtp(capturedImage, rawCaptured);
-      const hasData = res && res.success && res.data && (
-        Boolean(res.data.nik) ||
-        Boolean(res.data.name) ||
-        Boolean(res.data.birthdate) ||
-        Boolean(res.data.address) ||
-        Boolean(res.data.job)
-      );
+      const data = res?.data || {};
+      const hasNik = Boolean(data.nik && data.nik.length === 16);
+      const hasName = Boolean(data.name && data.name.trim().length > 2);
 
-      if (hasData) {
+      // KTP dinyatakan sukses LENGKAP hanya jika ada NIK DAN NAMA LENGKAP!
+      if (res && res.success && hasNik && hasName) {
         const imageToSave = rawCaptured || capturedImage;
-        onExtracted(res.data, imageToSave);
-        setLastExtracted(res.data);
+        onExtracted(data, imageToSave);
+        setLastExtracted(data);
+        setPartialData(null);
+        setScanFailed(false);
         if (notify) {
-          const detail = [res.data.nik ? `NIK: ${res.data.nik}` : '', res.data.name ? res.data.name : '']
-            .filter(Boolean)
-            .join(' - ');
-          notify(`KTP berhasil discan (${detail || 'Selesai'})! Foto KTP & data siap disimpan ke dokumen.`, 'success');
+          notify(`KTP berhasil dipindai lengkap: ${data.name} (NIK: ${data.nik})!`, 'success');
         }
         setScanStatus('Scan KTP selesai!');
-      } else {
+      } else if (hasNik && !hasName) {
+        // NIK masuk tapi nama BELUM kebaca -> AI meminta foto ulang lebih dekat!
         setScanFailed(true);
         setLastExtracted(null);
-        if (notify) notify(res?.message || 'Teks KTP tidak terbaca jelas (terlalu jauh atau buram). Dekatkan KTP ke kamera.', 'warning');
+        setPartialData(data);
+        setErrorMessage(`NIK berhasil terdeteksi (${data.nik}), namun Nama Lengkap belum terbaca jelas. Mohon foto ulang KTP lebih dekat ke arah nama.`);
+        if (notify) {
+          notify('Nama KTP belum terbaca jelas. Silakan foto ulang lebih dekat.', 'warning');
+        }
+      } else {
+        // Belum terbaca sama sekali
+        setScanFailed(true);
+        setLastExtracted(null);
+        setPartialData(null);
+        setErrorMessage(res?.message || 'Teks KTP tidak terbaca jelas (terlalu jauh atau buram). Dekatkan KTP hingga memenuhi bingkai kamera.');
+        if (notify) notify('Teks KTP belum terbaca jelas. Dekatkan kartu ke kamera.', 'warning');
       }
     } catch (err) {
       console.error('Scan KTP failed:', err);
       setScanFailed(true);
       setLastExtracted(null);
-      if (notify) notify('Gagal memproses OCR KTP. Silakan coba dekatkan kartu atau gunakan opsi Unggah Foto.', 'danger');
+      setPartialData(null);
+      setErrorMessage('Gagal memproses OCR KTP. Silakan coba dekatkan kartu atau gunakan opsi Unggah Foto dari HP.');
+      if (notify) notify('Gagal memproses OCR KTP. Coba foto ulang.', 'danger');
     } finally {
       setScanning(false);
     }
+  };
+
+  const applyPartialNik = () => {
+    if (!partialData) return;
+    const imageToSave = rawCaptured || capturedImage;
+    onExtracted(partialData, imageToSave);
+    setLastExtracted(partialData);
+    setScanFailed(false);
+    if (notify) notify(`NIK ${partialData.nik} dimasukkan ke formulir. Silakan ketik nama klien secara manual.`, 'info');
   };
 
   // Manual extract from pasted text
@@ -833,51 +855,88 @@ export default function KtpScanner({ onExtracted, notify }) {
             </div>
           </div>
 
-          {/* Warning & Bantuan jika scan gagal atau buram */}
+          {/* Warning & Bantuan jika scan gagal atau nama belum terbaca */}
           {scanFailed && (
-            <div style={{ marginTop: '12px', padding: '10px 12px', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.25)', borderRadius: '8px', fontSize: '0.78rem' }}>
-              <div style={{ fontWeight: 700, color: '#dc2626', marginBottom: '3px' }}>
-                ⚠️ Teks KTP belum terbaca (foto kurang tajam / buram)
+            <div style={{ marginTop: '12px', padding: '12px 14px', background: partialData ? 'rgba(234, 179, 8, 0.08)' : 'rgba(239, 68, 68, 0.08)', border: `1px solid ${partialData ? 'rgba(234, 179, 8, 0.35)' : 'rgba(239, 68, 68, 0.25)'}`, borderRadius: '8px', fontSize: '0.8rem' }}>
+              <div style={{ fontWeight: 700, color: partialData ? '#b45309' : '#dc2626', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Icon name={partialData ? "info" : "x"} size={16} />
+                {partialData ? '⚠️ Nama Klien Belum Terbaca (Scan Belum Lengkap)' : '⚠️ Teks KTP Belum Terbaca (Foto Terlalu Jauh / Buram)'}
               </div>
-              <div style={{ color: 'var(--text-2)', fontSize: '0.74rem', marginBottom: '8px', lineHeight: '1.4' }}>
-                Webcam laptop umumnya memiliki lensa <i>fixed-focus</i> sehingga sulit memfokuskan teks kecil dari jarak dekat.
+              <div style={{ color: 'var(--text-2)', fontSize: '0.76rem', marginBottom: '10px', lineHeight: '1.5' }}>
+                {errorMessage}
               </div>
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+
+              {partialData && partialData.nik && (
+                <div style={{ background: 'var(--surface)', padding: '6px 10px', borderRadius: '6px', marginBottom: '10px', fontSize: '0.75rem', color: 'var(--text)', border: '1px solid var(--border)' }}>
+                  <div><strong>NIK Terdeteksi:</strong> <span style={{ fontFamily: 'monospace', color: 'var(--primary)', fontWeight: 700 }}>{partialData.nik}</span></div>
+                  {partialData.birthdate && <div><strong>Tgl Lahir (Auto NIK):</strong> {partialData.birthdate}</div>}
+                  <div style={{ color: '#dc2626', fontSize: '0.72rem', marginTop: '3px', fontWeight: 600 }}>* Nama Lengkap belum terbaca. Mohon ambil foto ulang lebih dekat agar nama terisi otomatis.</div>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
                 <button
                   type="button"
-                  onClick={() => handleSelectMode('upload')}
+                  onClick={() => {
+                    setCapturedImage(null);
+                    setRawCaptured(null);
+                    setLastExtracted(null);
+                    setPartialData(null);
+                    setScanFailed(false);
+                    if (mode === 'camera') startCamera(currentDeviceIndex);
+                  }}
                   style={{
                     background: 'var(--primary)',
                     color: '#fff',
                     border: 'none',
                     borderRadius: '6px',
-                    padding: '6px 12px',
-                    fontSize: '0.74rem',
-                    fontWeight: 600,
+                    padding: '7px 14px',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '5px',
+                    gap: '6px',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
                   }}
                 >
-                  <Icon name="upload" size={13} />
-                  <span>Gunakan Unggah Foto (Foto dari Kamera HP)</span>
+                  <Icon name="refresh" size={14} />
+                  <span>🔄 Ambil Foto Ulang (Lebih Dekat)</span>
                 </button>
+
+                {partialData && (
+                  <button
+                    type="button"
+                    onClick={applyPartialNik}
+                    style={{
+                      background: 'var(--surface)',
+                      color: 'var(--text)',
+                      border: '1px solid var(--border)',
+                      borderRadius: '6px',
+                      padding: '7px 12px',
+                      fontSize: '0.76rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Gunakan NIK Saja & Ketik Nama Manual
+                  </button>
+                )}
+
                 <button
                   type="button"
-                  onClick={() => handleSelectMode('paste')}
+                  onClick={() => handleSelectMode('upload')}
                   style={{
-                    background: 'var(--surface)',
-                    color: 'var(--text)',
-                    border: '1px solid var(--border)',
+                    background: 'transparent',
+                    color: 'var(--text-2)',
+                    border: '1px dashed var(--border)',
                     borderRadius: '6px',
-                    padding: '6px 12px',
+                    padding: '7px 12px',
                     fontSize: '0.74rem',
-                    fontWeight: 600,
                     cursor: 'pointer',
                   }}
                 >
-                  Paste Teks Manual
+                  Unggah Foto dari HP
                 </button>
               </div>
             </div>

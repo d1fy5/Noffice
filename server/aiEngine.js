@@ -171,42 +171,67 @@ export async function extractDocumentData(rawText) {
   const phoneMatch = rawText.match(/\b(08\d{8,11}|\+628\d{8,11})\b/);
   if (phoneMatch) data.phone = phoneMatch[0];
 
-  // 4. Name Extractor (Mendukung Nama, Narna, Narria, multi-baris, dan urutan setelah NIK)
+  // 4. Name Extractor (Mendukung Nama, Name, Nama/Name bilingual, multi-baris, dan urutan setelah NIK)
   let nameFound = '';
   for (let i = 0; i < lines.length; i++) {
     const l = lines[i];
-    if (/(?:Nama|Narna|Narria|N\s*ama|NAMA|Atas\s*Nama)\s*[:=.]?\s*(.*)/i.test(l)) {
-      const match = l.match(/(?:Nama|Narna|Narria|N\s*ama|NAMA|Atas\s*Nama)\s*[:=.]?\s*(.*)/i);
+    if (/(?:Nama|Narna|Narria|Marna|Hama|N\s*ama|Atas\s*Nama)(?:\s*[\/|]\s*Name)?\s*[:=.\-!|;]?\s*(.*)/i.test(l)) {
+      const match = l.match(/(?:Nama|Narna|Narria|Marna|Hama|N\s*ama|Atas\s*Nama)(?:\s*[\/|]\s*Name)?\s*[:=.\-!|;]?\s*(.*)/i);
       let cand = (match[1] || '').trim();
+      cand = cand.replace(/^[\/|]?\s*Name\s*[:=.\-!|;]?\s*/i, '').trim();
+
       if (!cand && i + 1 < lines.length) {
         const next = lines[i + 1].trim();
-        if (!/(?:Tempat|TTL|NIK|Provinsi|Kabupaten|Kota|Agama|Jenis|Gol)/i.test(next)) {
+        if (!/(?:Tempat|TTL|NIK|Provinsi|Kabupaten|Kota|Agama|Jenis|Gol|Alamat)/i.test(next)) {
           cand = next;
         }
       }
-      if (cand) {
+      if (cand && cand.length > 2) {
         nameFound = cand;
         break;
       }
     }
   }
 
-  // Fallback nama: baris tepat setelah NIK (standar tata letak fisik KTP Indonesia)
+  // Fallback 1: Baris di bawah NIK (Standar tata letak KTP: NIK -> NAMA)
   if (!nameFound && data.nik) {
     const nikIdx = lines.findIndex(l => l.includes(data.nik));
-    if (nikIdx !== -1 && nikIdx + 1 < lines.length) {
-      const nextLine = lines[nikIdx + 1].trim();
-      if (!/(?:Tempat|TTL|Alamat|Agama|Jenis|Gol|Provinsi|Kota)/i.test(nextLine) && nextLine.length > 3) {
-        nameFound = nextLine.replace(/^(?:Nama|Narna|NAMA)\s*[:=.]?\s*/i, '');
+    if (nikIdx !== -1) {
+      for (let offset = 1; offset <= 3 && nikIdx + offset < lines.length; offset++) {
+        let candLine = lines[nikIdx + offset].trim();
+        candLine = candLine.replace(/^(?:Nama|Narna|NAMA)(?:\s*[\/|]\s*Name)?\s*[:=.\-!|;]?\s*/i, '').trim();
+        candLine = candLine.replace(/^[\/|]?\s*Name\s*[:=.\-!|;]?\s*/i, '').trim();
+        if (candLine.length <= 2 || /^[^a-zA-Z]+$/.test(candLine)) continue;
+        if (/(?:Tempat|TTL|Alamat|Agama|Jenis|Gol|Provinsi|Kota|Kabupaten|NIK)/i.test(candLine)) break;
+        if (/[A-Z]/.test(candLine)) {
+          nameFound = candLine;
+          break;
+        }
+      }
+    }
+  }
+
+  // Fallback 2: Cari baris berhuruf kapital 2 kata atau lebih (Format nama KTP Indonesia)
+  if (!nameFound) {
+    for (const l of lines) {
+      const cleaned = l.replace(/^(?:Nama|Narna|NAMA)(?:\s*[\/|]\s*Name)?\s*[:=.\-!|;]?\s*/i, '').trim();
+      if (/^[A-Z\s.,'-]{4,40}$/.test(cleaned) && cleaned.split(/\s+/).length >= 2) {
+        if (!/(?:REPUBLIK|INDONESIA|PROVINSI|KABUPATEN|KOTA|KARTU|TANDA|PENDUDUK|GOLONGAN|DARAH|WARGA|NEGARA|SEUMUR|HIDUP|BELUM|KAWIN|ISLAM|KRISTEN|HINDU|BUDHA|KEHUTANAN)/i.test(cleaned)) {
+          nameFound = cleaned;
+          break;
+        }
       }
     }
   }
 
   if (nameFound) {
-    nameFound = nameFound.replace(/^(?:Nama|Narna|Narria|N\s*ama|NAMA|Atas\s*Nama)\s*[:=.]?\s*/i, '');
-    nameFound = nameFound.replace(/(?:Tempat|TTL|Jenis|Kelamin|Gol|Darah|Alamat|Agama).*$/i, '').trim();
+    nameFound = nameFound.replace(/^(?:Nama|Narna|Narria|N\s*ama|NAMA|Atas\s*Nama)(?:\s*[\/|]\s*Name)?\s*[:=.\-!|;]?\s*/i, '');
+    nameFound = nameFound.replace(/^[\/|]?\s*Name\s*[:=.\-!|;]?\s*/i, '');
+    nameFound = nameFound.replace(/(?:Tempat|TTL|Jenis|Kelamin|Gol|Darah|Alamat|Agama|Status).*$/i, '').trim();
     nameFound = nameFound.replace(/[^a-zA-Z\s.,'-]/g, '').trim();
-    data.name = nameFound;
+    if (nameFound.length > 2) {
+      data.name = nameFound;
+    }
   }
 
   // 5. Tanggal Lahir (Mendukung DD-MM-YYYY, nama bulan teks, dan toleransi OCR typo)
@@ -253,6 +278,19 @@ export async function extractDocumentData(rawText) {
     }
   }
   data.birthdate = dateFound;
+
+  // Derivasi Tanggal Lahir otomatis dari digit NIK jika belum terbaca (Standar Resmi Kemendagri)
+  if (!data.birthdate && data.nik && data.nik.length === 16) {
+    const rawDay = parseInt(data.nik.slice(6, 8), 10);
+    const month = parseInt(data.nik.slice(8, 10), 10);
+    const rawYear = parseInt(data.nik.slice(10, 12), 10);
+    const day = rawDay > 40 ? rawDay - 40 : rawDay;
+    if (day >= 1 && day <= 31 && month >= 1 && month <= 12) {
+      const currentYearYY = new Date().getFullYear() % 100;
+      const fullYear = rawYear > currentYearYY ? 1900 + rawYear : 2000 + rawYear;
+      data.birthdate = `${fullYear}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    }
+  }
 
   // 6. Alamat Lengkap (Jalan + RT/RW + Kelurahan + Kecamatan + Kota/Kabupaten)
   let street = '';
@@ -449,14 +487,26 @@ export async function scanKtpImage(imageData, rawImageData = null) {
     }
 
     const d = bestExtracted?.data || {};
-    const hasMeaningfulData = Boolean(d.nik || d.name || d.birthdate || d.address || d.job);
+    const hasNik = Boolean(d.nik && d.nik.length === 16);
+    const hasName = Boolean(d.name && d.name.trim().length > 2);
 
-    if (!hasMeaningfulData) {
+    // KTP wajib ada NIK dan Nama lengkap untuk bisa dianggap scan berhasil
+    if (!hasNik || !hasName) {
+      const isPartial = Boolean(hasNik || hasName);
+      let errMsg = 'Teks KTP tidak terbaca jelas (terlalu jauh atau buram). Silakan dekatkan KTP ke kamera hingga memenuhi bingkai kotak, atau unggah foto KTP dari HP.';
+      if (hasNik && !hasName) {
+        errMsg = 'NIK terbaca (' + d.nik + '), tetapi Nama Lengkap belum terbaca jelas. Silakan foto ulang lebih dekat ke arah nama.';
+      } else if (!hasNik && hasName) {
+        errMsg = 'Nama terbaca (' + d.name + '), tetapi NIK 16-digit belum terbaca jelas. Silakan foto ulang lebih dekat ke arah NIK.';
+      }
+
       return {
         success: false,
+        incomplete: isPartial,
+        partialData: d,
         text: combinedRawText,
-        data: {},
-        message: 'Teks KTP tidak terbaca jelas. Posisi KTP terlalu jauh dari kamera atau foto buram. Silakan dekatkan kartu KTP ke dalam bingkai kamera hingga memenuhi layar, atau unggah foto KTP dari HP.',
+        data: d,
+        message: errMsg,
       };
     }
 
