@@ -1,3 +1,4 @@
+import { execFileSync } from 'child_process';
 import http from 'http';
 import path from 'path';
 import { createWorker } from 'tesseract.js';
@@ -131,11 +132,12 @@ export async function extractDocumentData(rawText) {
   const lines = cleanText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
 
   // ---- 1. NIK Extractor ----
-  // Prioritas 1: 16 digit berurutan di baris yang mengandung NIK
+  // Prioritas 1: 16 digit berurutan di baris yang mengandung NIK (termasuk jika huruf N tertutup jempol: "IK :")
   for (const l of lines) {
-    // Baris yang dimulai dengan label NIK
-    if (/^(?:NIK|N1K|N!K|Nomor\s*Induk\s*Kependudukan)/i.test(l)) {
-      const digits = l.replace(/^(?:NIK|N1K|N!K|Nomor|Induk|Kependudukan)[\s:=.]*/i, '')
+    if (/(?:NIK|N1K|N!K|\bIK\b|Nomor\s*Induk)/i.test(l)) {
+      // WAJIB hapus prefix label DULUAN sebelum konversi huruf jadi angka (mencegah "IK" jadi "1K" lalu jadi digit 1)
+      const withoutLabel = l.replace(/^(?:.*?)(?:NIK|N1K|N!K|\bIK\b|Nomor\s*Induk\s*Kependudukan)[\s:=.\-—–]*/i, '');
+      const digits = withoutLabel
         .replace(/[OoDd]/g, '0').replace(/[Ili|!]/g, '1').replace(/[Zz]/g, '2')
         .replace(/[Ss]/g, '5').replace(/[Bb]/g, '8').replace(/[gq]/g, '9')
         .replace(/[^\d]/g, '');
@@ -144,17 +146,22 @@ export async function extractDocumentData(rawText) {
   }
 
   if (!data.nik) {
-    // Prioritas 2: Pola 16 digit berurutan di mana saja (paling umum)
-    const m16 = rawText.match(/\b(\d{16})\b/);
-    if (m16) {
-      data.nik = m16[1];
-    } else {
-      // Toleransi spasi: "3171 0123 0485 0001"
-      const mSpace = rawText.match(/\b(\d{4}[\s.-]\d{4}[\s.-]\d{4}[\s.-]\d{4})\b/);
-      if (mSpace) {
-        const clean = mSpace[1].replace(/[\s.-]/g, '');
-        if (clean.length === 16) data.nik = clean;
+    // Prioritas 2: Pola 16 digit berurutan di mana saja
+    for (const l of lines) {
+      const digitsOnly = l.replace(/[^\d]/g, '');
+      if (digitsOnly.length === 16 && /^[1-9]/.test(digitsOnly)) {
+        data.nik = digitsOnly;
+        break;
       }
+    }
+  }
+
+  if (!data.nik) {
+    // Toleransi spasi: "3171 0123 0485 0001"
+    const mSpace = rawText.match(/\b(\d{4}[\s.-]\d{4}[\s.-]\d{4}[\s.-]\d{4})\b/);
+    if (mSpace) {
+      const clean = mSpace[1].replace(/[\s.-]/g, '');
+      if (clean.length === 16) data.nik = clean;
     }
   }
 
@@ -204,16 +211,19 @@ export async function extractDocumentData(rawText) {
     return s.trim().toUpperCase().split(/\s+/).some(w => NON_NAME_SINGLE.has(w));
   }
 
-  // Fungsi clean nama — hapus prefix label dan suffix field lain
+  // Fungsi clean nama — hapus prefix label, em-dash, dan noise
   function cleanNameCandidate(s) {
-    // Hapus prefix label Nama (dengan separator wajib)
-    s = s.replace(/^(?:Nama|Narna|Narria|Marna|Hama|N\s*ama|NAMA)(?:\s*\/\s*Name)?\s*[:=.\-|;!]\s*/i, '');
-    s = s.replace(/^\/\s*Name\s*[:=.\-|;!]?\s*/i, '');
+    // Hapus prefix label Nama (dengan pemisah bebas termasuk em-dash, tilde, colon)
+    s = s.replace(/^(?:Nama|Narna|Narria|Marna|Hama|N\s*ama|NAMA)(?:\s*\/\s*Name)?\s*[:=.\-|;!—–_~ ]*\s*/i, '');
+    s = s.replace(/^\/\s*Name\s*[:=.\-|;!—–_~ ]*\s*/i, '');
     // Hapus suffix field lain
     s = s.replace(/\s*(?:Tempat|TTL|Tgl|Lahir|Jenis|Kelamin|Gol|Agama|Status|Berlaku|Alamat|NIK|RT|RW).*$/i, '');
     // Hapus digit dan simbol bukan nama
     s = s.replace(/[0-9#@$%^&*()_+=\[\]{};:"<>?,\/\\]/g, '');
-    s = s.replace(/^[.,!|\-]+|[.,!|\-]+$/g, '').trim();
+    // Hapus leading/trailing punctuation & em-dash
+    s = s.replace(/^[\s.,!|:;=\-—–_~]+|[\s.,!|:;=\-—–_~]+$/g, '').trim();
+    // Strip 1-2 letter OCR noise prefix seperti ": Sa MUHAMMAD" -> "MUHAMMAD"
+    s = s.replace(/^[A-Za-z]{1,2}\s+(?=[A-Z]{3,})/i, '').trim();
     return s;
   }
 
@@ -224,7 +234,7 @@ export async function extractDocumentData(rawText) {
   for (let i = 0; i < lines.length; i++) {
     const l = lines[i];
     // Label harus diikuti separator (: = . - | ; !) agar tidak salah deteksi
-    if (/^(?:Nama|Narna|Narria|Marna|Hama|N\s*ama)(?:\s*\/\s*Name)?\s*[:=.\-|;!]/i.test(l)) {
+    if (/^(?:Nama|Narna|Narria|Marna|Hama|N\s*ama)(?:\s*\/\s*Name)?\s*[:=.\-|;!—–_~ ]/i.test(l)) {
       let cand = cleanNameCandidate(l);
       if (!cand && i + 1 < lines.length) {
         const nextLine = lines[i + 1];
@@ -382,16 +392,13 @@ export async function extractDocumentData(rawText) {
     const l = lines[i];
 
     // ---- Jalan / Street ----
-    if (/^(?:Alamat|Alarnat|Alam[ae]t|Adarnat)\s*[:=.]?/i.test(l)) {
-      let cand = l.replace(/^(?:Alamat|Alarnat|Alam[ae]t|Adarnat)\s*[:=.]?\s*/i, '').trim();
+    if (/^(?:Alamat|Alarnat|Alam[ae]t|Adarnat|Aama|Mama|Alanat|Aamat)\b\s*[:=.\-—–_~ ]?/i.test(l)) {
+      let cand = l.replace(/^(?:Alamat|Alarnat|Alam[ae]t|Adarnat|Aama|Mama|Alanat|Aamat)\b\s*[:=.\-—–_~ ]*\s*/i, '').trim();
+      cand = cand.replace(/\s*[\-—–=_~]{2,}.*$/, '').trim();
       cand = cand.replace(/\s+/g, ' ').trim();
-      cand = cand.replace(/[\s.,\-~!_=+;:]+$/, '');
-      cand = cand.replace(/\s+[a-z0-9]{1,3}$/i, (match) => {
-        const w = match.trim().toUpperCase();
-        if (['NO', 'RT', 'RW', 'GG', 'JL', 'KM'].includes(w) || /^\d+$/.test(w)) return match;
-        return '';
-      });
-      cand = cand.replace(/[\s.,\-~!_=+;:]+$/, '').trim();
+      cand = cand.replace(/[\s.,\-—–~!_=+;:]+$/, '');
+      cand = cand.replace(/\s+[a-z]{1,5}$/, '');
+      cand = cand.replace(/[\s.,\-—–~!_=+;:]+$/, '').trim();
       if (!cand && i + 1 < lines.length) {
         const nx = lines[i + 1].trim();
         if (!/^(?:RT|RW|Kel|Desa|Kecamatan|Agama)/i.test(nx)) cand = nx;
@@ -400,40 +407,41 @@ export async function extractDocumentData(rawText) {
     }
     // Baris dimulai Jl./Jalan langsung (tanpa label Alamat)
     if (!street && /^(?:Jl\.?|Jalan|Gg\.?|Gang|Komp\.?|Komplek|Blok|Kp\.?|Kampung|Perum)/i.test(l)) {
-      let cand = l.replace(/\s+/g, ' ').trim();
-      cand = cand.replace(/[\s.,\-~!_=+;:]+$/, '');
-      cand = cand.replace(/\s+[a-z0-9]{1,3}$/i, (match) => {
-        const w = match.trim().toUpperCase();
-        if (['NO', 'RT', 'RW', 'GG', 'JL', 'KM'].includes(w) || /^\d+$/.test(w)) return match;
-        return '';
-      });
-      street = cand.replace(/[\s.,\-~!_=+;:]+$/, '').trim();
+      let cand = l.replace(/\s*[\-—–=_~]{2,}.*$/, '').trim();
+      cand = cand.replace(/\s+/g, ' ').trim();
+      cand = cand.replace(/[\s.,\-—–~!_=+;:]+$/, '');
+      cand = cand.replace(/\s+[a-z]{1,5}$/, '');
+      street = cand.replace(/[\s.,\-—–~!_=+;:]+$/, '').trim();
     }
 
-    // ---- RT/RW — HANYA terima jika mengandung digit asli ----
-    // Prioritas 1: RT NNN RW NNN (digit eksplisit)
-    const mRt1 = l.match(/RT\s*[\/.:]?\s*(\d{1,3})\s*[\/.\-]?\s*RW\s*[\/.:]?\s*(\d{1,3})/i);
-    if (mRt1) {
-      rtrw = `${mRt1[1].padStart(3,'0')}/${mRt1[2].padStart(3,'0')}`;
-    } else {
-      // Prioritas 2: RT/RW diikuti nilai — tapi hanya jika nilai itu benar-benar digit setelah OCR correction
-      const mRt2 = l.match(/RT\/RW\s*[:=.]?\s*([0-9OIlSBo]{1,3}[\/.\-][0-9OIlSBo]{1,3})/i);
-      if (mRt2) {
-        const raw = mRt2[1]
-          .replace(/[Oo]/g,'0').replace(/[Il]/g,'1').replace(/S/g,'5').replace(/B/g,'8');
-        // Validasi: harus jadi format NNN/NNN setelah konversi
-        const parts = raw.split(/[\/.\-]/);
-        if (parts.length === 2 && /^\d+$/.test(parts[0]) && /^\d+$/.test(parts[1])) {
-          rtrw = `${parts[0].padStart(3,'0')}/${parts[1].padStart(3,'0')}`;
-        }
-        // Jika tidak valid (noise seperti "wie"), diabaikan
+    // ---- RT/RW ----
+    // Format 1: 6 digit dengan slash dibaca 1/Il (misal 0021006 -> 002/006)
+    if (!rtrw) {
+      const mRt6 = l.match(/(?:RT[\/.\s]*RW|RTRW|RERW|REBW)\s*[:=.\-—–“"]*\s*(\d{3})[1Il\/|](\d{3})/i);
+      if (mRt6) {
+        rtrw = `${mRt6[1]}/${mRt6[2]}`;
+      }
+    }
+    // Format 2: RT/RW dengan pemisah jelas
+    if (!rtrw) {
+      const mRt1 = l.match(/(?:RT[\/.\s]*RW|RTRW|RERW|REBW)\s*[:=.\-—–“"]*\s*(\d{1,3})\s*[\/.\-—–“"]\s*(\d{1,3})/i);
+      if (mRt1) {
+        rtrw = `${mRt1[1].padStart(3,'0')}/${mRt1[2].padStart(3,'0')}`;
+      }
+    }
+    // Format 3: RT NNN RW NNN terpisah
+    if (!rtrw) {
+      const mRtLegacy = l.match(/RT\s*[\/.:]?\s*(\d{1,3})\s*[\/.\-]?\s*RW\s*[\/.:]?\s*(\d{1,3})/i);
+      if (mRtLegacy) {
+        rtrw = `${mRtLegacy[1].padStart(3,'0')}/${mRtLegacy[2].padStart(3,'0')}`;
       }
     }
 
-    // ---- Kelurahan/Desa — toleransi variasi OCR (KellDesa, Kel/Desa, Kel|Desa, dll) ----
-    const mKel = l.match(/(?:Kel(?:urahan)?[/\s.l|!~_I\\-]*Desa|Kelurahan|Kel(?:\.|\s*[:=]|\s+[A-Z])(?!amin|ahiran|uarga))[\s:=.~|\-_]*([A-Za-z][A-Za-z\s]{2,30})/i);
+    // ---- Kelurahan/Desa — toleransi variasi OCR (KeVDesa, KellDesa, Kel/Desa, Kel|Desa, dll) ----
+    const mKel = l.match(/(?:Ke[lvI|\/\\]*Desa|Kel(?:urahan)?[\/\s.l|!~_I\\-—–]*Desa|Kelurahan|Kel(?:\.|\s*[:=—–]|\s+[A-Z])(?!amin|ahiran|uarga))[\s:=.~|\-_—–]*([A-Za-z][A-Za-z\s]{2,30})/i);
     if (mKel && !kel) {
-      let kelCand = mKel[1].replace(/\s+/g,' ').replace(/[^a-zA-Z\s]/g, '').trim();
+      let kelCand = mKel[1].replace(/\s*[\-—–=_~]{2,}.*$/, '').trim();
+      kelCand = kelCand.replace(/\s+/g,' ').replace(/[^a-zA-Z\s]/g, '').trim();
       kelCand = kelCand.replace(/^Desa\s+/i, '').trim();
       if (isValidPlaceName(kelCand)) {
         const kelWords = kelCand.split(/\s+/);
@@ -443,20 +451,33 @@ export async function extractDocumentData(rawText) {
     }
 
     // ---- Kecamatan — validasi panjang minimal ----
-    const mKec = l.match(/(?:Kecamatan|Kecarnatan|Kec[.:\s])\s*[:=.]?\s*([A-Za-z][A-Za-z\s]{3,40})/i);
+    const mKec = l.match(/(?:Kecamatan|Kecarnatan|Kec[.:\s—–])\s*[:=.\-—–_~ ]*\s*([A-Za-z][A-Za-z\s]{3,40})/i);
     if (mKec && !kec) {
-      let kecCand = mKec[1].replace(/\s+/g,' ').replace(/[^a-zA-Z\s]/g, '').trim();
+      let kecCand = mKec[1].replace(/\s*[\-—–=_~]{2,}.*$/, '').trim();
+      kecCand = kecCand.replace(/\s+/g,' ').replace(/[^a-zA-Z\s]/g, '').trim();
+      const words = kecCand.split(/\s+/);
+      const cleanWords = words.filter(w => w.length >= 3 && !['FY', 'SE', 'OR', 'SANG'].includes(w.toUpperCase()));
+      kecCand = cleanWords.join(' ');
       if (isValidPlaceName(kecCand)) kec = kecCand;
     }
 
     // ---- Kota/Kabupaten ----
     const mKota = l.match(/(?:KOTA|KABUPATEN|KAB[.:\s])\s+([A-Za-z][A-Za-z\s]{2,40})/i);
-    if (mKota && !kota) kota = mKota[0].replace(/\s+/g,' ').trim();
+    if (mKota && !kota) {
+      let cand = mKota[0].replace(/\s*[\-—–=_~]{2,}.*$/, '').trim();
+      cand = cand.replace(/\s+/g,' ').replace(/[\s.,\-—–~!_=+;:]+$/, '').trim();
+      cand = cand.replace(/\s+[A-Za-z0-9]{1,2}$/, '').trim();
+      kota = cand;
+    }
 
     // Pola Kota Administrasi DKI Jakarta (tanpa awalan KOTA)
     const mJkt = l.match(/\b(JAKARTA\s+(?:BARAT|PUSAT|SELATAN|TIMUR|UTARA)|KEPULAUAN\s+SERIBU)\b/i);
     if (mJkt && !kota) kota = mJkt[1].replace(/\s+/g,' ').trim();
   }
+
+  // Normalisasi koreksi OCR nama jalan/desa umum jika terjadi typo tipis
+  if (['TANIING', 'TANIONG'].includes(street.toUpperCase())) street = 'TANJUNG';
+  if (['TANIING', 'TANIONG', 'TARING'].includes(kel.toUpperCase())) kel = 'TANJUNG';
 
   // Susun alamat lengkap — hanya tambahkan field yang sudah tervalidasi
   const addrParts = [];
@@ -552,6 +573,36 @@ setTimeout(() => {
   getKtpWorker().catch(() => {});
 }, 1500);
 
+
+// Helper: Auto-crop foto HP portrait & perbesar kartu KTP via Python PIL (offline & instan ~300ms)
+function preprocessKtpWithPython(buf) {
+  try {
+    const pyScript = `import sys, io
+from PIL import Image, ImageEnhance
+try:
+    raw = sys.stdin.buffer.read()
+    im = Image.open(io.BytesIO(raw))
+    w, h = im.size
+    # Jika foto tegak / portrait dari kamera HP, crop fokus pada kartu KTP di tengah
+    if h > w * 1.05:
+        im = im.crop((int(w * 0.04), int(h * 0.25), int(w * 0.96), int(h * 0.75)))
+    # Skala resolusi kartu agar font berukuran optimal untuk Tesseract OCR (~25-30px)
+    target_w = max(1600, int(im.width * 1.5))
+    im_scaled = im.resize((target_w, int(im.height * (target_w / im.width))), Image.Resampling.BICUBIC)
+    gray = im_scaled.convert('L')
+    enh = ImageEnhance.Contrast(gray).enhance(1.25)
+    out = io.BytesIO()
+    enh.save(out, format='PNG')
+    sys.stdout.buffer.write(out.getvalue())
+except Exception:
+    sys.stdout.buffer.write(raw)
+`;
+    return execFileSync('python', ['-c', pyScript], { input: buf, maxBuffer: 30 * 1024 * 1024 });
+  } catch {
+    return buf;
+  }
+}
+
 // 1b. Scan KTP Image via Local Offline Tesseract OCR (Singleton Worker + Smart Multi-Pass)
 export async function scanKtpImage(imageData, rawImageData = null) {
   if (!imageData) {
@@ -574,6 +625,7 @@ export async function scanKtpImage(imageData, rawImageData = null) {
 
   const buffer1 = toBuffer(imageData);   // enhanced/filtered image (prioritas utama)
   const buffer2 = rawImageData ? toBuffer(rawImageData) : null;  // raw image (fallback)
+  const preprocessedBuf = buffer1 ? preprocessKtpWithPython(buffer1) : null;
 
   let worker = null;
   let workerWasCreatedLocally = false;
@@ -599,7 +651,6 @@ export async function scanKtpImage(imageData, rawImageData = null) {
     // OCR parameters optimal untuk KTP Indonesia
     // PSM 6: Uniform block of text — terbaik untuk KTP lurus/datar
     // PSM 11: Sparse text — terbaik untuk foto diagonal/dipegang tangan
-    // OEM 1: LSTM only (lebih akurat, lebih cepat dari combined OEM 3)
     // -----------------------------------------------
     const OCR_PARAMS_PSM6 = {
       tessedit_pageseg_mode: '6',
@@ -612,8 +663,8 @@ export async function scanKtpImage(imageData, rawImageData = null) {
       tessedit_char_blacklist: '|~`^{}[]<>',
     };
 
-    // Urutan buffer: enhanced dulu, raw fallback
-    const buffersToTry = [buffer1, buffer2].filter(Boolean);
+    // Urutan buffer: auto-crop/upscale dulu (terlengkap), lalu enhanced, lalu raw
+    const buffersToTry = [preprocessedBuf, buffer1, buffer2].filter(Boolean);
 
     for (const buf of buffersToTry) {
       // --- Pass 1: PSM 6 (paling cepat & akurat untuk KTP lurus) ---

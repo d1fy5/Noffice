@@ -47,8 +47,8 @@ function applyKtpEnhancement(canvas) {
         const lf = Math.min(255, Math.max(0, ((gray[p - 1] - pLow) / range) * 255));
         const rt = Math.min(255, Math.max(0, ((gray[p + 1] - pLow) / range) * 255));
 
-        // Laplacian sharpening terukur: mempertajam tepi huruf KTP tanpa merusak font
-        const sharp = norm + 1.25 * (norm - 0.25 * (up + dn + lf + rt));
+        // Laplacian sharpening halus: mempertajam tepi huruf KTP tanpa merusak font atau menggabungkan spasi antar-kata
+        const sharp = norm + 0.45 * (norm - 0.25 * (up + dn + lf + rt));
         const val = Math.min(255, Math.max(0, Math.round(sharp)));
 
         const idx = p * 4;
@@ -314,29 +314,42 @@ export default function KtpScanner({ onExtracted, notify }) {
 
     img.onload = () => {
       try {
-        // Optimal: 1600px lebar untuk foto dari kamera HP resolusi tinggi
-        // Cukup tajam untuk Tesseract OCR + tidak crash di mobile (< 8MB canvas)
-        const maxDim = 1600;
-        let w = img.width;
-        let h = img.height;
-        // Jangan perkecil jika sudah di bawah 1600px (pertahankan resolusi asli)
-        if (w > maxDim || h > maxDim) {
-          if (w > h) {
-            h = Math.round((h * maxDim) / w);
-            w = maxDim;
-          } else {
-            w = Math.round((w * maxDim) / h);
-            h = maxDim;
+        let srcX = 0, srcY = 0, srcW = img.width, srcH = img.height;
+        let targetW = img.width, targetH = img.height;
+
+        // Jika foto berorientasi tegak / portrait (foto HP dengan KTP mendatar di tengah):
+        // Fokuskan cropping otomatis pada area kartu KTP di tengah (rasio KTP ~1.58:1)
+        if (img.height > img.width * 1.05) {
+          srcW = Math.round(img.width * 0.94);
+          srcH = Math.min(img.height, Math.round(srcW / 1.58));
+          srcX = Math.max(0, Math.round((img.width - srcW) / 2));
+          srcY = Math.max(0, Math.round((img.height - srcH) / 2));
+          targetW = Math.max(1600, srcW);
+          targetH = Math.round(targetW / 1.58);
+        } else {
+          // Jika sudah landscape, pastikan resolusi minimal 1600px untuk ketajaman OCR
+          const maxDim = 1800;
+          if (img.width < 1400) {
+            targetW = 1600;
+            targetH = Math.round((img.height * 1600) / img.width);
+          } else if (img.width > maxDim || img.height > maxDim) {
+            if (img.width > img.height) {
+              targetH = Math.round((img.height * maxDim) / img.width);
+              targetW = maxDim;
+            } else {
+              targetW = Math.round((img.width * maxDim) / img.height);
+              targetH = maxDim;
+            }
           }
         }
 
         const canvas = document.createElement('canvas');
-        canvas.width = w;
-        canvas.height = h;
+        canvas.width = targetW;
+        canvas.height = targetH;
         const ctx = canvas.getContext('2d');
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = 'high';
-        ctx.drawImage(img, 0, 0, w, h);
+        ctx.drawImage(img, srcX, srcY, srcW, srcH, 0, 0, targetW, targetH);
 
         // Raw: simpan JPEG 92% sebagai referensi warna asli
         const rawUrl = canvas.toDataURL('image/jpeg', 0.92);
