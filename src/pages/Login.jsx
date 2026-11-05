@@ -57,10 +57,11 @@ export default function Login() {
             <input 
               type="email" 
               className="form-control" 
-              placeholder="admin@noffice.com"
+              placeholder="nama@email.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={loading}
+              autoComplete="username"
             />
           </div>
           <div className="form-group">
@@ -72,19 +73,13 @@ export default function Login() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               disabled={loading}
+              autoComplete="current-password"
             />
           </div>
           <Button variant="primary" className="btn-full" type="submit" disabled={loading}>
             {loading ? 'Memeriksa...' : 'Masuk'}
           </Button>
         </form>
-
-        <div className="login-hint">
-          <p><strong>Demo Akun:</strong></p>
-          <p>Admin Notaris: admin@noffice.com / admin123</p>
-          <p>Staf Notaris: dewi@noffice.com / dewi123</p>
-          <p>Staf PPAT: andi@noffice.com / andi123</p>
-        </div>
       </div>
     </div>
   );
