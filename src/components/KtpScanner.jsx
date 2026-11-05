@@ -244,11 +244,11 @@ export default function KtpScanner({ onExtracted, notify }) {
     const startX = Math.max(0, Math.round((vw - cropW) / 2));
     const startY = Math.max(0, Math.round((vh - cropH) / 2));
 
-    // Target resolusi optimal untuk OCR Tesseract (resolusi diperbesar agar karakter huruf tidak buram)
-    const targetW = Math.max(cropW, 1200);
+    // Target resolusi optimal: 1600px lebar agar huruf kecil KTP terbaca jelas Tesseract
+    const targetW = Math.max(cropW, 1600);
     const targetH = Math.round(targetW / 1.58);
 
-    // Canvas 1: Raw photo cropped & upscaled high quality
+    // Canvas 1: Raw photo cropped & upscaled high quality (JPEG 95% sebagai backup warna)
     const rawCanvas = document.createElement('canvas');
     rawCanvas.width = targetW;
     rawCanvas.height = targetH;
@@ -259,14 +259,15 @@ export default function KtpScanner({ onExtracted, notify }) {
     const rawDataUrl = rawCanvas.toDataURL('image/jpeg', 0.95);
     setRawCaptured(rawDataUrl);
 
-    // Canvas 2: Filtered & contrast-enhanced for OCR
+    // Canvas 2: Filtered & contrast-enhanced - PNG lossless agar tidak ada artefak JPEG
+    // yang merusak ketajaman huruf OCR (sangat penting untuk NIK dan nama berukuran kecil)
     const filterCanvas = document.createElement('canvas');
     filterCanvas.width = targetW;
     filterCanvas.height = targetH;
     const filterCtx = filterCanvas.getContext('2d');
     filterCtx.drawImage(rawCanvas, 0, 0);
     applyKtpEnhancement(filterCanvas);
-    const enhancedDataUrl = filterCanvas.toDataURL('image/jpeg', 0.95);
+    const enhancedDataUrl = filterCanvas.toDataURL('image/png');
 
     setCapturedImage(enhancedDataUrl);
     stopStream();
@@ -288,7 +289,7 @@ export default function KtpScanner({ onExtracted, notify }) {
         const ctx = c.getContext('2d');
         ctx.drawImage(img, 0, 0);
         applyKtpEnhancement(c);
-        setCapturedImage(c.toDataURL('image/jpeg', 0.95));
+        setCapturedImage(c.toDataURL('image/png')); // PNG lossless untuk OCR akurat
       };
       img.src = rawCaptured;
     }
@@ -313,10 +314,12 @@ export default function KtpScanner({ onExtracted, notify }) {
 
     img.onload = () => {
       try {
-        // Skala ramah mobile: maks 1200px (sangat tajam untuk OCR KTP dan hemat memori)
-        const maxDim = 1200;
+        // Optimal: 1600px lebar untuk foto dari kamera HP resolusi tinggi
+        // Cukup tajam untuk Tesseract OCR + tidak crash di mobile (< 8MB canvas)
+        const maxDim = 1600;
         let w = img.width;
         let h = img.height;
+        // Jangan perkecil jika sudah di bawah 1600px (pertahankan resolusi asli)
         if (w > maxDim || h > maxDim) {
           if (w > h) {
             h = Math.round((h * maxDim) / w);
@@ -331,15 +334,18 @@ export default function KtpScanner({ onExtracted, notify }) {
         canvas.width = w;
         canvas.height = h;
         const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
         ctx.drawImage(img, 0, 0, w, h);
 
-        // Kualitas kompresi 0.85 (file ringkas ~150KB, anti crash di browser HP)
-        const rawUrl = canvas.toDataURL('image/jpeg', 0.85);
+        // Raw: simpan JPEG 92% sebagai referensi warna asli
+        const rawUrl = canvas.toDataURL('image/jpeg', 0.92);
         setRawCaptured(rawUrl);
 
-        // Terapkan filter ketajaman teks
+        // Enhanced: PNG lossless agar tidak ada artefak kompresi yang merusak huruf OCR
+        // PNG lebih besar tetapi WAJIB untuk akurasi OCR huruf tipis KTP
         applyKtpEnhancement(canvas);
-        const enhancedUrl = canvas.toDataURL('image/jpeg', 0.85);
+        const enhancedUrl = canvas.toDataURL('image/png');
         setCapturedImage(enhancedUrl);
         setScanFailed(false);
       } catch (err) {

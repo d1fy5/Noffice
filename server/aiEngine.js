@@ -88,7 +88,7 @@ export async function checkAiStatus() {
   };
 }
 
-// 1. AI Data Extractor (KTP / Berkas Teks)
+// 1. AI Data Extractor (KTP / Berkas Teks) — Versi Presisi Tinggi
 export async function extractDocumentData(rawText) {
   if (!rawText || !rawText.trim()) {
     return { success: false, message: 'Teks kosong' };
@@ -116,220 +116,246 @@ export async function extractDocumentData(rawText) {
     }
   }
 
-  // Built-in Smart NLP Extractor (Offline Resilient Parser)
-  const data = {
-    nik: '',
-    name: '',
-    birthdate: '',
-    address: '',
-    phone: '',
-    job: '',
-    npwp: '',
-  };
+  // ============================================================
+  // Built-in Smart NLP Extractor — Presisi Tinggi untuk KTP RI
+  // ============================================================
+  const data = { nik: '', name: '', birthdate: '', address: '', phone: '', job: '', npwp: '' };
 
-  const lines = rawText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  // Normalisasi: hapus karakter sampah OCR, pisahkan baris
+  const cleanText = rawText
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    // Perbaiki OCR artefak umum pada KTP: titik dua kadang jadi '.' atau '|'
+    .replace(/(?<=(?:NIK|Nama|Alamat|Lahir|Pekerjaan|Kelamin|Agama|Darah|Status|Kecamatan|Kelurahan|Desa|Kewarganegaraan|Berlaku))\s*[.|;,]\s*/gi, ': ');
 
-  // 1. NIK Extractor (16 digit persis, toleransi spasi, atau perbaikan subtitusi OCR)
-  const nikExact = rawText.match(/\b\d{16}\b/);
-  if (nikExact) {
-    data.nik = nikExact[0];
-  } else {
-    // Toleransi spasi/titik pada 16 digit: e.g. "3171 0123 0485 0001"
-    const spacedNik = rawText.match(/\b(?:\d[\s.-]?){15}\d\b/);
-    if (spacedNik) {
-      const cleanDigits = spacedNik[0].replace(/[\s.-]/g, '');
-      if (cleanDigits.length === 16) {
-        data.nik = cleanDigits;
+  const lines = cleanText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+
+  // ---- 1. NIK Extractor ----
+  // Prioritas 1: 16 digit berurutan di baris yang mengandung NIK
+  for (const l of lines) {
+    // Baris yang dimulai dengan label NIK
+    if (/^(?:NIK|N1K|N!K|Nomor\s*Induk\s*Kependudukan)/i.test(l)) {
+      const digits = l.replace(/^(?:NIK|N1K|N!K|Nomor|Induk|Kependudukan)[\s:=.]*/i, '')
+        .replace(/[OoDd]/g, '0').replace(/[Ili|!]/g, '1').replace(/[Zz]/g, '2')
+        .replace(/[Ss]/g, '5').replace(/[Bb]/g, '8').replace(/[gq]/g, '9')
+        .replace(/[^\d]/g, '');
+      if (digits.length >= 16) { data.nik = digits.slice(0, 16); break; }
+    }
+  }
+
+  if (!data.nik) {
+    // Prioritas 2: Pola 16 digit berurutan di mana saja (paling umum)
+    const m16 = rawText.match(/\b(\d{16})\b/);
+    if (m16) {
+      data.nik = m16[1];
+    } else {
+      // Toleransi spasi: "3171 0123 0485 0001"
+      const mSpace = rawText.match(/\b(\d{4}[\s.-]\d{4}[\s.-]\d{4}[\s.-]\d{4})\b/);
+      if (mSpace) {
+        const clean = mSpace[1].replace(/[\s.-]/g, '');
+        if (clean.length === 16) data.nik = clean;
       }
     }
   }
 
   if (!data.nik) {
+    // Prioritas 3: Baris yang hampir seluruhnya digit (OCR misread NIK)
     for (const l of lines) {
-      if (/(?:NIK|N1K|N!K|Nomor\s*Induk)/i.test(l) || /^[0-9OIlZSBgq\s-]{16,28}$/i.test(l)) {
-        let norm = l.replace(/^(?:NIK|N1K|N!K|Nomor|Induk|Kependudukan)[\s:=.]*/i, '');
-        norm = norm.replace(/[OoDd]/g, '0')
-                   .replace(/[Ili|!]/g, '1')
-                   .replace(/[Zz]/g, '2')
-                   .replace(/[Ss]/g, '5')
-                   .replace(/[Bb]/g, '8')
-                   .replace(/[gq]/g, '9')
-                   .replace(/[^0-9]/g, '');
-        if (norm.length >= 16) {
-          data.nik = norm.slice(0, 16);
-          break;
-        }
+      if (/^[0-9OIlZSBDgqo\s.,-]{14,22}$/.test(l)) {
+        const norm = l
+          .replace(/[Oo]/g, '0').replace(/[Ili|!]/g, '1').replace(/[Zz]/g, '2')
+          .replace(/[Ss]/g, '5').replace(/[Bb]/g, '8').replace(/[gq]/g, '9')
+          .replace(/[^\d]/g, '');
+        if (norm.length === 16) { data.nik = norm; break; }
       }
     }
   }
 
-  // 2. NPWP Extractor
+  // ---- 2. NPWP ----
   const npwpMatch = rawText.match(/\b\d{2}[\s.-]?\d{3}[\s.-]?\d{3}[\s.-]?\d{1}[\s.-]?\d{3}[\s.-]?\d{3}\b/);
   if (npwpMatch) data.npwp = npwpMatch[0];
 
-  // 3. Phone Extractor
-  const phoneMatch = rawText.match(/\b(08\d{8,11}|\+628\d{8,11})\b/);
+  // ---- 3. Phone ----
+  const phoneMatch = rawText.match(/\b(0\d{9,13}|\+62\d{9,13})\b/);
   if (phoneMatch) data.phone = phoneMatch[0];
 
-  // 4. Name Extractor (Mendukung Nama, Name, Nama/Name bilingual, multi-baris, dan urutan setelah NIK)
+  // ---- 4. Nama ----
+  // Kata-kata yang BUKAN nama (untuk filter)
+  const NON_NAME_WORDS = /^(?:REPUBLIK|INDONESIA|PROVINSI|KABUPATEN|KOTA|KARTU|TANDA|PENDUDUK|GOLONGAN|DARAH|WARGA|NEGARA|SEUMUR|HIDUP|KAWIN|BELUM|CERAI|ISLAM|KRISTEN|KATOLIK|HINDU|BUDHA|KONGHUCU|LAKI|PEREMPUAN|WNI|WNA|PETANI|PELAJAR|MAHASISWA|WIRASWASTA|KARYAWAN|PEGAWAI|BURUH|MENGURUS|RUMAH|TANGGA|PENSIUNAN|TNI|POLRI|DOKTER|GURU|DOSEN|BIDAN|PERAWAT|BERLAKU|SEUMUR|HIDUP|NOMOR|INDUK|KEPENDUDUKAN|JENIS|KELAMIN|AGAMA|STATUS|PERKAWINAN|PEKERJAAN|KEWARGANEGARAAN|ALAMAT|KELURAHAN|DESA|KECAMATAN|RT|RW)$/i;
+
+  // Fungsi clean nama
+  function cleanNameCandidate(s) {
+    // Hapus prefix label
+    s = s.replace(/^(?:Nama|Narna|Narria|Marna|Hama|N\s*ama|NAMA)(?:\s*\/\s*Name)?\s*[:=.\-|;!]\s*/i, '');
+    s = s.replace(/^\/\s*Name\s*[:=.\-|;!]?\s*/i, '');
+    // Hapus suffix yang bukan nama (Tempat Tgl Lahir biasanya ada setelah nama)
+    s = s.replace(/\s*(?:Tempat|TTL|Tgl|Lahir|Jenis|Kelamin|Gol|Agama|Status|Berlaku|Alamat|NIK|RT|RW).*$/i, '');
+    // Hapus digit dan simbol yang tidak wajar dalam nama
+    s = s.replace(/[0-9#@$%^&*()_+=\[\]{};:"<>?,\/\\]/g, '');
+    // Hapus tanda titik dan koma di awal/akhir
+    s = s.replace(/^[.,!|\-]+|[.,!|\-]+$/g, '').trim();
+    return s;
+  }
+
   let nameFound = '';
+
+  // Metode 1: Cari label "Nama" eksplisit
   for (let i = 0; i < lines.length; i++) {
     const l = lines[i];
-    if (/(?:Nama|Narna|Narria|Marna|Hama|N\s*ama|Atas\s*Nama)(?:\s*[\/|]\s*Name)?\s*[:=.\-!|;]?\s*(.*)/i.test(l)) {
-      const match = l.match(/(?:Nama|Narna|Narria|Marna|Hama|N\s*ama|Atas\s*Nama)(?:\s*[\/|]\s*Name)?\s*[:=.\-!|;]?\s*(.*)/i);
-      let cand = (match[1] || '').trim();
-      cand = cand.replace(/^[\/|]?\s*Name\s*[:=.\-!|;]?\s*/i, '').trim();
-
+    if (/^(?:Nama|Narna|Narria|Marna|Hama|N\s*ama)(?:\s*\/\s*Name)?\s*[:=.\-|;!]?/i.test(l)) {
+      let cand = cleanNameCandidate(l);
+      // Jika baris label kosong, ambil baris berikutnya
       if (!cand && i + 1 < lines.length) {
-        const next = lines[i + 1].trim();
-        if (!/(?:Tempat|TTL|NIK|Provinsi|Kabupaten|Kota|Agama|Jenis|Gol|Alamat)/i.test(next)) {
-          cand = next;
+        const nextLine = lines[i + 1];
+        if (!/^(?:Tempat|TTL|Tgl|NIK|Provinsi|Kabupaten|Kota|Agama|Jenis|Gol|Alamat|RT|Status)/i.test(nextLine)) {
+          cand = cleanNameCandidate(nextLine);
         }
       }
-      if (cand && cand.length > 2) {
-        nameFound = cand;
-        break;
-      }
-    }
-  }
-
-  // Fallback 1: Baris di bawah NIK (Standar tata letak KTP: NIK -> NAMA)
-  if (!nameFound && data.nik) {
-    const nikIdx = lines.findIndex(l => l.includes(data.nik));
-    if (nikIdx !== -1) {
-      for (let offset = 1; offset <= 3 && nikIdx + offset < lines.length; offset++) {
-        let candLine = lines[nikIdx + offset].trim();
-        candLine = candLine.replace(/^(?:Nama|Narna|NAMA)(?:\s*[\/|]\s*Name)?\s*[:=.\-!|;]?\s*/i, '').trim();
-        candLine = candLine.replace(/^[\/|]?\s*Name\s*[:=.\-!|;]?\s*/i, '').trim();
-        if (candLine.length <= 2 || /^[^a-zA-Z]+$/.test(candLine)) continue;
-        if (/(?:Tempat|TTL|Alamat|Agama|Jenis|Gol|Provinsi|Kota|Kabupaten|NIK)/i.test(candLine)) break;
-        if (/[A-Z]/.test(candLine)) {
-          nameFound = candLine;
+      // Validasi: minimal 3 huruf, minimal 2 kata atau 1 kata panjang >3
+      if (cand && cand.length >= 3 && /[A-Za-z]/.test(cand)) {
+        const words = cand.trim().split(/\s+/).filter(w => w.length > 0);
+        if (words.length >= 1 && !NON_NAME_WORDS.test(cand.trim())) {
+          nameFound = cand.trim();
           break;
         }
       }
     }
   }
 
-  // Fallback 2: Cari baris berhuruf kapital 2 kata atau lebih (Format nama KTP Indonesia)
+  // Metode 2: Baris tepat di bawah NIK (layout standar KTP RI)
+  if (!nameFound && data.nik) {
+    const nikLineIdx = lines.findIndex(l => l.replace(/[\s.,-]/g, '').includes(data.nik));
+    if (nikLineIdx !== -1) {
+      for (let off = 1; off <= 3 && nikLineIdx + off < lines.length; off++) {
+        let cand = cleanNameCandidate(lines[nikLineIdx + off]);
+        if (!cand || cand.length < 3) continue;
+        if (/^(?:Tempat|TTL|Tgl|Alamat|Agama|Jenis|Gol|Provinsi|Kota|Kabupaten|RT|Status)/i.test(cand)) break;
+        // Nama di KTP biasanya huruf kapital atau Title Case
+        if (/[A-Za-z]{2}/.test(cand) && !NON_NAME_WORDS.test(cand.trim())) {
+          nameFound = cand.trim();
+          break;
+        }
+      }
+    }
+  }
+
+  // Metode 3: Fallback — baris ALL CAPS 2+ kata yang bukan kata kunci (format KTP lama)
   if (!nameFound) {
     for (const l of lines) {
-      const cleaned = l.replace(/^(?:Nama|Narna|NAMA)(?:\s*[\/|]\s*Name)?\s*[:=.\-!|;]?\s*/i, '').trim();
-      if (/^[A-Z\s.,'-]{4,40}$/.test(cleaned) && cleaned.split(/\s+/).length >= 2) {
-        if (!/(?:REPUBLIK|INDONESIA|PROVINSI|KABUPATEN|KOTA|KARTU|TANDA|PENDUDUK|GOLONGAN|DARAH|WARGA|NEGARA|SEUMUR|HIDUP|BELUM|KAWIN|ISLAM|KRISTEN|HINDU|BUDHA|KEHUTANAN)/i.test(cleaned)) {
-          nameFound = cleaned;
-          break;
-        }
-      }
+      // Harus mengandung huruf, 4-50 karakter, hanya huruf+spasi+titik+apostrof
+      if (!/^[A-Z][A-Z\s.,'\-]{3,49}$/.test(l)) continue;
+      const words = l.trim().split(/\s+/);
+      if (words.length < 2) continue;
+      // Pastikan tidak satupun kata adalah kata kunci
+      if (words.some(w => NON_NAME_WORDS.test(w))) continue;
+      nameFound = l.trim();
+      break;
     }
   }
 
   if (nameFound) {
-    nameFound = nameFound.replace(/^(?:Nama|Narna|Narria|N\s*ama|NAMA|Atas\s*Nama)(?:\s*[\/|]\s*Name)?\s*[:=.\-!|;]?\s*/i, '');
-    nameFound = nameFound.replace(/^[\/|]?\s*Name\s*[:=.\-!|;]?\s*/i, '');
-    nameFound = nameFound.replace(/(?:Tempat|TTL|Jenis|Kelamin|Gol|Darah|Alamat|Agama|Status).*$/i, '').trim();
-    nameFound = nameFound.replace(/[^a-zA-Z\s.,'-]/g, '').trim();
-    if (nameFound.length > 2) {
-      data.name = nameFound;
+    // Judul kasus yang lebih manusiawi jika semua kapital
+    if (nameFound === nameFound.toUpperCase() && nameFound.length > 3) {
+      nameFound = nameFound.replace(/\b\w/g, c => c.toUpperCase()).replace(/\b(\w)/g, (_, c) => c.toUpperCase());
+      // Kembalikan ke all caps karena format KTP memang kapital
     }
+    // Batas panjang wajar
+    if (nameFound.length > 60) nameFound = nameFound.slice(0, 60).trim();
+    data.name = nameFound;
   }
 
-  // 5. Tanggal Lahir (Mendukung DD-MM-YYYY, nama bulan teks, dan toleransi OCR typo)
+  // ---- 5. Tanggal Lahir ----
   const monthMap = {
-    januari: '01', jan: '01',
+    januari: '01', jan: '01', february: '02',
     februari: '02', pebruari: '02', feb: '02',
-    maret: '03', mar: '03',
+    maret: '03', march: '03', mar: '03',
     april: '04', apr: '04',
     mei: '05', may: '05',
-    juni: '06', jun: '06',
-    juli: '07', jul: '07',
-    agustus: '08', agu: '08', ags: '08',
-    september: '09', sep: '09',
-    oktober: '10', okt: '10', oct: '10',
+    juni: '06', june: '06', jun: '06',
+    juli: '07', july: '07', jul: '07',
+    agustus: '08', august: '08', agu: '08', ags: '08', aug: '08',
+    september: '09', sep: '09', sept: '09',
+    oktober: '10', october: '10', okt: '10', oct: '10',
     november: '11', nopember: '11', nov: '11',
-    desember: '12', dec: '12', des: '12'
+    desember: '12', december: '12', dec: '12', des: '12'
   };
 
   let dateFound = '';
+  // Cari di baris yang mengandung Tempat/TTL atau digit tanggal
   for (const l of lines) {
-    const cleanLine = l.replace(/(\d{1,2})[-/. ][OoDd](\d)[-/. ]/g, '$1-0$2-')
-                       .replace(/(\d{1,2})[-/. ](\d)[-/. ][12][90][0-9SOB]{2}/g, (m) => m.replace(/S/g, '5').replace(/O/g, '0').replace(/B/g, '8'));
+    // Bersihkan substitusi OCR umum pada digit tahun
+    const cl = l
+      .replace(/[Oo]/g, '0').replace(/[Ss]/g, '5').replace(/[Bb]/g, '8')
+      .replace(/[Il]/g, '1').replace(/[Zz]/g, '2');
 
-    const numMatch = cleanLine.match(/\b(\d{1,2})[-/. ](\d{1,2})[-/. ](\d{4})\b/);
-    if (numMatch) {
-      const d = String(numMatch[1]).padStart(2, '0');
-      const m = String(numMatch[2]).padStart(2, '0');
-      const y = numMatch[3];
-      if (Number(m) >= 1 && Number(m) <= 12 && Number(d) >= 1 && Number(d) <= 31 && Number(y) >= 1930 && Number(y) <= 2025) {
-        dateFound = `${y}-${m}-${d}`;
-        break;
+    // Format: DD-MM-YYYY atau DD/MM/YYYY atau DD MM YYYY
+    const m1 = cl.match(/\b(\d{1,2})[-\/. ](\d{1,2})[-\/. ]((?:19|20)\d{2})\b/);
+    if (m1) {
+      const d = String(m1[1]).padStart(2, '0');
+      const mo = String(m1[2]).padStart(2, '0');
+      const y = m1[3];
+      if (+mo >= 1 && +mo <= 12 && +d >= 1 && +d <= 31) {
+        dateFound = `${y}-${mo}-${d}`; break;
       }
     }
 
-    const textMonthMatch = l.match(/(\d{1,2})[\s\-]+([A-Za-z]{3,10})[\s\-]+(\d{4})/);
-    if (textMonthMatch) {
-      const d = String(textMonthMatch[1]).padStart(2, '0');
-      const mStr = textMonthMatch[2].toLowerCase();
-      const y = textMonthMatch[3];
-      if (monthMap[mStr]) {
-        dateFound = `${y}-${monthMap[mStr]}-${d}`;
-        break;
-      }
+    // Format: DD MonthName YYYY (e.g. "01 Januari 1990")
+    const m2 = l.match(/(\d{1,2})[\s\-]+(\w{3,12})[\s\-]+((?:19|20)\d{2})/);
+    if (m2) {
+      const d = String(m2[1]).padStart(2, '0');
+      const mStr = m2[2].toLowerCase();
+      const y = m2[3];
+      if (monthMap[mStr]) { dateFound = `${y}-${monthMap[mStr]}-${d}`; break; }
     }
   }
   data.birthdate = dateFound;
 
-  // Derivasi Tanggal Lahir otomatis dari digit NIK jika belum terbaca (Standar Resmi Kemendagri)
+  // Auto-derivasi dari NIK jika tanggal lahir tidak terbaca
   if (!data.birthdate && data.nik && data.nik.length === 16) {
     const rawDay = parseInt(data.nik.slice(6, 8), 10);
     const month = parseInt(data.nik.slice(8, 10), 10);
     const rawYear = parseInt(data.nik.slice(10, 12), 10);
     const day = rawDay > 40 ? rawDay - 40 : rawDay;
     if (day >= 1 && day <= 31 && month >= 1 && month <= 12) {
-      const currentYearYY = new Date().getFullYear() % 100;
-      const fullYear = rawYear > currentYearYY ? 1900 + rawYear : 2000 + rawYear;
+      const cyy = new Date().getFullYear() % 100;
+      const fullYear = rawYear > cyy ? 1900 + rawYear : 2000 + rawYear;
       data.birthdate = `${fullYear}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     }
   }
 
-  // 6. Alamat Lengkap (Jalan + RT/RW + Kelurahan + Kecamatan + Kota/Kabupaten)
-  let street = '';
-  let rtrw = '';
-  let kel = '';
-  let kec = '';
-  let kota = '';
-
+  // ---- 6. Alamat ----
+  let street = '', rtrw = '', kel = '', kec = '', kota = '';
   for (let i = 0; i < lines.length; i++) {
     const l = lines[i];
-    if (/(?:Alamat|Alarnat|Address)\s*[:=.]?\s*(.*)/i.test(l)) {
-      let cand = l.replace(/(?:Alamat|Alarnat|Address)\s*[:=.]?\s*/i, '').trim();
+    // Jalan / Alamat
+    if (/^(?:Alamat|Alarnat|Alam[ae]t|Adarnat)\s*[:=.]?/i.test(l)) {
+      let cand = l.replace(/^(?:Alamat|Alarnat|Alam[ae]t|Adarnat)\s*[:=.]?\s*/i, '').trim();
       if (!cand && i + 1 < lines.length) {
-        const next = lines[i + 1].trim();
-        if (!/(?:RT|RW|Kel|Desa|Kecamatan|Kecarnatan|Agama)/i.test(next)) {
-          cand = next;
-        }
+        const nx = lines[i + 1];
+        if (!/^(?:RT|RW|Kel|Desa|Kecamatan|Agama)/i.test(nx)) cand = nx;
       }
       if (cand) street = cand;
     }
-    if (!street && /^(?:Jl|Jalan|Gg|Gang|Komplek|Blok|Kp|Kampung)\b/i.test(l)) {
+    if (!street && /^(?:Jl\.?|Jalan|Gg\.?|Gang|Komp\.?|Komplek|Blok|Kp\.?|Kampung|Perum)/i.test(l)) {
       street = l;
     }
-
-    const mRt = l.match(/RT[\/\s.]*RW\s*[:=.]?\s*([0-9OIl/\s-]+)/i);
-    if (mRt) {
-      rtrw = mRt[1].replace(/[Oo]/g, '0').replace(/[Il]/g, '1').replace(/\s/g, '').trim();
+    // RT/RW
+    const mRt = l.match(/RT\s*[\/.:]?\s*(\d{1,3})\s*[\/.\-]?\s*RW\s*[\/.:]?\s*(\d{1,3})/i);
+    if (mRt) rtrw = `${mRt[1].padStart(3,'0')}/${mRt[2].padStart(3,'0')}`;
+    else {
+      const mRt2 = l.match(/RT\/RW\s*[:=.]?\s*([0-9OIl\/\s-]+)/i);
+      if (mRt2) rtrw = mRt2[1].replace(/[Oo]/g,'0').replace(/[Il]/g,'1').replace(/\s/g,'').trim();
     }
-
-    const mKel = l.match(/(?:Kel[\/\s.]*Desa|Kelurahan|Desa)\s*[:=.]?\s*([A-Za-z\s]+)/i);
-    if (mKel) kel = mKel[1].trim();
-
-    const mKec = l.match(/(?:Kecamatan|Kecarnatan|Kecamatarn|Kec[.:\s]+)\s*[:=.]?\s*([A-Za-z\s]+)/i);
-    if (mKec) kec = mKec[1].trim();
-
-    const mKota = l.match(/(?:KOTA|KABUPATEN|KAB[.]?)\s+([A-Za-z\s]+)/i);
-    if (mKota && !kota) kota = mKota[0].trim();
+    // Kelurahan/Desa
+    const mKel = l.match(/(?:Kel(?:urahan)?[\/\s.]*|Desa)\s*[:=.]?\s*([A-Za-z][A-Za-z\s]{1,40})/i);
+    if (mKel && !kel) kel = mKel[1].replace(/\s+/g,' ').trim();
+    // Kecamatan
+    const mKec = l.match(/(?:Kecamatan|Kec[.:\s])\s*[:=.]?\s*([A-Za-z][A-Za-z\s]{1,40})/i);
+    if (mKec && !kec) kec = mKec[1].replace(/\s+/g,' ').trim();
+    // Kota/Kabupaten
+    const mKota = l.match(/(?:KOTA|KABUPATEN|KAB[.:\s])\s+([A-Za-z][A-Za-z\s]{1,40})/i);
+    if (mKota && !kota) kota = mKota[0].replace(/\s+/g,' ').trim();
   }
-
   const addrParts = [];
   if (street) addrParts.push(street);
   if (rtrw) addrParts.push(`RT/RW ${rtrw}`);
@@ -338,55 +364,86 @@ export async function extractDocumentData(rawText) {
   if (kota) addrParts.push(kota);
   data.address = addrParts.join(', ');
 
-  // 7. Pekerjaan (Pekerjaan / Jabatan / Profesi + Fallback Daftar Pekerjaan Resmi KTP)
+  // ---- 7. Pekerjaan ----
   const occupations = [
-    'WIRASWASTA', 'KARYAWAN SWASTA', 'PEGAWAI NEGERI SIPIL', 'PNS',
+    'WIRASWASTA', 'KARYAWAN SWASTA', 'PEGAWAI NEGERI SIPIL', 'PNS', 'ASN',
     'PELAJAR/MAHASISWA', 'PELAJAR', 'MAHASISWA', 'BELUM/TIDAK BEKERJA',
     'MENGURUS RUMAH TANGGA', 'IBU RUMAH TANGGA', 'BURUH HARIAN LEPAS', 'BURUH',
     'PEDAGANG', 'PETANI/PEKEBUN', 'PETANI', 'PETERNAK', 'NELAYAN',
     'DOKTER', 'BIDAN', 'PERAWAT', 'GURU', 'DOSEN', 'PENGACARA', 'ADVOKAT',
     'NOTARIS', 'PPAT', 'AKUNTAN', 'KONSULTAN', 'ARSITEK', 'SOPIR', 'PENSIUNAN',
-    'TNI', 'POLRI', 'KARYAWAN BUMN', 'KARYAWAN BUMD'
+    'TNI', 'POLRI', 'KARYAWAN BUMN', 'KARYAWAN BUMD', 'SWASTA',
   ];
-
   let jobFound = '';
   for (let i = 0; i < lines.length; i++) {
     const l = lines[i];
-    if (/(?:Pekerjaan|Pekerjaarn|Pekeriaan|Profesi|Jabatan)\s*[:=.]?\s*(.*)/i.test(l)) {
-      let cand = l.replace(/(?:Pekerjaan|Pekerjaarn|Pekeriaan|Profesi|Jabatan)\s*[:=.]?\s*/i, '').trim();
+    if (/^(?:Pekerjaan|Pekerjaarn|Pekeriaan|Profesi|Jabatan)\s*[:=.]?/i.test(l)) {
+      let cand = l.replace(/^(?:Pekerjaan|Pekerjaarn|Pekeriaan|Profesi|Jabatan)\s*[:=.]?\s*/i, '').trim();
       if (!cand && i + 1 < lines.length) {
-        const next = lines[i + 1].trim();
-        if (!/(?:Kewarganegaraan|WNI|Agama|Berlaku)/i.test(next)) {
-          cand = next;
-        }
+        const nx = lines[i + 1];
+        if (!/^(?:Kewarganegaraan|WNI|Agama|Berlaku|Status)/i.test(nx)) cand = nx;
       }
       if (cand) {
-        cand = cand.replace(/(?:Kewarganegaraan|WNI|Agama|Berlaku).*$/i, '').trim();
-        jobFound = cand;
-        break;
+        cand = cand.replace(/(?:Kewarganegaraan|WNI|WNA|Agama|Berlaku|Status).*$/i, '').trim();
+        if (cand.length >= 3) { jobFound = cand; break; }
       }
     }
   }
-
   if (!jobFound) {
     const upperText = rawText.toUpperCase();
     for (const occ of occupations) {
-      if (upperText.includes(occ)) {
-        jobFound = occ;
-        break;
-      }
+      if (upperText.includes(occ)) { jobFound = occ; break; }
     }
   }
   data.job = jobFound;
 
-  return {
-    success: true,
-    data,
-    engine: 'Built-in Smart NLP Engine (100% Offline)',
-  };
+  return { success: true, data, engine: 'Built-in Smart NLP Engine v2 (100% Offline)' };
 }
 
-// 1b. Scan KTP Image via Local Offline Tesseract OCR (Multi-Pass & Resilient)
+// ============================================================
+// SINGLETON TESSERACT WORKER — Inisialisasi sekali, reuse terus.
+// Menghilangkan overhead 3-5 detik createWorker setiap request.
+// ============================================================
+let _ktpWorker = null;
+let _ktpWorkerReady = false;
+let _ktpWorkerBusy = false;
+let _ktpWorkerQueue = [];
+
+async function getKtpWorker() {
+  if (_ktpWorkerReady && !_ktpWorkerBusy) return _ktpWorker;
+
+  // Jika worker sedang dibuat oleh request lain, tunggu di antrian
+  if (!_ktpWorkerReady) {
+    if (!_ktpWorker) {
+      // Mulai inisialisasi worker
+      _ktpWorker = createWorker(['ind', 'eng'], 1, {
+        langPath: path.resolve('public/tessdata'),
+        cachePath: path.resolve('public/tessdata'),
+        errorHandler: (err) => console.warn('[Tesseract]', err),
+      }).then((w) => {
+        _ktpWorkerReady = true;
+        _ktpWorker = w;
+        console.log('[KTP OCR] Singleton worker siap.');
+        return w;
+      }).catch((err) => {
+        console.error('[KTP OCR] Gagal inisialisasi worker:', err.message);
+        _ktpWorker = null;
+        _ktpWorkerReady = false;
+        throw err;
+      });
+    }
+    return _ktpWorker; // Ini adalah Promise jika masih pending
+  }
+
+  return _ktpWorker;
+}
+
+// Warm-up worker saat server start (tidak blocking)
+setTimeout(() => {
+  getKtpWorker().catch(() => {});
+}, 1500);
+
+// 1b. Scan KTP Image via Local Offline Tesseract OCR (Singleton Worker + Smart Multi-Pass)
 export async function scanKtpImage(imageData, rawImageData = null) {
   if (!imageData) {
     return { success: false, message: 'Data gambar tidak ditemukan' };
@@ -406,91 +463,113 @@ export async function scanKtpImage(imageData, rawImageData = null) {
     return null;
   };
 
-  const buffer1 = toBuffer(imageData);
-  const buffer2 = rawImageData ? toBuffer(rawImageData) : null;
-  const buffersToTry = [buffer1, buffer2].filter(Boolean);
+  const buffer1 = toBuffer(imageData);   // enhanced/filtered image (prioritas utama)
+  const buffer2 = rawImageData ? toBuffer(rawImageData) : null;  // raw image (fallback)
 
   let worker = null;
+  let workerWasCreatedLocally = false;
   try {
-    worker = await createWorker(['ind', 'eng'], 1, {
-      langPath: path.resolve('public/tessdata'),
-      cachePath: path.resolve('public/tessdata'),
-      errorHandler: (err) => {
-        console.warn('Tesseract worker error handled safely:', err);
-      },
-    });
+    // Dapatkan singleton worker (atau buat lokal jika gagal)
+    try {
+      worker = await getKtpWorker();
+    } catch {
+      // Fallback: buat worker baru untuk request ini saja
+      worker = await createWorker(['ind', 'eng'], 1, {
+        langPath: path.resolve('public/tessdata'),
+        cachePath: path.resolve('public/tessdata'),
+      });
+      workerWasCreatedLocally = true;
+    }
 
-    let bestExtracted = null;
+    _ktpWorkerBusy = true;
+
     let combinedRawText = '';
+    let bestExtracted = null;
+
+    // -----------------------------------------------
+    // OCR parameters optimal untuk KTP Indonesia
+    // PSM 6: Uniform block of text — terbaik untuk KTP lurus/datar
+    // PSM 11: Sparse text — terbaik untuk foto diagonal/dipegang tangan
+    // OEM 1: LSTM only (lebih akurat, lebih cepat dari combined OEM 3)
+    // -----------------------------------------------
+    const OCR_PARAMS_PSM6 = {
+      tessedit_pageseg_mode: '6',
+      tessedit_ocr_engine_mode: '1',
+      preserve_interword_spaces: '1',
+      tessedit_char_blacklist: '|~`^{}[]<>',
+    };
+    const OCR_PARAMS_PSM11 = {
+      tessedit_pageseg_mode: '11',
+      tessedit_ocr_engine_mode: '1',
+      preserve_interword_spaces: '1',
+      tessedit_char_blacklist: '|~`^{}[]<>',
+    };
+
+    // Urutan buffer: enhanced dulu, raw fallback
+    const buffersToTry = [buffer1, buffer2].filter(Boolean);
 
     for (const buf of buffersToTry) {
-      // Pass 1: PSM 6 (single uniform block)
+      // --- Pass 1: PSM 6 (paling cepat & akurat untuk KTP lurus) ---
       try {
-        await worker.setParameters({
-          tessedit_pageseg_mode: '6',
-          preserve_interword_spaces: '1',
-        });
-        const ret1 = await worker.recognize(buf);
-        const t1 = ret1.data?.text || '';
+        await worker.setParameters(OCR_PARAMS_PSM6);
+        const r1 = await worker.recognize(buf);
+        const t1 = r1.data?.text || '';
         combinedRawText += '\n' + t1;
-        const ext1 = await extractDocumentData(t1);
-        if (ext1.data?.nik || (ext1.data?.name && ext1.data?.address)) {
-          bestExtracted = ext1;
+        const e1 = await extractDocumentData(t1);
+        const d1 = e1?.data || {};
+        const hasNik1 = d1.nik && d1.nik.length === 16;
+        const hasName1 = d1.name && d1.name.trim().length > 2;
+        if (hasNik1 && hasName1) {
+          bestExtracted = e1;
           break;
         }
-      } catch (err1) {
-        console.warn('PSM 6 error:', err1.message);
+        if (hasNik1) {
+          // NIK sudah ada, simpan sebagai kandidat terbaik sejauh ini
+          if (!bestExtracted) bestExtracted = e1;
+        }
+      } catch (e) {
+        console.warn('[KTP] PSM 6 error:', e.message);
       }
 
-      // Pass 2: PSM 11 (Sparse text - sangat efektif jika foto KTP dipegang tangan / ada background)
-      try {
-        await worker.setParameters({
-          tessedit_pageseg_mode: '11',
-          preserve_interword_spaces: '1',
-        });
-        const ret2 = await worker.recognize(buf);
-        const t2 = ret2.data?.text || '';
-        combinedRawText += '\n' + t2;
-        const ext2 = await extractDocumentData(combinedRawText);
-        if (ext2.data?.nik || (ext2.data?.name && ext2.data?.address)) {
-          bestExtracted = ext2;
-          break;
+      // --- Pass 2: PSM 11 hanya jika Pass 1 belum lengkap ---
+      if (!bestExtracted || !(bestExtracted.data?.nik && bestExtracted.data?.name)) {
+        try {
+          await worker.setParameters(OCR_PARAMS_PSM11);
+          const r2 = await worker.recognize(buf);
+          const t2 = r2.data?.text || '';
+          combinedRawText += '\n' + t2;
+          // Ekstrak dari teks gabungan semua pass (lebih banyak konteks = lebih akurat)
+          const e2 = await extractDocumentData(combinedRawText);
+          const d2 = e2?.data || {};
+          const hasNik2 = d2.nik && d2.nik.length === 16;
+          const hasName2 = d2.name && d2.name.trim().length > 2;
+          if (hasNik2 && hasName2) {
+            bestExtracted = e2;
+            break;
+          }
+          if (hasNik2 || hasName2) {
+            bestExtracted = e2;
+          }
+        } catch (e) {
+          console.warn('[KTP] PSM 11 error:', e.message);
         }
-      } catch (err2) {
-        console.warn('PSM 11 error:', err2.message);
-      }
-
-      // Pass 3: PSM 3 (Fully automatic segmentation)
-      try {
-        await worker.setParameters({
-          tessedit_pageseg_mode: '3',
-          preserve_interword_spaces: '1',
-        });
-        const ret3 = await worker.recognize(buf);
-        const t3 = ret3.data?.text || '';
-        combinedRawText += '\n' + t3;
-        const ext3 = await extractDocumentData(combinedRawText);
-        if (ext3.data?.nik || ext3.data?.name) {
-          bestExtracted = ext3;
-          break;
-        }
-      } catch (err3) {
-        console.warn('PSM 3 error:', err3.message);
+      } else {
+        break; // Sudah lengkap dari pass 1 pada buffer pertama
       }
     }
 
-    await worker.terminate();
-    worker = null;
-
-    if (!bestExtracted) {
-      bestExtracted = await extractDocumentData(combinedRawText);
+    // Final extraction dari semua teks yang terkumpul jika masih belum ada
+    if (!bestExtracted || !(bestExtracted.data?.nik)) {
+      const eFinal = await extractDocumentData(combinedRawText);
+      if (!bestExtracted || (eFinal.data?.nik && !bestExtracted.data?.nik)) {
+        bestExtracted = eFinal;
+      }
     }
 
     const d = bestExtracted?.data || {};
     const hasNik = Boolean(d.nik && d.nik.length === 16);
     const hasName = Boolean(d.name && d.name.trim().length > 2);
 
-    // KTP wajib ada NIK dan Nama lengkap untuk bisa dianggap scan berhasil
     if (!hasNik || !hasName) {
       const isPartial = Boolean(hasNik || hasName);
       let errMsg = 'Teks KTP tidak terbaca jelas (terlalu jauh atau buram). Silakan dekatkan KTP ke kamera hingga memenuhi bingkai kotak, atau unggah foto KTP dari HP.';
@@ -499,29 +578,19 @@ export async function scanKtpImage(imageData, rawImageData = null) {
       } else if (!hasNik && hasName) {
         errMsg = 'Nama terbaca (' + d.name + '), tetapi NIK 16-digit belum terbaca jelas. Silakan foto ulang lebih dekat ke arah NIK.';
       }
-
-      return {
-        success: false,
-        incomplete: isPartial,
-        partialData: d,
-        text: combinedRawText,
-        data: d,
-        message: errMsg,
-      };
+      return { success: false, incomplete: isPartial, partialData: d, text: combinedRawText, data: d, message: errMsg };
     }
 
-    return {
-      success: true,
-      text: combinedRawText,
-      data: d,
-      engine: 'Tesseract OCR + Smart NLP (100% Offline)',
-    };
+    return { success: true, text: combinedRawText, data: d, engine: 'Tesseract OCR + Smart NLP (100% Offline)' };
+
   } catch (err) {
-    if (worker) {
+    if (workerWasCreatedLocally && worker) {
       try { await worker.terminate(); } catch {}
     }
-    console.error('Scan KTP Error safely caught:', err);
+    console.error('[KTP] Scan error:', err.message);
     return { success: false, message: 'Gagal memindai gambar KTP: ' + err.message };
+  } finally {
+    _ktpWorkerBusy = false;
   }
 }
 
