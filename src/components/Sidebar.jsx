@@ -5,7 +5,7 @@ import Avatar from './Avatar.jsx';
 import LogoMark from './LogoMark.jsx';
 import { useTranslation } from '../store/useTranslation.js';
 import { useAuth } from '../store/AuthContext.jsx';
-import { useToast } from "../store/hooks.js";
+import { useToast } from '../store/hooks.js';
 
 const mainNav = [
   { to: '/dashboard', icon: 'dashboard', labelKey: 'dashboard' },
@@ -33,32 +33,33 @@ export default function Sidebar({ open, onClose }) {
     navigate('/login');
   };
 
-  const filteredMainNav = mainNav.filter(item => !item.adminOnly || isAdmin);
-  const filteredSecondaryNav = secondaryNav.filter(item => !item.adminOnly || isAdmin);
+  const filteredMainNav = mainNav.filter((item) => !item.adminOnly || isAdmin);
+  const filteredSecondaryNav = secondaryNav.filter((item) => !item.adminOnly || isAdmin);
 
   useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape' && open) onClose();
+    if (!open) return;
+    document.body.classList.add('drawer-open');
+    document.documentElement.style.overflow = 'hidden';
+    const onKey = (e) => {
+      if (e.key === 'Escape') onClose();
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.body.classList.remove('drawer-open');
+      document.documentElement.style.overflow = '';
+      document.removeEventListener('keydown', onKey);
+    };
   }, [open, onClose]);
 
   return (
     <>
-      <div
-        className={`sidebar-backdrop ${open ? 'open' : ''}`}
-        onClick={onClose}
-        aria-hidden="true"
-      />
-      <aside className={`sidebar ${open ? 'open' : ''}`} aria-label={t('nav.main')}>
-        <div className="sidebar-brand">
-          <div className="brand-logo-wrap">
-            <LogoMark size={28} className="brand-logo" />
-            <div className="brand-text">
-              <span className="brand-title">Noffice</span>
-              <span className="brand-sub">Document Management</span>
-            </div>
+      <div className={`drawer-backdrop ${open ? 'show' : ''}`} onClick={onClose} aria-hidden="true" />
+      <aside className={`sidebar ${open ? 'open' : ''}`} aria-label={t('app.name')}>
+        <div className="sidebar-logo">
+          <LogoMark size={38} className="logo-mark" />
+          <div>
+            <div className="logo-text">{t('app.name')}</div>
+            <div className="logo-tag">{t('app.subtitle')}</div>
           </div>
         </div>
 
@@ -71,38 +72,44 @@ export default function Sidebar({ open, onClose }) {
               className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
               onClick={onClose}
             >
-              <span className="nav-icon"><Icon name={item.icon} size={18} /></span>
-              <span className="nav-label">{t(item.labelKey)}</span>
+              <span className="nav-icon"><Icon name={item.icon} size={19} /></span>
+              {t(item.labelKey)}
             </NavLink>
           ))}
 
-          <div className="nav-group-label" style={{ marginTop: '20px' }}>
-            {t('nav.settings')}
-          </div>
-          {filteredSecondaryNav.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-              onClick={onClose}
-            >
-              <span className="nav-icon"><Icon name={item.icon} size={18} /></span>
-              <span className="nav-label">{t(item.labelKey)}</span>
-            </NavLink>
-          ))}
+          {filteredSecondaryNav.length > 0 && (
+            <>
+              <div className="nav-group-label">{t('nav.settings')}</div>
+              {filteredSecondaryNav.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+                  onClick={onClose}
+                >
+                  <span className="nav-icon"><Icon name={item.icon} size={19} /></span>
+                  {t(item.labelKey)}
+                </NavLink>
+              ))}
+            </>
+          )}
         </nav>
 
-        <div className="sidebar-footer">
-          <div className="user-profile-summary">
-            <Avatar name={user?.name || 'User'} size={36} />
-            <div className="user-info">
-              <div className="user-name-text">{user?.name || 'User'}</div>
-              <div className="user-role-text">{user?.role === 'admin' ? 'Administrator' : 'Staf Notaris'}</div>
-            </div>
-            <button className="logout-btn" onClick={handleLogout} title="Logout">
-              <Icon name="logout" size={18} />
-            </button>
+        <div className="sidebar-profile">
+          <Avatar name={user?.name || 'Noffice User'} />
+          <div>
+            <div className="sp-name">{user?.name || t('profile')}</div>
+            <div className="sp-role">{user?.role === 'admin' ? 'Administrator' : 'Staf Notaris'}</div>
           </div>
+          <button
+            className="sp-logout"
+            aria-label="Logout"
+            onClick={handleLogout}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+            title="Logout"
+          >
+            <Icon name="logout" size={18} />
+          </button>
         </div>
       </aside>
     </>
