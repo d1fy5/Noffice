@@ -4,8 +4,21 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import os from 'os';
+import multer from 'multer';
 import { dbGet, dbQuery, dbRun, hashPassword } from './db.js';
 import { checkAiStatus, extractDocumentData, scanKtpImage, scanDocumentImage, generateLegalClause, auditCaseData, generateCopilotResponse, sanitizeReply } from './aiEngine.js';
+import { extractKtpWithVision } from './visionService.js';
+import { ktpRateLimiter } from './rateLimiter.js';
+import { validateAndNormalizeKtp } from './ktpValidator.js';
+
+// Muat variabel lingkungan dari .env jika ada
+if (fs.existsSync('.env')) {
+  try {
+    process.loadEnvFile();
+  } catch (err) {
+    console.warn('[Server] Notice: .env tidak dimuat otomatis via process.loadEnvFile:', err.message);
+  }
+}
 
 process.on('uncaughtException', (err) => {
   console.error('[SERVER CAUGHT UNCAUGHT EXCEPTION]', err);
@@ -24,7 +37,61 @@ if (!fs.existsSync(UPLOADS_DIR)) {
 }
 
 app.use(cors());
-app.use(express.json({ limit: '50mb' }));
+
+// Parser JSON umum dibatasi 5 MB
+const generalJsonParser = express.json({ limit: '5mb' });
+// Parser JSON khusus untuk endpoint scan KTP dinaikkan ke 12 MB (menampung base64 gambar 8 MB)
+const ktpJsonParser = express.json({ limit: '12mb' });
+
+app.use((req, res, next) => {
+  // Lewati parser umum jika menuju ke endpoint ekstraksi KTP
+  if (req.path === '/api/ktp/extract') {
+    return next();
+  }
+  generalJsonParser(req, res, next);
+});
+
+// --- MULTER IN-MEMORY STORAGE UNTUK SCAN KTP (MAKS 8 MB, JPG/PNG/WEBP) ---
+const ktpUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 8 * 1024 * 1024 }, // 8 MB
+  fileFilter: (req, file, cb) => {
+    const allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (allowed.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      const err = new Error('Hanya berkas format JPG, PNG, atau WebP yang diperbolehkan.');
+      err.code = 'INVALID_FILE_TYPE';
+      cb(err, false);
+    }
+  },
+});
+
+function handleKtpUpload(req, res, next) {
+  const contentType = req.headers['content-type'] || '';
+  // Jika pengiriman berupa JSON (misalnya base64 string), lewati multer
+  if (contentType.includes('application/json')) {
+    return next();
+  }
+
+  ktpUpload.single('image')(req, res, (err) => {
+    if (err) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({
+          success: false,
+          message: 'Ukuran berkas melebihi batas maksimal 8 MB.',
+          code: 'FILE_TOO_LARGE',
+        });
+      }
+      return res.status(400).json({
+        success: false,
+        message: err.message || 'Gagal memproses unggahan berkas.',
+        code: err.code || 'UPLOAD_ERROR',
+      });
+    }
+    next();
+  });
+}
 
 // --- HELPER AUTHENTICATION MIDDLEWARE ---
 async function getSessionFromReq(req) {
@@ -591,6 +658,117 @@ app.post('/api/ai/scan-ktp', requireAuth, async (req, res) => {
     res.json(result);
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// --- ROUTE PROXY VISION AI KTP (LANGKAH 1 & 2) ---
+// Menerima multipart/form-data (field: 'image') atau application/json { image: base64, mimeType }
+app.post('/api/ktp/extract', requireAuth, ktpRateLimiter, ktpJsonParser, handleKtpUpload, async (req, res) => {
+  try {
+    let imageBuffer = null;
+    let mimeType = 'image/jpeg';
+
+    if (req.file) {
+      imageBuffer = req.file.buffer;
+      mimeType = req.file.mimetype;
+    } else if (req.body && req.body.image) {
+      const rawImage = req.body.image;
+      if (typeof rawImage !== 'string') {
+        return res.status(400).json({
+          success: false,
+          message: 'Format payload gambar base64 tidak valid.',
+          code: 'INVALID_PAYLOAD',
+        });
+      }
+
+      // Parsing data URL jika dikirim sebagai base64 string lengkap
+      const dataUriMatch = rawImage.match(/^data:([^;,]+)(?:;charset=[^;,]+)?(?:;base64)?,(.*)$/);
+      let base64Data = rawImage;
+      if (dataUriMatch) {
+        mimeType = dataUriMatch[1];
+        base64Data = dataUriMatch[2];
+      } else if (req.body.mimeType) {
+        mimeType = req.body.mimeType;
+      }
+
+      // Validasi MIME type
+      const allowedMimes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+      if (!allowedMimes.includes(mimeType)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Hanya format gambar JPG, PNG, atau WebP yang diperbolehkan.',
+          code: 'INVALID_FILE_TYPE',
+        });
+      }
+
+      imageBuffer = Buffer.from(base64Data, 'base64');
+      if (imageBuffer.length > 8 * 1024 * 1024) {
+        return res.status(400).json({
+          success: false,
+          message: 'Ukuran berkas melebihi batas maksimal 8 MB.',
+          code: 'FILE_TOO_LARGE',
+        });
+      }
+    }
+
+    if (!imageBuffer || imageBuffer.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Tidak ada berkas gambar KTP yang dikirimkan. Gunakan multipart (field: image) atau JSON { image: base64 }.',
+        code: 'IMAGE_MISSING',
+      });
+    }
+
+    // Ekstraksi Vision AI Percobaan Pertama
+    let result = await extractKtpWithVision({ imageBuffer, mimeType });
+    if (!result.success) {
+      const statusCode = result.code === 'TIMEOUT' ? 504 : result.code === 'API_KEY_MISSING' ? 503 : 500;
+      return res.status(statusCode).json(result);
+    }
+
+    // Validasi dan normalisasi data dari Vision AI (Langkah 2)
+    let validated = validateAndNormalizeKtp(result.rawVisionData);
+
+    // Mode Verifikasi NIK (env KTP_VERIFY_NIK=true): jika NIK gagal validasi, panggil API sekali lagi (max 1 retry)
+    const verifyNikEnabled = process.env.KTP_VERIFY_NIK === 'true' || process.env.KTP_VERIFY_NIK === '1';
+    let retried = false;
+
+    if (verifyNikEnabled && validated.fieldStatus.nik === 'invalid') {
+      console.log('[VisionAI] NIK invalid pada ekstraksi pertama, menjalankan retry verifikasi (maks 1 kali)...');
+      const retryResult = await extractKtpWithVision({ imageBuffer, mimeType });
+      if (retryResult.success) {
+        retried = true;
+        const retryValidated = validateAndNormalizeKtp(retryResult.rawVisionData);
+        if (retryValidated.fieldStatus.nik === 'ok') {
+          console.log('[VisionAI] Retry verifikasi BERHASIL: NIK lolos validasi pada percobaan kedua.');
+          validated = retryValidated;
+          result = retryResult;
+        } else {
+          console.log('[VisionAI] Retry verifikasi SELESAI: NIK tetap invalid.');
+        }
+      }
+    }
+
+    res.json({
+      success: true,
+      data: validated.data,
+      fieldStatus: validated.fieldStatus,
+      imageQuality: validated.imageQuality,
+      message: validated.message,
+      provider: result.provider,
+      model: result.model,
+      durationMs: result.durationMs,
+      apiDurationMs: result.apiDurationMs,
+      resizeDurationMs: result.resizeDurationMs,
+      retried,
+    });
+  } catch (error) {
+    console.error('[KTP Extract API Error]', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Terjadi kesalahan internal server saat memproses KTP: ' + error.message,
+      code: 'SERVER_ERROR',
+    });
   }
 });
 
