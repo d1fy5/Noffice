@@ -1,10 +1,20 @@
-node_modules
-dist
-dist-ssr
+node_modules/
+dist/
+dist-ssr/
 *.local
+.env
+.env.*
+!.env.example
 .DS_Store
 npm-debug.log*
 .dev.log
 scratch/
+
+# Database lokal
+*.sqlite
 *.sqlite-shm
 *.sqlite-wal
+
+# Dokumen runtime Noffice
+server/uploads/*
+!server/uploads/.gitkeep
